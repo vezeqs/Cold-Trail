@@ -133,9 +133,7 @@ def source_verify(
     live: Annotated[
         bool, typer.Option("--live", help="Probe live and validate contracts (needs network)")
     ] = False,
-    directory: Annotated[
-        Path | None, typer.Option("--dir", help="Fixture directory")
-    ] = None,
+    directory: Annotated[Path | None, typer.Option("--dir", help="Fixture directory")] = None,
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Verify source contracts offline (replay fixtures), or record/live-verify them."""
@@ -164,9 +162,7 @@ def source_verify(
         return
 
     if live:
-        results = {
-            item: asyncio.run(verify_live(item, settings)) for item in names
-        }
+        results = {item: asyncio.run(verify_live(item, settings)) for item in names}
     else:
         results = asyncio.run(verify_all(settings, directory, names))
 
@@ -314,9 +310,7 @@ def archive(
         async with Fetcher(settings) as fetcher:
             rows = await cdx(fetcher, url, limit)
             text = await snapshot(fetcher, snapshot_ts, url) if snapshot_ts else None
-            history = (
-                await recover_profile_snapshots(fetcher, url, limit=5) if recover else None
-            )
+            history = await recover_profile_snapshots(fetcher, url, limit=5) if recover else None
             return rows, text, history
 
     try:
@@ -368,9 +362,13 @@ def ct_search(
 
     async def collect():
         async with Fetcher(settings) as fetcher:
-            return await crtsh_identities(fetcher, query, limit=limit)
+            return await crtsh_identities(fetcher, query, limit=limit, strict=True)
 
-    rows = asyncio.run(collect())
+    try:
+        rows = asyncio.run(collect())
+    except FetchError as exc:
+        typer.echo(f"certificate transparency unavailable: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
     if json_out:
         _print_json(rows)
         return

@@ -34,6 +34,29 @@ def toml_value(value: object) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
+SEARCH_LIKE = (
+    "/search",
+    "query=",
+    "?q=",
+    "&q=",
+    "?s=",
+    "&s=",
+    "usernameexists",
+    "check_nickname",
+    "register/validate",
+    "validate/username",
+    "members?username",
+    "search-by-username",
+    "?username=",
+    "&username=",
+)
+
+
+def _search_like(url: str) -> bool:
+    low = url.casefold()
+    return any(marker in low for marker in SEARCH_LIKE)
+
+
 def _fetch(ref: str) -> bytes:
     url = DATA_URL.format(ref=ref)
     with urllib.request.urlopen(url, timeout=30) as response:
@@ -73,6 +96,8 @@ def main() -> None:
         if "{}" not in url and "{username}" not in url:
             continue
         url = url.replace("{}", "{username}")
+        if _search_like(url):
+            continue
         probe = entry.get("urlProbe") or ""
         if probe:
             probe = probe.replace("{}", "{username}")

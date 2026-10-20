@@ -238,19 +238,25 @@ async def test_bluesky_found(settings):
 
 @respx.mock
 async def test_bluesky_posts(settings):
-    respx.get("https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile").mock(
-        return_value=httpx.Response(200, json={"did": "did:plc:abc", "handle": "alice.bsky.social"})
-    )
-    respx.get("https://public.api.bsky.app/xrpc/com.atproto.repo.listRecords").mock(
+    respx.get("https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed").mock(
         return_value=httpx.Response(
             200,
             json={
-                "records": [
+                "feed": [
                     {
-                        "uri": "at://did:plc:abc/app.bsky.feed.post/3kabc",
-                        "value": {"text": "hello", "createdAt": "2024-01-01T00:00:00Z"},
+                        "post": {
+                            "uri": "at://did:plc:abc/app.bsky.feed.post/3kabc",
+                            "author": {"handle": "alice.bsky.social"},
+                            "record": {
+                                "text": "hello",
+                                "createdAt": "2024-01-01T00:00:00Z",
+                            },
+                            "likeCount": 3,
+                            "repostCount": 1,
+                            "replyCount": 0,
+                        }
                     }
-                ]
+                ],
             },
         )
     )
@@ -258,6 +264,46 @@ async def test_bluesky_posts(settings):
         posts = await SOURCES["bluesky"].posts(fetcher, "alice.bsky.social", 5)
     assert len(posts) == 1
     assert posts[0].url == "https://bsky.app/profile/alice.bsky.social/post/3kabc"
+    assert posts[0].text == "hello"
+    assert posts[0].metrics["likes"] == 3
+
+
+@respx.mock
+async def test_bluesky_posts_respects_since_and_limit(settings):
+    def feed(rkeys: list[tuple[str, str]]) -> dict:
+        return {
+            "feed": [
+                {
+                    "post": {
+                        "uri": f"at://did:plc:abc/app.bsky.feed.post/{rkey}",
+                        "author": {"handle": "alice.bsky.social"},
+                        "record": {"text": rkey, "createdAt": created},
+                    }
+                }
+                for rkey, created in rkeys
+            ]
+        }
+
+    respx.get(
+        "https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed",
+        params={"actor": "alice.bsky.social", "limit": 10},
+    ).mock(
+        return_value=httpx.Response(
+            200,
+            json=feed(
+                [
+                    ("new1", "2024-06-01T00:00:00Z"),
+                    ("old1", "2023-01-01T00:00:00Z"),
+                    ("new2", "2024-07-01T00:00:00Z"),
+                ]
+            ),
+        )
+    )
+    async with Fetcher(settings) as fetcher:
+        posts = await SOURCES["bluesky"].posts(
+            fetcher, "alice.bsky.social", 10, since="2024-01-01T00:00:00Z"
+        )
+    assert [post.post_id for post in posts] == ["new1"]
 
 
 @respx.mock

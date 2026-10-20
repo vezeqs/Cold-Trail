@@ -81,57 +81,58 @@ class Bluesky(Source):
     async def posts(
         self, fetcher: Fetcher, target: str, limit: int, *, since: str | None = None
     ) -> list[Post]:
-        status, data = await fetcher.get_json(
-            f"{PUBLIC_API}/app.bsky.actor.getProfile", params={"actor": target}
-        )
-        if status != 200 or not isinstance(data, dict) or not data.get("did"):
-            return []
-        did = data["did"]
-        handle = data.get("handle") or target
         posts: list[Post] = []
         cursor: str | None = None
         while len(posts) < limit:
             params: dict[str, object] = {
-                "repo": did,
-                "collection": "app.bsky.feed.post",
+                "actor": target,
                 "limit": min(100, limit - len(posts)),
             }
             if cursor:
                 params["cursor"] = cursor
-            status, records = await fetcher.get_json(
-                f"{PUBLIC_API}/com.atproto.repo.listRecords", params=params
+            status, payload = await fetcher.get_json(
+                f"{PUBLIC_API}/app.bsky.feed.getAuthorFeed", params=params
             )
-            if status != 200 or not isinstance(records, dict):
+            if status != 200 or not isinstance(payload, dict):
                 break
-            batch = records.get("records") or []
-            if not batch:
+            feed = payload.get("feed") or []
+            if not feed:
                 break
             stop = False
-            for record in batch:
-                uri = record.get("uri") or ""
-                value = record.get("value") or {}
+            for item in feed:
+                post = item.get("post") or {}
+                uri = post.get("uri") or ""
+                record = post.get("record") or {}
                 rkey = uri.rsplit("/", 1)[-1] if uri else ""
-                created = value.get("createdAt")
+                created = record.get("createdAt")
                 if not rkey:
                     continue
                 if not is_after(created, since):
                     stop = True
                     break
+                author = (post.get("author") or {}).get("handle") or target
                 posts.append(
                     Post(
                         source=self.name,
-                        username=handle,
+                        username=author,
                         post_id=rkey,
-                        url=f"https://bsky.app/profile/{quote(handle)}/post/{rkey}",
+                        url=f"https://bsky.app/profile/{quote(author)}/post/{rkey}",
                         created_at=created,
-                        text=value.get("text"),
-                        metrics={"langs": value.get("langs")},
+                        text=record.get("text"),
+                        metrics={
+                            "likes": post.get("likeCount"),
+                            "reposts": post.get("repostCount"),
+                            "replies": post.get("replyCount"),
+                            "repost": bool(item.get("reason")),
+                        },
                     )
                 )
-            if stop:
+                if len(posts) >= limit:
+                    break
+            if stop or len(posts) >= limit:
                 break
-            cursor = records.get("cursor")
-            if not cursor or len(batch) < params["limit"]:
+            cursor = payload.get("cursor")
+            if not cursor:
                 break
         return posts[:limit]
 

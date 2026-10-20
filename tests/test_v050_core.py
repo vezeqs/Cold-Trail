@@ -61,15 +61,11 @@ def test_history_records_none_to_value_and_value_to_none(settings):
         second = store.start_run("pivot", "alice")
         store.save_profiles(second, [profile(bio="new bio")])
         changes = store.record_profile_history(second, [profile(bio="new bio")])
-        assert [(c.field, c.old_value, c.new_value) for c in changes] == [
-            ("bio", None, "new bio")
-        ]
+        assert [(c.field, c.old_value, c.new_value) for c in changes] == [("bio", None, "new bio")]
         third = store.start_run("pivot", "alice")
         store.save_profiles(third, [profile(bio=None)])
         changes = store.record_profile_history(third, [profile(bio=None)])
-        assert [(c.field, c.old_value, c.new_value) for c in changes] == [
-            ("bio", "new bio", None)
-        ]
+        assert [(c.field, c.old_value, c.new_value) for c in changes] == [("bio", "new bio", None)]
 
 
 # -- watch: shared fetcher + alert dedupe ------------------------------------
@@ -80,8 +76,9 @@ async def test_watch_shares_one_fetcher_per_cycle_and_dedupes(settings, monkeypa
     fetchers: list[Fetcher] = []
     report_profile = profile()
 
-    async def fake_pivot(target, *, settings, sources=None, expand=False, store=None,
-                         fetcher=None, **kwargs):
+    async def fake_pivot(
+        target, *, settings, sources=None, expand=False, store=None, fetcher=None, **kwargs
+    ):
         fetchers.append(fetcher)
         return PivotReport(
             target=target,
@@ -93,8 +90,9 @@ async def test_watch_shares_one_fetcher_per_cycle_and_dedupes(settings, monkeypa
             coverage={"found": 1},
         )
 
-    async def fake_harvest(source_name, username, *, settings, limit, store=None,
-                           run_id=None, fetcher=None, **kwargs):
+    async def fake_harvest(
+        source_name, username, *, settings, limit, store=None, run_id=None, fetcher=None, **kwargs
+    ):
         fetchers.append(fetcher)
         return CheckResult(source_name, username, "found", profile=report_profile), []
 
@@ -184,9 +182,7 @@ def test_recluster_save_persists_links_and_clusters(tmp_path):
             ],
         )
         store.finish_run(run_id)
-    result = runner.invoke(
-        app, ["--db", str(db), "recluster", "--run", str(run_id), "--json"]
-    )
+    result = runner.invoke(app, ["--db", str(db), "recluster", "--run", str(run_id), "--json"])
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["saved"] is True
@@ -228,6 +224,37 @@ def test_diff_runs_reports_changes(tmp_path):
     assert payload["profiles"]["changed"][0]["fields"]["bio"] == ["old bio", "new bio"]
     assert payload["posts"]["added"] == [{"source": "github", "post_id": "p2"}]
     assert payload["posts"]["removed"] == [{"source": "github", "post_id": "p1"}]
+
+
+def test_diff_runs_serializes_links(tmp_path):
+    from larpharvester.models import Link
+
+    db = tmp_path / "t.db"
+    with Store(db) as store:
+        first = store.start_run("pivot", "alice")
+        a = profile()
+        b = profile(source="gitlab", url="https://gitlab.com/alice")
+        store.save_profiles(first, [a, b])
+        store.save_links(first, [Link(a, b, 0.9, ["same avatar"])])
+        store.finish_run(first)
+
+        second = store.start_run("pivot", "alice")
+        store.save_profiles(second, [a, b])
+        store.finish_run(second)
+
+        payload = diff_runs(store, first, second)
+
+    assert payload["links"]["removed"] == [
+        {
+            "source_a": "github",
+            "username_a": "alice",
+            "source_b": "gitlab",
+            "username_b": "alice",
+            "score": 0.9,
+            "reasons": ["same avatar"],
+        }
+    ]
+    assert payload["links"]["added"] == []
 
 
 def test_cli_diff_json(tmp_path):

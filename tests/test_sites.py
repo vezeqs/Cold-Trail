@@ -86,7 +86,7 @@ async def test_message_check(settings):
     )
     respx.get("https://t.example/alice").mock(
         return_value=httpx.Response(
-            200, text="<h1>Alice</h1>", headers={"content-type": "text/html"}
+            200, text="<title>Alice</title><h1>Alice</h1>", headers={"content-type": "text/html"}
         )
     )
     source = DeclarativeSource(site)
@@ -98,7 +98,9 @@ async def test_message_check(settings):
 @respx.mock
 async def test_response_url_check(settings):
     site = make_site(error_type="response_url", error_url="https://t.example/error")
-    respx.get("https://t.example/alice").mock(return_value=httpx.Response(200, text="ok"))
+    respx.get("https://t.example/alice").mock(
+        return_value=httpx.Response(200, text="<title>alice profile</title>")
+    )
     source = DeclarativeSource(site)
     async with Fetcher(settings) as fetcher:
         assert (await source.check(fetcher, "alice")).status == "found"
@@ -118,13 +120,50 @@ async def test_regex_rejection_skips_network(settings):
 async def test_url_probe_is_used_for_request(settings):
     site = make_site(url_probe="https://t.example/api/{username}")
     respx.get("https://t.example/api/alice").mock(
-        return_value=httpx.Response(200, text="ok", headers={"content-type": "text/html"})
+        return_value=httpx.Response(200, text="<title>alice profile</title>")
     )
     source = DeclarativeSource(site)
     async with Fetcher(settings) as fetcher:
         result = await source.check(fetcher, "alice")
     assert result.status == "found"
     assert result.profile.url == "https://t.example/alice"
+
+
+@respx.mock
+async def test_challenge_and_generic_pages_are_not_profiles(settings):
+    from larpharvester.http import BlockedError
+
+    site = make_site(name="APClips", url="https://apclips.com/{username}")
+    source = DeclarativeSource(site)
+    for body in (
+        "<title>Security Verification</title>",
+        "<title>Client Challenge</title>",
+    ):
+        respx.get("https://apclips.com/simonw").mock(
+            return_value=httpx.Response(200, text=body, headers={"content-type": "text/html"})
+        )
+        async with Fetcher(settings) as fetcher:
+            with pytest.raises(BlockedError):
+                await source.check(fetcher, "simonw")
+    for body in (
+        "<title>APClips.com</title>",
+        "<title>APClips - Home</title>",
+        "<html><body>no metadata</body></html>",
+    ):
+        respx.get("https://apclips.com/simonw").mock(
+            return_value=httpx.Response(200, text=body, headers={"content-type": "text/html"})
+        )
+        async with Fetcher(settings) as fetcher:
+            result = await source.check(fetcher, "simonw")
+        assert result.status == "not_found", body
+
+    respx.get("https://apclips.com/simonw").mock(
+        return_value=httpx.Response(
+            200, text="<title>SimonW on APClips</title>", headers={"content-type": "text/html"}
+        )
+    )
+    async with Fetcher(settings) as fetcher:
+        assert (await source.check(fetcher, "simonw")).status == "found"
 
 
 def test_declarative_source_name_and_group():

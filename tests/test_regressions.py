@@ -123,7 +123,8 @@ def test_discovered_usernames_limit():
         )
     ]
     assert len(discovered_usernames(results, limit=3)) == 3
-    assert len(discovered_usernames(results, limit=0)) == 11  # 0 = unlimited
+    # The email-source username ("root") is not trusted; only the 10 accounts expand.
+    assert len(discovered_usernames(results, limit=0)) == 10
 
 
 # -- HTTP cache robustness -----------------------------------------------------

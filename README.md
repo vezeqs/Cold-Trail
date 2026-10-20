@@ -11,7 +11,7 @@ Three interfaces over one database:
 - **Web UI** — local FastAPI app with a JSON API, live SSE pivot streaming, an interactive
   identity graph, an OSINT workbench, run diffing, case dossiers, optional auth, and export downloads
 
-495 sources out of the box: 42 hand-written API sources plus 453 declarative definitions generated
+480 sources out of the box: 42 hand-written API sources plus 438 declarative definitions generated
 from the [Sherlock](https://github.com/sherlock-project/sherlock) dataset (MIT). No API keys needed
 for most of it; optional keys unlock GitHub rate limits, HIBP, and EmailRep.
 
@@ -19,6 +19,14 @@ v0.5.0 adds cryptographic identity collection (SSH/GPG keys, Gists, Bluesky DID 
 NIP-05, ENS), avatar EXIF/GPS metadata, live TLS certificate inspection, BGP/ASN enrichment,
 certificate-transparency search, Wayback profile recovery, run-to-run diffing, source contract
 testing with recorded fixtures, and Docker/systemd deployment.
+
+v0.5.1 is a live-investigation hardening release: Twitch now requires real profile metadata,
+Bluesky harvests use the supported author-feed API, expansion only follows structured evidence
+(no more pivoting on email local-parts or bio emails), same-platform accounts never correlate,
+declarative web pages with challenge/landing/not-found titles are rejected, `web.*` page
+templates are excluded from correlation and entity extraction, the corpus drops search/
+availability endpoints, `diff` handles links, and `ct` reports upstream outages instead of
+showing an empty table.
 
 ## Install
 
@@ -129,7 +137,7 @@ uv run larpharvester archive https://example.com/ --snapshot 20200101000000
 | `social` | reddit, hackernews, mastodon, bluesky, telegram, youtube, twitch, steam, chesscom, lichess, roblox, duolingo, tiktok, medium, substack, linktree, matrix, nostr, ens |
 | `dev` | github, gitlab, codeberg, stackoverflow, kaggle, huggingface, npm, pypi, devto, hackerone, crates, dockerhub, rubygems, packagist |
 | `email` | gravatar, keybase, pgp, github-commits, hibp, emailrep, hudsonrock, leakcheck, libravatar |
-| `web` | 453 declarative sites (Sherlock corpus), selectable with `--web` or `-g web` |
+| `web` | 438 declarative sites (Sherlock corpus), selectable with `--web` or `-g web` |
 
 ```bash
 uv run larpharvester sources                 # curated only
@@ -317,7 +325,7 @@ limited per client (20 requests/minute).
 ## Development
 
 ```bash
-uv run pytest                # 348 tests, no network required
+uv run pytest                # 373 tests, no network required
 uv run ruff check .
 uv run ruff format --check .
 ```
@@ -327,11 +335,11 @@ uv run ruff format --check .
 **Docker / Compose**
 
 ```bash
-docker build -t larpharvester:0.5.0 .
+docker build -t larpharvester:0.5.1 .
 docker run --rm -p 127.0.0.1:8765:8765 \
   -v larpharvester-data:/data \
   -e LARPHARVESTER_WEB_TOKEN=change-me \
-  larpharvester:0.5.0
+  larpharvester:0.5.1
 
 # Compose with an optional Tor sidecar:
 LARPHARVESTER_WEB_TOKEN=change-me docker compose up -d

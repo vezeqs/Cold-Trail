@@ -340,13 +340,23 @@ async def bgp_prefixes(fetcher: Fetcher, resource: str) -> dict[str, Any] | None
     return {"asn": asn, "holder": holder, "announced": dedupe(prefixes)}
 
 
-async def crtsh_identities(fetcher: Fetcher, query: str, limit: int = 100) -> list[dict[str, Any]]:
-    """Search certificate transparency for certificates matching an identity query."""
+async def crtsh_identities(
+    fetcher: Fetcher, query: str, limit: int = 100, *, strict: bool = False
+) -> list[dict[str, Any]]:
+    """Search certificate transparency for certificates matching an identity query.
+
+    With ``strict=True`` a non-200 response raises FetchError instead of looking
+    like "no results" (crt.sh frequently returns 502/503 under load).
+    """
     try:
         status, data = await fetcher.get_json(CRTSH, params={"q": query, "output": "json"})
     except FetchError:
+        if strict:
+            raise
         return []
     if status != 200 or not isinstance(data, list):
+        if strict:
+            raise FetchError(f"crt.sh returned HTTP {status}")
         return []
     out: dict[tuple[str, str], dict[str, Any]] = {}
     for entry in data:

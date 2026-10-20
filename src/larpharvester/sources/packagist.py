@@ -31,7 +31,7 @@ class Packagist(Source):
                     username=vendor,
                     url=f"https://packagist.org/users/{quote(target)}/",
                     display_name=target,
-                    bio=f"{len(names)} PHP package(s): {', '.join(names[:5])}",
+                    bio=None,
                     extra={"packages": names[:50], "package_count": len(names)},
                 ),
             )

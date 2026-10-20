@@ -27,8 +27,8 @@ class UserSource(Source):
 
     async def check(self, fetcher, target):
         self.seen.append(target)
-        # Every username profile advertises an email; every email profile
-        # advertises a new username — this is the hop chain.
+        # Structured links only: email profiles advertise an account, username
+        # profiles advertise an email field.
         if "@" in target:
             handle = target.split("@", 1)[0] + "-alt"
             return self.ok(
@@ -48,6 +48,7 @@ class UserSource(Source):
                 username=target,
                 url=f"https://user.example/{target}",
                 bio=f"contact {target}@example.com",
+                extra={"email": f"{target}@example.com"},
             ),
         )
 

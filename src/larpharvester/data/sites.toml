@@ -255,13 +255,6 @@ main = "https://bsky.app/"
 error_type = "status_code"
 url_probe = "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={username}.bsky.social"
 
-[sites."BoardGameGeek"]
-url = "https://api.geekdo.com/api/accounts/validate/username?username={username}"
-main = "https://boardgamegeek.com/"
-error_type = "message"
-error_msg = ["\"isValid\":true"]
-url_probe = "https://api.geekdo.com/api/accounts/validate/username?username={username}"
-
 [sites."BongaCams"]
 url = "https://pt.bongacams.com/profile/{username}"
 main = "https://pt.bongacams.com"
@@ -380,14 +373,6 @@ url = "https://chaturbate.com/{username}"
 main = "https://chaturbate.com"
 error_type = "status_code"
 nsfw = true
-
-[sites."Chess"]
-url = "https://www.chess.com/callback/user/valid?username={username}"
-main = "https://www.chess.com/"
-error_type = "message"
-error_msg = ["Username is valid"]
-regex = "^[a-zA-Z0-9_]{3,25}$"
-url_probe = "https://www.chess.com/callback/user/valid?username={username}"
 
 [sites."Choice Community"]
 url = "https://choice.community/u/{username}/summary"
@@ -597,13 +582,6 @@ url = "https://d3.ru/user/{username}/posts"
 main = "https://d3.ru/"
 error_type = "status_code"
 
-[sites."dailykos"]
-url = "https://www.dailykos.com/signup/check_nickname?nickname={username}"
-main = "https://www.dailykos.com"
-error_type = "message"
-error_msg = ["{\"result\":true,\"message\":null}"]
-url_probe = "https://www.dailykos.com/signup/check_nickname?nickname={username}"
-
 [sites."DailyMotion"]
 url = "https://www.dailymotion.com/{username}"
 main = "https://www.dailymotion.com/"
@@ -668,14 +646,6 @@ url = "https://discuss.elastic.co/u/{username}"
 main = "https://discuss.elastic.co/"
 error_type = "status_code"
 
-[sites."Diskusjon.no"]
-url = "https://www.diskusjon.no/?app=core&module=system&controller=ajax&do=usernameExists&input={username}"
-main = "https://www.diskusjon.no"
-error_type = "message"
-error_msg = ["{\"result\":\"ok\"}"]
-regex = "^[a-zA-Z0-9_.-]{3,40}$"
-url_probe = "https://www.diskusjon.no/?app=core&module=system&controller=ajax&do=usernameExists&input={username}"
-
 [sites."Disqus"]
 url = "https://disqus.com/{username}"
 main = "https://disqus.com/"
@@ -704,13 +674,6 @@ regex = "^[a-zA-Z][a-zA-Z0-9_-]*$"
 url = "https://www.drive2.ru/users/{username}"
 main = "https://www.drive2.ru/"
 error_type = "status_code"
-
-[sites."Duolingo"]
-url = "https://www.duolingo.com/2017-06-30/users?username={username}"
-main = "https://duolingo.com/"
-error_type = "message"
-error_msg = ["{\"users\":[]}"]
-url_probe = "https://www.duolingo.com/2017-06-30/users?username={username}"
 
 [sites."eGPU"]
 url = "https://egpu.io/forums/profile/{username}/"
@@ -850,12 +813,6 @@ main = "https://framapiaf.org"
 error_type = "status_code"
 regex = "^[a-zA-Z0-9_]{1,30}$"
 
-[sites."freecodecamp"]
-url = "https://api.freecodecamp.org/api/users/get-public-profile?username={username}"
-main = "https://www.freecodecamp.org/"
-error_type = "status_code"
-url_probe = "https://api.freecodecamp.org/api/users/get-public-profile?username={username}"
-
 [sites."Freelancer"]
 url = "https://www.freelancer.com/api/users/0.1/users?usernames%5B%5D={username}&compact=true"
 main = "https://www.freelancer.com/"
@@ -955,13 +912,6 @@ url = "https://www.github.com/{username}"
 main = "https://www.github.com/"
 error_type = "status_code"
 regex = "^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$"
-
-[sites."GitLab"]
-url = "https://gitlab.com/api/v4/users?username={username}"
-main = "https://gitlab.com/"
-error_type = "message"
-error_msg = ["[]"]
-url_probe = "https://gitlab.com/api/v4/users?username={username}"
 
 [sites."GNOME VCS"]
 url = "https://gitlab.gnome.org/{username}"
@@ -1116,22 +1066,10 @@ main = "https://hubski.com/"
 error_type = "message"
 error_msg = ["No such user"]
 
-[sites."HudsonRock"]
-url = "https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-username?username={username}"
-main = "https://hudsonrock.com"
-error_type = "message"
-error_msg = ["This username is not associated"]
-
 [sites."Hugging Face"]
 url = "https://huggingface.co/{username}"
 main = "https://huggingface.co/"
 error_type = "status_code"
-
-[sites."hunting"]
-url = "https://www.hunting.ru/forum/members/?username={username}"
-main = "https://www.hunting.ru/forum/"
-error_type = "message"
-error_msg = ["Указанный пользователь не найден. Пожалуйста, введите другое имя."]
 
 [sites."Icons8 Community"]
 url = "https://community.icons8.com/u/{username}/summary"
@@ -1148,12 +1086,6 @@ regex = "^[A-Za-z0-9]{3,35}$"
 url = "https://ifunny.co/user/{username}"
 main = "https://ifunny.co/"
 error_type = "status_code"
-
-[sites."igromania"]
-url = "http://forum.igromania.ru/member.php?username={username}"
-main = "http://forum.igromania.ru/"
-error_type = "message"
-error_msg = ["Пользователь не зарегистрирован и не имеет профиля для просмотра."]
 
 [sites."Image Fap"]
 url = "https://www.imagefap.com/profile/{username}"
@@ -1280,12 +1212,6 @@ url = "https://www.kaggle.com/{username}"
 main = "https://www.kaggle.com/"
 error_type = "status_code"
 
-[sites."kaskus"]
-url = "https://www.kaskus.co.id/api/users?username={username}"
-main = "https://www.kaskus.co.id"
-error_type = "status_code"
-url_probe = "https://www.kaskus.co.id/api/users?username={username}"
-
 [sites."Keybase"]
 url = "https://keybase.io/{username}"
 main = "https://keybase.io/"
@@ -1316,14 +1242,6 @@ main = "https://www.kongregate.com/"
 error_type = "status_code"
 regex = "^[a-zA-Z][a-zA-Z0-9_-]*$"
 headers = { "Accept" = "text/html" }
-
-[sites."Kvinneguiden"]
-url = "https://forum.kvinneguiden.no/?app=core&module=system&controller=ajax&do=usernameExists&input={username}"
-main = "https://forum.kvinneguiden.no"
-error_type = "message"
-error_msg = ["{\"result\":\"ok\"}"]
-regex = "^[a-zA-Z0-9_.-]{3,18}$"
-url_probe = "https://forum.kvinneguiden.no/?app=core&module=system&controller=ajax&do=usernameExists&input={username}"
 
 [sites."kwork"]
 url = "https://kwork.ru/user/{username}"
@@ -1482,13 +1400,6 @@ error_type = "status_code"
 url = "https://www.mercadolivre.com.br/perfil/{username}"
 main = "https://www.mercadolivre.com.br"
 error_type = "status_code"
-
-[sites."minds"]
-url = "https://www.minds.com/api/v3/register/validate?username={username}"
-main = "https://www.minds.com"
-error_type = "message"
-error_msg = ["\"valid\":true"]
-url_probe = "https://www.minds.com/api/v3/register/validate?username={username}"
 
 [sites."Minecraft"]
 url = "https://api.mojang.com/users/profiles/minecraft/{username}"
@@ -1734,12 +1645,6 @@ url = "https://osu.ppy.sh/users/{username}"
 main = "https://osu.ppy.sh/"
 error_type = "status_code"
 
-[sites."OurDJTalk"]
-url = "https://ourdjtalk.com/members?username={username}"
-main = "https://ourdjtalk.com/"
-error_type = "message"
-error_msg = ["The specified member cannot be found"]
-
 [sites."Outgress"]
 url = "https://outgress.com/agents/{username}"
 main = "https://outgress.com/"
@@ -1768,12 +1673,6 @@ error_msg = ["The member you specified is either invalid or doesn't exist."]
 url = "https://www.patreon.com/{username}"
 main = "https://www.patreon.com/"
 error_type = "status_code"
-
-[sites."PCGamer"]
-url = "https://forums.pcgamer.com/members/?username={username}"
-main = "https://pcgamer.com"
-error_type = "message"
-error_msg = ["The specified member cannot be found. Please enter a member's entire name."]
 
 [sites."PentesterLab"]
 url = "https://pentesterlab.com/profile/{username}"
@@ -1805,12 +1704,6 @@ error_type = "status_code"
 url = "https://www.periscope.tv/{username}/"
 main = "https://www.periscope.tv/"
 error_type = "status_code"
-
-[sites."phpRU"]
-url = "https://php.ru/forum/members/?username={username}"
-main = "https://php.ru/forum/"
-error_type = "message"
-error_msg = ["Указанный пользователь не найден. Пожалуйста, введите другое имя."]
 
 [sites."pikabu"]
 url = "https://pikabu.ru/@{username}"
@@ -2026,11 +1919,6 @@ url = "https://www.reverbnation.com/{username}"
 main = "https://www.reverbnation.com/"
 error_type = "message"
 error_msg = ["Sorry, we couldn't find that page"]
-
-[sites."Roblox"]
-url = "https://www.roblox.com/user.aspx?username={username}"
-main = "https://www.roblox.com/"
-error_type = "status_code"
 
 [sites."RocketTube"]
 url = "https://www.rockettube.com/{username}"
@@ -2507,12 +2395,6 @@ url = "https://velog.io/@{username}/posts"
 main = "https://velog.io/"
 error_type = "status_code"
 
-[sites."Velomania"]
-url = "https://forum.velomania.ru/member.php?username={username}"
-main = "https://forum.velomania.ru/"
-error_type = "message"
-error_msg = ["Пользователь не зарегистрирован и не имеет профиля для просмотра."]
-
 [sites."Venmo"]
 url = "https://test1.venmo.com/u/{username}"
 main = "https://venmo.com/"
@@ -2667,11 +2549,6 @@ error_type = "status_code"
 [sites."Wykop"]
 url = "https://www.wykop.pl/ludzie/{username}"
 main = "https://www.wykop.pl"
-error_type = "status_code"
-
-[sites."Xbox Gamertag"]
-url = "https://xboxgamertag.com/search/{username}"
-main = "https://xboxgamertag.com/"
 error_type = "status_code"
 
 [sites."xHamster"]

@@ -638,9 +638,7 @@ def test_auth_accepts_bearer_and_api_key(auth_client):
 
 
 def test_login_cookie_flow(auth_client):
-    response = auth_client.post(
-        "/login", data={"token": "sekret"}, follow_redirects=False
-    )
+    response = auth_client.post("/login", data={"token": "sekret"}, follow_redirects=False)
     assert response.status_code == 303
     assert auth_client.get("/").status_code == 200
     bad = auth_client.post("/login", data={"token": "nope"}, follow_redirects=False)

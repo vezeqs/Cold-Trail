@@ -238,6 +238,9 @@ async def _enrich(results: list[CheckResult], fetcher: Fetcher, avatar_hash: boo
 
 
 def profile_entities(profile: Profile) -> list:
+    # Declarative web.* profiles expose page templates, not user-authored text.
+    if profile.source.startswith("web."):
+        return []
     ents = extract_entities(profile.bio, profile.source, profile.username)
     for field in profile.extra.get("fields") or []:
         if isinstance(field, dict):
@@ -294,13 +297,21 @@ _HANDLE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$")
 
 
 def discovered_usernames(results: list[CheckResult], limit: int | None = MAX_EXPAND) -> list[str]:
-    """Pull usernames linked from email sources (Gravatar accounts, Keybase proofs, EmailRep)."""
+    """Pull usernames linked from email sources (Gravatar accounts, Keybase proofs, EmailRep).
+
+    Only *structured* link evidence is used. A profile's own username is trusted
+    only when it comes from a username-kind source: email sources often derive
+    the username from the address local part (e.g. ``simon@…`` -> ``simon``),
+    which is not an account on other platforms and would pivot into strangers.
+    """
     found: list[str] = []
     for result in results:
         profile: Profile | None = result.profile
         if profile is None:
             continue
-        _add(found, profile.username)
+        source = SOURCES.get(profile.source)
+        if source is not None and source.kind == "username":
+            _add(found, profile.username)
         for account in profile.extra.get("accounts") or []:
             if isinstance(account, dict):
                 _add(found, account.get("username"))
@@ -322,20 +333,31 @@ def discovered_usernames(results: list[CheckResult], limit: int | None = MAX_EXP
 
 
 def discovered_emails(results: list[CheckResult], limit: int | None = MAX_EXPAND) -> list[str]:
-    """Collect email addresses discovered in found profiles (for reverse expansion)."""
+    """Collect emails from structured profile fields (for reverse expansion).
+
+    Bio-derived emails are deliberately excluded: a same-handle stranger's bio
+    must not pull their address into the investigation.
+    """
     found: list[str] = []
     seen: set[str] = set()
     for result in results:
         profile: Profile | None = result.profile
         if profile is None:
             continue
-        for ent in profile_entities(profile):
-            if ent.kind != "email":
+        candidates: list[str] = []
+        for key in ("email", "public_email"):
+            value = profile.extra.get(key)
+            if isinstance(value, str):
+                candidates.append(value)
+        for key in profile.extra.get("gpg_keys") or []:
+            if isinstance(key, dict):
+                candidates.extend(str(email) for email in key.get("emails") or [])
+        for value in candidates:
+            email = value.strip().casefold()
+            if "@" not in email or email in seen:
                 continue
-            key = ent.value.casefold()
-            if key not in seen:
-                seen.add(key)
-                found.append(ent.value)
+            seen.add(email)
+            found.append(email)
     return found if limit in (None, 0) else found[:limit]
 
 

@@ -34,7 +34,13 @@ HARD_MARKERS = (
     "checking your browser",
     "ddos-guard",
     "verify you are human",
+    "please verify you are a human",
     "are you a robot",
+    "security verification",
+    "client challenge",
+    "privacy gate",
+    "unusual traffic",
+    "captcha",
     "access denied",
     "perimeterx",
     "px-captcha",
@@ -78,6 +84,7 @@ class Fetched:
 class Fetcher:
     """Shared async HTTP client: concurrency cap, per-host pacing, caching, retries,
     circuit breaking, optional proxy/Tor, raw capture and replay."""
+
     def __init__(
         self,
         settings: Settings,

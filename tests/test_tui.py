@@ -270,8 +270,9 @@ async def test_tui_action_pivot_row(settings, seeded, monkeypatch):
 async def test_tui_action_harvest_row(settings, seeded, monkeypatch):
     from larpharvester.models import CheckResult
 
-    async def fake_harvest(source_name, username, *, settings, limit, store=None,
-                           run_id=None, fetcher=None, **kwargs):
+    async def fake_harvest(
+        source_name, username, *, settings, limit, store=None, run_id=None, fetcher=None, **kwargs
+    ):
         return CheckResult(source_name, username, "not_found"), []
 
     monkeypatch.setattr(tui_app, "run_harvest", fake_harvest)

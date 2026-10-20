@@ -132,9 +132,7 @@ async def test_record_contract_captures_replayable_exchanges(settings, tmp_path,
 
 
 def test_validate_result_reports_status_mismatch():
-    problems = validate_result(
-        "github", CheckResult("github", "octocat", "not_found", detail="x")
-    )
+    problems = validate_result("github", CheckResult("github", "octocat", "not_found", detail="x"))
     assert any("expected status 'found'" in problem for problem in problems)
 
 

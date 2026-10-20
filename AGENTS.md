@@ -72,7 +72,7 @@ src/larpharvester/
 ├── watch.py        monitoring loop, diffs, alerts
 ├── http.py         pacing, cache/ETag, circuit breaker, budget, WAF/bot-wall detection, proxy/Tor, replay
 ├── sources/        curated sources (subclass Source, @register) + declarative engine
-├── data/sites.toml 453 generated site definitions (Sherlock v0.16.2, MIT)
+├── data/sites.toml 459 generated site definitions (Sherlock v0.16.2, MIT)
 ├── correlate.py    pair scoring, Jaro-Winkler handle similarity, clusters, recluster_rows()
 ├── analysis.py     entity extraction (email/btc/eth/xmr/onion/pgp/ssh/matrix/…), language, timezone, stylometry
 ├── report.py       JSON/JSONL/CSV/GraphML/GEXF/DOT/HTML/Markdown/STIX/Maltego, redaction, encryption
@@ -222,3 +222,26 @@ Export formats: `json`, `jsonl`, `csv` (`&table=`), `graphml`, `gexf`, `dot`,
   `docker-compose.yml` has an optional `tor` profile (`socks5h://tor:9050`).
   systemd units in `deploy/` are hardened (`ProtectSystem=strict`, empty capability set).
   OCI builds ignore `HEALTHCHECK` (podman warning); that is expected.
+- **Bluesky:** the public AppView does NOT implement `com.atproto.repo.listRecords`
+  (HTTP 501). Harvests must use `app.bsky.feed.getAuthorFeed` with `actor`/`cursor`.
+- **Twitch:** existence requires `<meta property="og:profile:username">` matching the
+  handle. Missing handles return HTTP 200 with a generic "Twitch" shell — never trust
+  the title alone, and never store the "streams live on Twitch!" template as a bio.
+- **Declarative `web.*` profiles are page templates, not user text.** `_untrusted_text()`
+  excludes their bio/display-name/mentions/entities/avatar/EXIF from correlation, and
+  `profile_entities()` returns [] for them. `_page_rejected()` rejects challenge,
+  landing, consent, and not-found titles (HTTP 200 pages are often generic).
+  `scripts/build_sites.py` filters search/availability endpoints (`/search`, `?q=`,
+  `?username=`, `usernameExists`, …) from the corpus.
+- **Expansion is structured-evidence-only:** `discovered_usernames` trusts a profile's
+  username only for username-kind sources; email sources contribute only
+  accounts/proofs/logins/handle-history/NIP-05. `discovered_emails` reads only
+  `extra.email`, `extra.public_email`, and GPG UID emails — never bio text. This prevents
+  common local-parts (`simon@…` → `simon`) from pivoting into strangers.
+- **Same-platform pairs never correlate** (`correlate` skips `a.source == b.source`),
+  because shared default avatars and similar handles on one platform are usually
+  different people.
+- **`diff_runs` serializes record types separately** (profiles/entities vs links);
+  never reuse the profile serializer for links.
+- **`ct` uses `crtsh_identities(..., strict=True)`** so a 502/503 from crt.sh is a
+  clear error (exit 2), not an empty result table.

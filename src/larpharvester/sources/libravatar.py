@@ -25,7 +25,7 @@ class Libravatar(Source):
                 target,
                 Profile(
                     source=self.name,
-                    username=normalized.split("@", 1)[0],
+                    username=normalized,
                     url=f"https://www.libravatar.org/avatar/{digest}",
                     avatar=f"https://seccdn.libravatar.org/avatar/{digest}?s=200",
                     extra={"sha256": digest, "email": normalized},

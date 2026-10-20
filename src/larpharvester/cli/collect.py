@@ -110,7 +110,7 @@ def pivot(
         _save_pivot(settings, report)
 
     if json_out:
-        _print_json(asdict(report))
+        _print_json(_report_payload(report))
         _exit_for_found(report)
         return
     if jsonl:
@@ -124,9 +124,19 @@ def pivot(
     _exit_for_found(report)
 
 
+def _report_payload(report: PivotReport) -> dict:
+    payload = asdict(report)
+    payload["profiles"] = [asdict(profile) for profile in report.profiles]
+    return payload
+
+
 def _pivot_jsonl(report: PivotReport) -> None:
     for result in report.results:
         typer.echo(json.dumps({"type": "check", **asdict(result)}, default=str))
+    for profile in report.profiles:
+        typer.echo(json.dumps({"type": "profile", **asdict(profile)}, default=str))
+    for entity in entities_for_profiles(report.profiles):
+        typer.echo(json.dumps({"type": "entity", **asdict(entity)}, default=str))
     for link in report.links:
         typer.echo(json.dumps({"type": "link", **asdict(link)}, default=str))
     for cluster in report.clusters:
@@ -188,7 +198,7 @@ def batch(
                 persist_pivot(store, report)
             if not json_out:
                 _render_pivot(report)
-            reports.append(asdict(report))
+            reports.append(_report_payload(report))
     finally:
         if store is not None:
             store.close()

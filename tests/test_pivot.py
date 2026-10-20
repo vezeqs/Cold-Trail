@@ -53,9 +53,9 @@ def sources(monkeypatch):
 
 async def test_discovered_usernames_dedupes_and_strips_at():
     result = await EmailSource().check(None, "alice@example.com")
-    # profile.username is itself a discovered handle
-    assert discovered_usernames([result]) == ["alice", "alicegh", "alicebsky"]
-    assert discovered_usernames([result], limit=1) == ["alice"]
+    # Only structured accounts expand; the email-source username is not trusted.
+    assert discovered_usernames([result]) == ["alicegh", "alicebsky"]
+    assert discovered_usernames([result], limit=1) == ["alicegh"]
 
 
 async def test_email_pivot_expands_into_username_sources(sources, tmp_path):
@@ -65,10 +65,10 @@ async def test_email_pivot_expands_into_username_sources(sources, tmp_path):
         expand=True,
     )
     assert report.kind == "email"
-    assert report.expanded == ["alice", "alicegh", "alicebsky"]
+    assert report.expanded == ["alicegh", "alicebsky"]
     assert {r.source for r in report.results} == {"email-src", "user-src"}
     user_targets = {r.target for r in report.results if r.source == "user-src"}
-    assert user_targets == {"alice", "alicegh", "alicebsky"}
+    assert user_targets == {"alicegh", "alicebsky"}
 
 
 async def test_expansion_falls_back_to_full_cross_kind_pool(sources, tmp_path):
@@ -96,6 +96,28 @@ async def test_mixed_kind_source_list_raises(sources, tmp_path):
 
 
 async def test_username_pivot_expands_into_email_sources(sources, tmp_path):
+    class StructuredEmail(UserSource):
+        async def check(self, fetcher, target):
+            result = await super().check(fetcher, target)
+            result.profile.extra["email"] = "alice@example.com"
+            return result
+
+    import larpharvester.pivot as pivot_mod
+
+    pivot_mod.SOURCES["user-src"] = StructuredEmail()
+    try:
+        report = await pivot(
+            "alice",
+            settings=Settings(db_path=tmp_path / "t.db"),
+            expand=True,
+        )
+    finally:
+        pivot_mod.SOURCES["user-src"] = UserSource()
+    assert report.expanded == ["alice@example.com"]
+    assert any(r.source == "email-src" and r.target == "alice@example.com" for r in report.results)
+
+
+async def test_bio_emails_do_not_drive_expansion(sources, tmp_path):
     class EmailBio(UserSource):
         async def check(self, fetcher, target):
             result = await super().check(fetcher, target)
@@ -113,8 +135,7 @@ async def test_username_pivot_expands_into_email_sources(sources, tmp_path):
         )
     finally:
         pivot_mod.SOURCES["user-src"] = UserSource()
-    assert report.expanded == ["alice@example.com"]
-    assert any(r.source == "email-src" and r.target == "alice@example.com" for r in report.results)
+    assert report.expanded == []
 
 
 async def test_expand_does_nothing_for_usernames(sources, tmp_path):

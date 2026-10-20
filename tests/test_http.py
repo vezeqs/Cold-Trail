@@ -120,3 +120,17 @@ async def test_retries_on_500(settings):
     async with Fetcher(settings) as fetcher:
         assert await fetcher.get_json("https://api.example/x") == (200, {"ok": True})
     assert route.call_count == 2
+
+
+@respx.mock
+async def test_security_verification_page_is_blocked(settings):
+    respx.get("https://example.test/challenge").mock(
+        return_value=httpx.Response(
+            200,
+            text="<html><head><title>Security Verification</title></head></html>",
+            headers={"content-type": "text/html"},
+        )
+    )
+    async with Fetcher(settings) as fetcher:
+        with pytest.raises(BlockedError):
+            await fetcher.get("https://example.test/challenge")

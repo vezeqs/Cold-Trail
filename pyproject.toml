@@ -1,6 +1,6 @@
 [project]
 name = "larpharvester"
-version = "0.5.0"
+version = "0.5.1"
 description = "OSINT username/email pivoting and public profile & post harvesting"
 readme = "README.md"
 requires-python = ">=3.11"

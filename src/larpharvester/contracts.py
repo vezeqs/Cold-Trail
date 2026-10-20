@@ -205,9 +205,7 @@ def validate_result(source_name: str, result: Any) -> list[str]:
     return problems
 
 
-async def verify_live(
-    source_name: str, settings: Settings, target: str | None = None
-) -> list[str]:
+async def verify_live(source_name: str, settings: Settings, target: str | None = None) -> list[str]:
     """Probe a source live and validate the contract (requires network)."""
     contract = CONTRACTS.get(source_name) or Contract(source_name, "")
     probe_target = target or contract.target
@@ -226,7 +224,5 @@ async def verify_all(
 ) -> dict[str, list[str]]:
     names = sources or sorted(CONTRACTS)
     return {
-        name: await verify_contract(name, settings, directory)
-        for name in names
-        if name in SOURCES
+        name: await verify_contract(name, settings, directory) for name in names if name in SOURCES
     }

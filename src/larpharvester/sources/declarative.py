@@ -43,6 +43,63 @@ def parse_meta(text: str) -> Meta:
     )
 
 
+GENERIC_TITLES = (
+    "security verification",
+    "client challenge",
+    "just a moment",
+    "attention required",
+    "access denied",
+    "privacy gate",
+    "page not found",
+    "404",
+    "not found",
+    "does not exist",
+    "no existe",
+    "não existe",
+    "nicht gefunden",
+    "introuvable",
+    "user not found",
+    "profile not found",
+    "no such user",
+    "currently unavailable",
+    "page unavailable",
+    # Observed platform landing/consent pages (live investigation).
+    "internet archive: digital library",
+    "get the free official geocaching app",
+    "nastavení souhlasu",
+    "sign in · gitlab",
+    "pay me on cash app",
+    "centralauth",
+    "learn language in context",
+    "live gay video chat",
+    "watch hundreds of free hd porn videos",
+    "undefined |",
+    "pagetitle:",
+)
+
+
+def _page_rejected(site: SiteDef, title: str | None, target: str) -> str | None:
+    """Return a reason when a 200 page is clearly not a profile page."""
+    if not title:
+        return "no profile metadata (empty title)"
+    low = " ".join(title.split()).casefold()
+    for marker in GENERIC_TITLES:
+        if marker in low:
+            return f"challenge/error page ({marker})"
+    name = " ".join(site.name.split()).casefold()
+    host = site.main.casefold().removeprefix("https://").removeprefix("http://").split("/")[0]
+    hosts = {host, host.removeprefix("www.")}
+    if low in {name, *hosts}:
+        return "landing page (title is the site name)"
+    if name and low.startswith(name) and target.casefold() not in low:
+        return "landing page (title is the site name)"
+    return None
+
+
+def _generic_title(site: SiteDef, title: str | None, target: str = "") -> bool:
+    return _page_rejected(site, title, target) is not None
+
+
 class DeclarativeSource(Source):
     """A source defined entirely by data in sites.toml (Sherlock-style checks)."""
 
@@ -76,6 +133,9 @@ class DeclarativeSource(Source):
         if not _found(site, response):
             return self.missing(target, f"HTTP {response.status}")
         meta = parse_meta(response.text)
+        rejection = _page_rejected(site, meta.title, target)
+        if rejection:
+            return self.missing(target, rejection)
         human = site.url.replace("{username}", quote(target, safe=""))
         return self.ok(
             target,
@@ -87,7 +147,13 @@ class DeclarativeSource(Source):
                 bio=meta.description,
                 avatar=meta.image,
                 website=None,
-                extra={"site": site.name, "nsfw": site.nsfw, "group": "web"},
+                extra={
+                    "site": site.name,
+                    "nsfw": site.nsfw,
+                    "group": "web",
+                    "page_title": meta.title,
+                    "page_description": meta.description,
+                },
             ),
         )
 
