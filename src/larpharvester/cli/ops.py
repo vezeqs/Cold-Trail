@@ -13,7 +13,7 @@ from ._app import _print_json, _settings, app, console
 # -- ops --------------------------------------------------------------------
 
 
-@app.command()
+@app.command(rich_help_panel="Operations")
 def audit(
     ctx: typer.Context,
     limit: Annotated[int, typer.Option("-n", "--limit", min=1)] = 100,
@@ -33,7 +33,7 @@ def audit(
     console.print(table)
 
 
-@app.command()
+@app.command(rich_help_panel="Operations")
 def doctor(
     ctx: typer.Context,
     json_out: Annotated[bool, typer.Option("--json")] = False,
@@ -84,7 +84,7 @@ def doctor(
         console.print(table)
 
 
-@app.command()
+@app.command(rich_help_panel="Operations")
 def prune(
     ctx: typer.Context,
     days: Annotated[int, typer.Option("--days", min=1)] = 30,
@@ -98,7 +98,7 @@ def prune(
     console.print(f"pruned {removed} runs older than {days} days")
 
 
-@app.command()
+@app.command(rich_help_panel="Operations")
 def db(
     ctx: typer.Context,
     json_out: Annotated[bool, typer.Option("--json")] = False,

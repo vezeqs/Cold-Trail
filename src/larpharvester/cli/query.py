@@ -18,7 +18,7 @@ from ._app import (
 )
 
 
-@app.command()
+@app.command(rich_help_panel="Query")
 def profiles(
     ctx: typer.Context,
     run: Annotated[int | None, typer.Option("--run")] = None,
@@ -49,7 +49,7 @@ def profiles(
     console.print(table)
 
 
-@app.command()
+@app.command(rich_help_panel="Query")
 def posts(
     ctx: typer.Context,
     run: Annotated[int | None, typer.Option("--run")] = None,
@@ -87,7 +87,7 @@ def posts(
     console.print(table)
 
 
-@app.command()
+@app.command(rich_help_panel="Query")
 def links(
     ctx: typer.Context,
     run: Annotated[int | None, typer.Option("--run")] = None,
@@ -103,7 +103,7 @@ def links(
     _render_stored_links(rows)
 
 
-@app.command()
+@app.command(rich_help_panel="Query")
 def clusters(
     ctx: typer.Context,
     run: Annotated[int | None, typer.Option("--run")] = None,
@@ -119,7 +119,7 @@ def clusters(
     _render_stored_clusters(rows)
 
 
-@app.command()
+@app.command(rich_help_panel="Query")
 def entities(
     ctx: typer.Context,
     run: Annotated[int | None, typer.Option("--run")] = None,
@@ -147,7 +147,7 @@ def entities(
     console.print(table)
 
 
-@app.command()
+@app.command(rich_help_panel="Query")
 def runs(
     ctx: typer.Context,
     limit: Annotated[int, typer.Option("-n", "--limit", min=1)] = 25,
@@ -174,7 +174,7 @@ def runs(
     console.print(table)
 
 
-@app.command()
+@app.command(rich_help_panel="Query")
 def edges(
     ctx: typer.Context,
     run: Annotated[int | None, typer.Option("--run")] = None,
@@ -199,7 +199,7 @@ def edges(
     console.print(table)
 
 
-@app.command()
+@app.command(rich_help_panel="Query")
 def search(
     ctx: typer.Context,
     query: Annotated[str, typer.Argument(help="FTS query")],
@@ -226,7 +226,7 @@ def search(
     console.print(table)
 
 
-@app.command()
+@app.command(rich_help_panel="Query")
 def timeline(
     ctx: typer.Context,
     run: Annotated[int | None, typer.Option("--run")] = None,
@@ -253,7 +253,7 @@ def timeline(
     console.print(table)
 
 
-@app.command()
+@app.command(rich_help_panel="Query")
 def history(
     ctx: typer.Context,
     run: Annotated[int | None, typer.Option("--run")] = None,
@@ -270,7 +270,7 @@ def history(
     _render_history(rows)
 
 
-@app.command()
+@app.command(rich_help_panel="Query")
 def diff(
     ctx: typer.Context,
     run_a: Annotated[int, typer.Argument(help="Baseline run ID")],

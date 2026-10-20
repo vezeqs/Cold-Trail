@@ -90,6 +90,8 @@ def iter_jsonl(payload: dict[str, Any]):
         yield json.dumps({"type": "edge", **edge}, ensure_ascii=False, default=str)
     for change in payload.get("history", []):
         yield json.dumps({"type": "history", **change}, ensure_ascii=False, default=str)
+    for attachment in payload.get("attachments", []):
+        yield json.dumps({"type": "attachment", **attachment}, ensure_ascii=False, default=str)
 
 
 def to_jsonl(payload: dict[str, Any]) -> str:
@@ -299,6 +301,18 @@ def to_markdown(payload: dict[str, Any], redacted: bool = False) -> str:
             when = str(p.get("created_at") or "")[:19]
             txt = " ".join(str(p.get("text") or "").split())[:200]
             lines.append(f"- **{when}** `{p.get('source')}:{p.get('username')}` — {txt}")
+        lines.append("")
+
+    attachments = payload.get("attachments") or []
+    if attachments:
+        lines.extend(["## Evidence", ""])
+        lines.append("| # | File | Size | SHA-256 | Note |")
+        lines.append("| --- | --- | --- | --- | --- |")
+        for a in attachments:
+            lines.append(
+                f"| {a.get('id')} | {a.get('filename')} | {int(a.get('size') or 0)} B "
+                f"| `{str(a.get('sha256') or '')[:16]}…` | {a.get('note') or ''} |"
+            )
         lines.append("")
 
     return "\n".join(lines)
@@ -544,6 +558,16 @@ def to_html(payload: dict[str, Any], redacted: bool = False) -> str:
         ]
         for c in checks
     ]
+    attachment_rows = [
+        [
+            str(a.get("id", "")),
+            escape(str(a.get("filename", ""))),
+            f"{int(a.get('size') or 0)} B",
+            escape(str(a.get("sha256", ""))[:16] + "…"),
+            escape(str(a.get("note") or "")),
+        ]
+        for a in payload.get("attachments") or []
+    ]
     dork_rows = (
         []
         if redacted
@@ -567,6 +591,7 @@ def to_html(payload: dict[str, Any], redacted: bool = False) -> str:
         ("Entities", table(["Kind", "Value", "Observed on", "Context"], entity_rows)),
         ("Timeline", table(["When", "Source", "Username", "Text", "URL"], post_rows)),
         ("Profile changes", table(["Target", "Field", "Old", "New", "Observed"], history_rows)),
+        ("Evidence", table(["#", "File", "Size", "SHA-256", "Note"], attachment_rows)),
         ("Source checks", table(["Source", "Target", "Status", "Detail"], check_rows)),
         ("Search dorks", table(["Engine", "Query", "Open"], dork_rows)),
     ]

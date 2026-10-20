@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 POSTS_AU_TRIGGER = """CREATE TRIGGER posts_au AFTER UPDATE OF text, username, source ON posts BEGIN
     INSERT INTO posts_fts(posts_fts, rowid, text, username, source)
@@ -200,6 +200,23 @@ CREATE TABLE IF NOT EXISTS notes (
     note TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER REFERENCES runs(id) ON DELETE SET NULL,
+    target_type TEXT NOT NULL DEFAULT 'run',
+    target TEXT,
+    sha256 TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    media_type TEXT,
+    size INTEGER NOT NULL,
+    note TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_attachments_run ON attachments(run_id);
+CREATE INDEX IF NOT EXISTS idx_attachments_sha ON attachments(sha256);
+CREATE INDEX IF NOT EXISTS idx_attachments_target ON attachments(target_type, target);
 
 CREATE INDEX IF NOT EXISTS idx_checks_run ON checks(run_id);
 CREATE INDEX IF NOT EXISTS idx_checks_source ON checks(source);

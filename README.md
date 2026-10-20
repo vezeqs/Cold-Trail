@@ -6,10 +6,12 @@ the result as JSON, CSV, GraphML, GEXF, DOT, or a self-contained HTML dossier.
 
 Three interfaces over one database:
 
-- **CLI** — 42 commands, scriptable, JSON/JSONL output
-- **TUI** — six-tab terminal console with row drill-down (`p` pivot, `h` harvest, `d` diff)
+- **CLI** — 47 commands, scriptable, JSON/JSONL output
+- **TUI** — seven-tab terminal console with row drill-down (`p` pivot, `h` harvest, `d` diff,
+  `1`–`7` jump to tabs)
 - **Web UI** — local FastAPI app with a JSON API, live SSE pivot streaming, an interactive
-  identity graph, an OSINT workbench, run diffing, case dossiers, optional auth, and export downloads
+  identity graph, an OSINT workbench, external-tool runner, imports, run diffing, case dossiers,
+  evidence downloads, a Help page, optional auth, and export downloads
 
 480 sources out of the box: 42 hand-written API sources plus 438 declarative definitions generated
 from the [Sherlock](https://github.com/sherlock-project/sherlock) dataset (MIT). No API keys needed
@@ -38,6 +40,26 @@ v0.5.2 is the speed and usability release:
 - **Faster discovery:** `sources -q <text>` filters the registry; the web sources page has a
   client-side filter; the TUI shows a loading indicator while a pivot runs; `watch` cycle lines
   are timestamped.
+
+v0.6.0 is the integration, evidence, and menu release:
+- **`larpharvester menu`** — an interactive, categorized launcher for pivot, harvest, graph,
+  search, runs, intel, cases, external tools, TUI, and web UI.
+- **Grouped help** — the 47 commands are organized into Start here / Collect / Query / Intel /
+  Integrations / Evidence / Casework / Output / Interfaces / Operations panels.
+- **External tools** — `integrations` lists detected binaries and install hints; `run` executes
+  sherlock, holehe, theHarvester, subfinder, h8mail, ghunt, exiftool, yt-dlp, whois, dig, or nmap
+  and imports the findings (raw output saved as evidence). Import-only stubs cover SpiderFoot and
+  Maltego.
+- **Importers** — `ingest` auto-detects Maltego CSV, SpiderFoot JSON, theHarvester JSON, and
+  generic JSON.
+- **Evidence storage** — files are stored content-addressed (SHA-256) under the data directory,
+  recorded in a new `attachments` table, and accessible via `evidence add/list/export/verify`,
+  each run/case page, and a download endpoint.
+- **Case dossiers** — `case export` merges every run in a case into one JSON/JSONL/CSV/GraphML/
+  GEXF/DOT/HTML/Markdown/STIX/Maltego dossier.
+- **Visual/menu polish** — new web Help page, TUI Help tab and tab shortcuts, dark-themed
+  checkboxes/file inputs, fixed table widths and footer placement, and external-tool/import forms
+  in the web workbench.
 
 ## Install
 
@@ -100,6 +122,9 @@ uv run larpharvester graph alice -s bluesky
 # Continuous monitoring with alerts
 uv run larpharvester watch alice -s reddit -s hackernews --interval 3600 \
     --alert ntfy --alert-target my-osint-topic
+
+# Interactive menu (pivot, harvest, graph, intel, cases, tools, TUI, web)
+uv run larpharvester menu
 ```
 
 ## Query and report
@@ -227,11 +252,45 @@ uv run larpharvester source verify --live -s github     # probe live and validat
 Recorded fixtures live in `tests/fixtures/contracts/`; replaying them through the parsers catches
 upstream API drift and parser regressions without touching the network.
 
+## External tools, imports & evidence
+
+```bash
+# What is installed, and what to install for the rest
+uv run larpharvester integrations
+
+# Run an installed OSINT binary; findings are imported, raw output saved as evidence
+uv run larpharvester run sherlock alice
+uv run larpharvester run exiftool photo.jpg
+uv run larpharvester run yt-dlp "https://www.youtube.com/watch?v=..."
+uv run larpharvester run nmap 203.0.113.10 --timeout 120
+
+# Import another tool's export (auto-detects the format)
+uv run larpharvester ingest maltego.csv
+uv run larpharvester ingest spiderfoot.json
+uv run larpharvester ingest theharvester.json
+
+# Content-addressed evidence: dedupe, hashes, verification, export
+uv run larpharvester evidence add screenshot.png --run 3 --target-type profile \
+    --target github:alice --note "profile avatar"
+uv run larpharvester evidence list --run 3
+uv run larpharvester evidence verify
+uv run larpharvester evidence export 7 -o recovered.png
+
+# Merge every run in a case into one dossier
+uv run larpharvester case export op-alice --format html -o case.html
+```
+
+Supported runners: sherlock, holehe, theHarvester, subfinder, h8mail, ghunt, exiftool, yt-dlp,
+whois, dig, nmap. Import-only: SpiderFoot, Maltego. Missing binaries are reported with an install
+command rather than failing silently.
+
 ## Storage
 
-SQLite, schema v3, auto-migrated. Tables: `runs`, `checks`, `profiles`, `posts`, `links`,
+SQLite, schema v4, auto-migrated. Tables: `runs`, `checks`, `profiles`, `posts`, `links`,
 `clusters`, `cluster_members`, `entities`, `edges`, `profile_history`, `cursors`, `http_cache`,
-`raw`, `probe_cache`, `audit`, `cases`, `case_runs`, `tags`, `notes`, plus `posts_fts` (FTS5).
+`raw`, `probe_cache`, `audit`, `cases`, `case_runs`, `tags`, `notes`, `attachments`, plus
+`posts_fts` (FTS5). Evidence blobs live under `<database dir>/evidence/<sha[:2]>/<sha>` and are
+deduplicated by SHA-256.
 
 ```bash
 uv run larpharvester db
@@ -293,6 +352,13 @@ machine. Exit code is `1` when exposed, `0` when clean — safe for CI/scripts.
 | `POST /api/pivot` | Queue a pivot (`{"target": "...", "include_web": false, "depth": 1, ...}`) → `202 {job_id}` |
 | `GET /api/jobs/{id}` | Job status, counts, and the full event list |
 | `GET /api/jobs/{id}/stream` | Server-Sent Events: `check` per source, then `done` |
+| `GET /evidence/{id}` | Download a content-addressed evidence file |
+| `GET /api/evidence/{id}` | Evidence metadata |
+| `POST /tools/external` | Run an installed external tool and import results |
+| `POST /tools/ingest` | Upload a Maltego/SpiderFoot/theHarvester/JSON export |
+
+Pages: `/`, `/runs`, `/runs/{id}`, `/diff`, `/search`, `/sources`, `/cases`, `/cases/{name}`,
+`/tools`, `/pivot`, `/jobs/{id}`, `/help`, `/login`, `/healthz`, `/api/docs`.
 
 Run exports are downloadable at `/runs/{id}/export?format=json|jsonl|csv|graphml|gexf|dot|html|md|stix|maltego`
 with optional `&redact=true` and `&table=` for CSV. Case pages (`/cases/{name}`) aggregate every
@@ -336,7 +402,7 @@ limited per client (20 requests/minute).
 ## Development
 
 ```bash
-uv run pytest                # 379 tests, no network required
+uv run pytest                # 421 tests, no network required
 uv run ruff check .
 uv run ruff format --check .
 ```
@@ -346,11 +412,11 @@ uv run ruff format --check .
 **Docker / Compose**
 
 ```bash
-docker build -t larpharvester:0.5.2 .
+docker build -t larpharvester:0.6.0 .
 docker run --rm -p 127.0.0.1:8765:8765 \
   -v larpharvester-data:/data \
   -e LARPHARVESTER_WEB_TOKEN=change-me \
-  larpharvester:0.5.2
+  larpharvester:0.6.0
 
 # Compose with an optional Tor sidecar:
 LARPHARVESTER_WEB_TOKEN=change-me docker compose up -d

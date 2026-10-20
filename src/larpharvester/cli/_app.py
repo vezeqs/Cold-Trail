@@ -26,8 +26,8 @@ app = typer.Typer(
 )
 case_app = typer.Typer(help="Case management.")
 source_app = typer.Typer(help="Source inspection.")
-app.add_typer(case_app, name="case")
-app.add_typer(source_app, name="source")
+app.add_typer(case_app, name="case", rich_help_panel="Casework")
+app.add_typer(source_app, name="source", rich_help_panel="Intel")
 
 console = Console()
 STATUS_STYLE = {"found": "green", "not_found": "dim", "blocked": "yellow", "error": "red"}

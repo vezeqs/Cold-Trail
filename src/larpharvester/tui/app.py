@@ -17,6 +17,7 @@ from typing import Any
 
 from textual import work
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import (
     Button,
@@ -45,16 +46,62 @@ from ..pivot import persist_pivot
 from ..pivot import pivot as run_pivot
 from ..store import Store
 
+HELP_TEXT = """[bold]larpharvester — quick guide[/bold]
+
+[bold]Workflow[/bold]
+  Pivot → Browse → Harvest → Graph → Cases → Export
+
+[bold]Tabs[/bold]
+  Dashboard  database counts, coverage, recent runs
+  Pivot      probe a username/email (results stream in)
+  Browse     pick a run to inspect profiles, posts, and evidence
+  Search     full-text search over harvested posts
+  Tools      domain / IP / phone / dorks / breach / harvest
+  Cases      create cases; view tags and notes
+  Help       this page
+
+[bold]Keys[/bold]
+  q  quit          r  refresh
+  p  pivot the focused row
+  h  harvest the focused row
+  d  diff the two most recent runs
+  1-7  jump to Dashboard/Pivot/Browse/Search/Tools/Cases/Help
+  Enter  open the highlighted run in Browse
+
+[bold]Common CLI commands[/bold]
+  larpharvester pivot alice --expand --depth 2
+  larpharvester harvest alice -s github -n 50
+  larpharvester graph alice -s bluesky
+  larpharvester menu
+  larpharvester integrations
+  larpharvester run sherlock alice
+  larpharvester ingest export.json
+  larpharvester evidence add screenshot.png --run 3
+  larpharvester export 3 --format html -o dossier.html
+
+[bold]Tips[/bold]
+  Global options (--db, --concurrency, --max-requests) go before the command.
+  pivot hides non-matching checks; add --all-checks to see everything.
+  sources -q <text> filters the source registry.
+"""
+
 
 class LarpharvesterTUI(App):
     TITLE = f"larpharvester {__version__}"
     SUB_TITLE = "OSINT pivoting console"
     BINDINGS = [
-        ("q", "quit", "Quit"),
-        ("r", "refresh", "Refresh"),
-        ("p", "pivot_row", "Pivot row"),
-        ("h", "harvest_row", "Harvest row"),
-        ("d", "diff_runs", "Diff runs"),
+        Binding("q", "quit", "Quit"),
+        Binding("r", "refresh", "Refresh"),
+        Binding("p", "pivot_row", "Pivot row"),
+        Binding("h", "harvest_row", "Harvest row"),
+        Binding("d", "diff_runs", "Diff runs"),
+        Binding("1", "show_tab('tab-dashboard')", "Dashboard", show=False),
+        Binding("2", "show_tab('tab-pivot')", "Pivot", show=False),
+        Binding("3", "show_tab('tab-browse')", "Browse", show=False),
+        Binding("4", "show_tab('tab-search')", "Search", show=False),
+        Binding("5", "show_tab('tab-tools')", "Tools", show=False),
+        Binding("6", "show_tab('tab-cases')", "Cases", show=False),
+        Binding("7", "show_tab('tab-help')", "Help", show=False),
     ]
     CSS = """
     Screen { background: #0e1116; color: #d7dee8; }
@@ -82,11 +129,12 @@ class LarpharvesterTUI(App):
     #browse-detail { width: 1fr; }
     #browse-profiles { height: 12; }
     #browse-posts { height: 1fr; }
+    #browse-evidence { height: 8; }
     #search-q { width: 52; }
     #search-results { height: 1fr; }
     #tool-select { width: 30; }
-    #tool-target { width: 40; }
-    #tool-source { width: 22; }
+    #tool-target { width: 1fr; }
+    #tool-source { width: 26; }
     #tool-output {
         background: #151b23;
         border: solid #26303b;
@@ -97,6 +145,7 @@ class LarpharvesterTUI(App):
     #case-name { width: 40; }
     #cases-table { height: 12; margin-bottom: 1; }
     #annotations-table { height: 1fr; }
+    #help-text { padding: 1 2; }
     DataTable { background: #0e1116; }
     """
 
@@ -144,6 +193,7 @@ class LarpharvesterTUI(App):
                     with Vertical(id="browse-detail"):
                         yield DataTable(id="browse-profiles")
                         yield DataTable(id="browse-posts")
+                        yield DataTable(id="browse-evidence")
             with TabPane("Search", id="tab-search"):
                 with Vertical():
                     with Horizontal():
@@ -166,12 +216,13 @@ class LarpharvesterTUI(App):
                             allow_blank=False,
                             id="tool-select",
                         )
+                        yield Button("Run tool", id="tool-run", variant="primary")
+                    with Horizontal():
                         yield Input(
                             placeholder="domain / IP / phone / handle / email",
                             id="tool-target",
                         )
                         yield Input(placeholder="source (harvest)", id="tool-source")
-                        yield Button("Run tool", id="tool-run", variant="primary")
                     yield Static("", id="tool-output", markup=False)
             with TabPane("Cases", id="tab-cases"):
                 with Vertical():
@@ -180,6 +231,9 @@ class LarpharvesterTUI(App):
                         yield Button("Create case", id="case-create", variant="primary")
                     yield DataTable(id="cases-table")
                     yield DataTable(id="annotations-table")
+            with TabPane("Help", id="tab-help"):
+                with VerticalScroll():
+                    yield Static(HELP_TEXT, id="help-text")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -197,6 +251,9 @@ class LarpharvesterTUI(App):
         posts_table = self.query_one("#browse-posts", DataTable)
         posts_table.cursor_type = "row"
         posts_table.add_columns("When", "Source", "Username", "Text")
+        evidence_table = self.query_one("#browse-evidence", DataTable)
+        evidence_table.cursor_type = "row"
+        evidence_table.add_columns("File", "Size", "SHA-256", "Note")
         search_table = self.query_one("#search-results", DataTable)
         search_table.cursor_type = "row"
         search_table.add_columns("When", "Source", "Username", "Text")
@@ -211,6 +268,9 @@ class LarpharvesterTUI(App):
         self.refresh_cases()
 
     # -- actions ------------------------------------------------------------
+
+    def action_show_tab(self, tab_id: str) -> None:
+        self.query_one(TabbedContent).active = tab_id
 
     def action_refresh(self) -> None:
         self.refresh_data()
@@ -306,7 +366,8 @@ class LarpharvesterTUI(App):
             f"[b]Runs[/b] {stats['runs']}  [b]Checks[/b] {stats['checks']}  "
             f"[b]Profiles[/b] {stats['profiles']}  [b]Posts[/b] {stats['posts']}\n"
             f"[b]Links[/b] {stats['links']}  [b]Clusters[/b] {stats['clusters']}  "
-            f"[b]Entities[/b] {stats['entities']}  [b]Cases[/b] {stats['cases']}\n"
+            f"[b]Entities[/b] {stats['entities']}  [b]Cases[/b] {stats['cases']}  "
+            f"[b]Evidence[/b] {stats['attachments']}\n"
             f"[green]{found} found[/green]  [red]{errors} blocked/error[/red]"
         )
         dashboard = self.query_one("#dash-runs", DataTable)
@@ -482,6 +543,7 @@ class LarpharvesterTUI(App):
         with Store(self.settings.db_path) as store:
             profiles = store.profiles(run_id=run_id, limit=500)
             posts = store.posts(run_id=run_id, limit=200)
+            attachments = store.attachments(run_id=run_id, limit=200)
         profiles_table = self.query_one("#browse-profiles", DataTable)
         profiles_table.clear()
         for profile in profiles:
@@ -500,7 +562,19 @@ class LarpharvesterTUI(App):
                 post["username"],
                 " ".join((post["text"] or "").split())[:120],
             )
-        self.notify(f"run #{run_id}: {len(profiles)} profiles, {len(posts)} posts")
+        evidence_table = self.query_one("#browse-evidence", DataTable)
+        evidence_table.clear()
+        for attachment in attachments:
+            evidence_table.add_row(
+                attachment["filename"],
+                f"{attachment['size']} B",
+                attachment["sha256"][:12],
+                attachment["note"] or "",
+            )
+        self.notify(
+            f"run #{run_id}: {len(profiles)} profiles, {len(posts)} posts, "
+            f"{len(attachments)} evidence"
+        )
 
     # -- search -------------------------------------------------------------
 

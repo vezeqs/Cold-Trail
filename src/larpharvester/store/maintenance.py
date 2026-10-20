@@ -21,6 +21,7 @@ class MaintenanceMixin:
             "entities": self.entities(run_id, limit=10_000_000),
             "edges": self.edges(run_id, limit=10_000_000),
             "history": self.history(run_id, limit=10_000_000),
+            "attachments": self.attachments(run_id=run_id, limit=10_000_000),
         }
 
     def stats(self) -> dict[str, int]:
@@ -37,6 +38,7 @@ class MaintenanceMixin:
             "cases",
             "notes",
             "tags",
+            "attachments",
         )
         return {
             table: self.conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]

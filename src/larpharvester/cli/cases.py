@@ -1,17 +1,23 @@
 from __future__ import annotations
 
+import os
+import sys
+from pathlib import Path
 from typing import Annotated
 
 import typer
 from rich.table import Table
 
+from ..casework import merge_case_payload
+from ..report import encrypt_bytes, redact_payload
 from ..store import Store
 from ._app import _print_json, _settings, app, case_app, console
+from .output import _render_format
 
 # -- cases, tags, notes -----------------------------------------------------
 
 
-@case_app.command("new")
+@case_app.command("new", rich_help_panel="Casework")
 def case_new(
     ctx: typer.Context,
     name: Annotated[str, typer.Argument()],
@@ -27,7 +33,7 @@ def case_new(
     console.print(f"created case #{case_id} {name}")
 
 
-@case_app.command("list")
+@case_app.command("list", rich_help_panel="Casework")
 def case_list(
     ctx: typer.Context,
     json_out: Annotated[bool, typer.Option("--json")] = False,
@@ -52,7 +58,7 @@ def case_list(
     console.print(table)
 
 
-@case_app.command("add")
+@case_app.command("add", rich_help_panel="Casework")
 def case_add(
     ctx: typer.Context,
     name: Annotated[str, typer.Argument()],
@@ -68,7 +74,7 @@ def case_add(
     console.print(f"attached run #{run_id} to {name}")
 
 
-@case_app.command("show")
+@case_app.command("show", rich_help_panel="Casework")
 def case_show(
     ctx: typer.Context,
     name: Annotated[str, typer.Argument()],
@@ -88,7 +94,47 @@ def case_show(
         console.print(f"  #{run['id']} {run['kind']} {run['target']} ({run['status']})")
 
 
-@app.command()
+@case_app.command("export", rich_help_panel="Casework")
+def case_export(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Argument(help="Case name")],
+    format: Annotated[
+        str, typer.Option("--format", help="json|jsonl|csv|graphml|gexf|dot|html|md|stix|maltego")
+    ] = "json",
+    table: Annotated[str, typer.Option("--table", help="CSV table")] = "profiles",
+    out: Annotated[Path | None, typer.Option("-o", "--out")] = None,
+    redact: Annotated[bool, typer.Option("--redact")] = False,
+    encrypt: Annotated[bool, typer.Option("--encrypt")] = False,
+    passphrase_env: Annotated[str, typer.Option("--passphrase-env")] = "LARPHARVESTER_PASSPHRASE",
+) -> None:
+    """Export every run in a case as one merged dossier."""
+    settings = _settings(ctx)
+    with Store(settings.db_path) as store:
+        case = store.case(name)
+        if case is None:
+            typer.echo(f"no such case: {name}", err=True)
+            raise typer.Exit(code=1)
+        payload = merge_case_payload(store, case)
+    if redact:
+        payload = redact_payload(payload)
+    data = _render_format(payload, format, table, redacted=redact).encode()
+    if encrypt:
+        passphrase = os.environ.get(passphrase_env)
+        if not passphrase:
+            typer.echo(f"passphrase not set in {passphrase_env}", err=True)
+            raise typer.Exit(code=2)
+        data = encrypt_bytes(data, passphrase)
+    if out is None:
+        sys.stdout.buffer.write(data)
+        if not data.endswith(b"\n"):
+            sys.stdout.buffer.write(b"\n")
+        return
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(data)
+    console.print(f"wrote {out}")
+
+
+@app.command(rich_help_panel="Casework")
 def tag(
     ctx: typer.Context,
     target_type: Annotated[str, typer.Argument(help="profile|post|run|entity")],
@@ -101,7 +147,7 @@ def tag(
     console.print(f"tagged {target_type}:{target} with {tag_value}")
 
 
-@app.command()
+@app.command(rich_help_panel="Casework")
 def tags(
     ctx: typer.Context,
     target_type: Annotated[str | None, typer.Option("--type")] = None,
@@ -122,7 +168,7 @@ def tags(
     console.print(table)
 
 
-@app.command()
+@app.command(rich_help_panel="Casework")
 def note(
     ctx: typer.Context,
     target_type: Annotated[str, typer.Argument(help="profile|run|entity|case")],
@@ -135,7 +181,7 @@ def note(
     console.print("note added")
 
 
-@app.command()
+@app.command(rich_help_panel="Casework")
 def notes(
     ctx: typer.Context,
     target_type: Annotated[str | None, typer.Option("--type")] = None,

@@ -17,14 +17,16 @@ import hmac
 import json
 import logging
 import re
+import tempfile
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import FastAPI, Form, HTTPException, Query, Request
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import (
+    FileResponse,
     HTMLResponse,
     JSONResponse,
     RedirectResponse,
@@ -38,14 +40,25 @@ from pydantic import BaseModel, Field
 from .. import __version__
 from ..analysis import entities_from_posts
 from ..breach import full_breach_audit, pwned_password
+from ..casework import merge_case_payload
 from ..config import Settings
 from ..correlate import diff_runs, recluster_rows
 from ..domain import asn_lookup, lookup_domain, ptr, rdap_ip, reverse_ip, shodan_host
 from ..dorks import dorks as build_dorks
 from ..dorks import reverse_image_links
+from ..evidence import evidence_path
 from ..harvest import collect_follows
 from ..harvest import harvest as run_harvest
 from ..http import Fetcher
+from ..integrations import (
+    ToolError,
+    ToolUnavailable,
+    ingest_file,
+    list_tools,
+    persist_ingest,
+    persist_tool_result,
+    run_tool,
+)
 from ..models import CheckResult
 from ..phone import lookup as phone_lookup
 from ..pivot import entities_for_profiles, persist_pivot
@@ -91,6 +104,7 @@ MAX_JOBS = 200
 JOB_RETENTION = 3600.0
 RATE_LIMIT = 20
 RATE_WINDOW = 60.0
+MAX_UPLOAD = 50 * 1024 * 1024
 PUBLIC_PATHS = {"/healthz", "/api/health", "/login"}
 
 
@@ -151,6 +165,15 @@ def _safe_url(value: Any) -> str:
     return text if text.startswith(("http://", "https://")) else "#"
 
 
+def _filesize(value: Any) -> str:
+    size = float(value or 0)
+    for unit in ("B", "KB", "MB", "GB"):
+        if size < 1024 or unit == "GB":
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{int(value or 0)} B"
+
+
 CSV_TABLES = {
     "run",
     "checks",
@@ -161,6 +184,7 @@ CSV_TABLES = {
     "entities",
     "edges",
     "history",
+    "attachments",
 }
 
 
@@ -298,9 +322,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     templates.env.filters["short"] = _short
     templates.env.filters["ts"] = _ts
     templates.env.filters["url"] = _safe_url
+    templates.env.filters["filesize"] = _filesize
     templates.env.globals.update(
         version=__version__,
         groups=sorted(GROUPS),
+        curated_groups=[group for group in GROUPS if group != "web"],
         source_count=len(SOURCES),
     )
 
@@ -358,87 +384,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         else:
             body = renderer(payload)
         return Response(content=body.encode(), media_type=media_type, headers=headers)
-
-    def _case_payload(store: Store, case: dict[str, Any]) -> dict[str, Any]:
-        """Merge every run in a case into a single exportable dossier payload."""
-        runs = case.get("runs") or []
-        merged: dict[str, Any] = {
-            "run": {
-                "id": f"case:{case['name']}",
-                "kind": "case",
-                "target": case["name"],
-                "started_at": runs[0]["started_at"] if runs else case["created_at"],
-                "finished_at": runs[-1].get("finished_at") if runs else None,
-                "status": "ok",
-            },
-            "checks": [],
-            "profiles": [],
-            "posts": [],
-            "links": [],
-            "clusters": [],
-            "entities": [],
-            "edges": [],
-            "history": [],
-        }
-        seen_profiles: set[tuple[str, str]] = set()
-        seen_posts: set[tuple[str, str]] = set()
-        seen_links: set[tuple[str, str, str, str]] = set()
-        seen_clusters: set[str] = set()
-        seen_entities: set[tuple[str, str, str, str]] = set()
-        seen_edges: set[tuple[str, str, str, str]] = set()
-        for run in runs:
-            try:
-                payload = store.export_run(run["id"])
-            except KeyError:
-                continue
-            merged["checks"].extend(payload.get("checks") or [])
-            merged["history"].extend(payload.get("history") or [])
-            for profile in payload.get("profiles") or []:
-                key = (profile["source"], profile["username"].casefold())
-                if key not in seen_profiles:
-                    seen_profiles.add(key)
-                    merged["profiles"].append(profile)
-            for post in payload.get("posts") or []:
-                key = (post["source"], str(post["post_id"]))
-                if key not in seen_posts:
-                    seen_posts.add(key)
-                    merged["posts"].append(post)
-            for link in payload.get("links") or []:
-                key = (
-                    link["source_a"],
-                    link["username_a"].casefold(),
-                    link["source_b"],
-                    link["username_b"].casefold(),
-                )
-                if key not in seen_links:
-                    seen_links.add(key)
-                    merged["links"].append(link)
-            for cluster in payload.get("clusters") or []:
-                key = str(cluster.get("cluster_key"))
-                if key not in seen_clusters:
-                    seen_clusters.add(key)
-                    merged["clusters"].append(cluster)
-            for entity in payload.get("entities") or []:
-                key = (
-                    entity["source"],
-                    entity["username"].casefold(),
-                    entity["kind"],
-                    str(entity["value"]).casefold(),
-                )
-                if key not in seen_entities:
-                    seen_entities.add(key)
-                    merged["entities"].append(entity)
-            for edge in payload.get("edges") or []:
-                key = (
-                    edge["platform"],
-                    edge["actor"].casefold(),
-                    edge["target"].casefold(),
-                    edge.get("direction") or "follows",
-                )
-                if key not in seen_edges:
-                    seen_edges.add(key)
-                    merged["edges"].append(edge)
-        return merged
 
     # -- optional auth ------------------------------------------------------
 
@@ -589,6 +534,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "entities": store.entities(run_id, limit=10_000),
                 "edges": store.edges(run_id, limit=10_000),
                 "history": store.history(run_id, limit=10_000),
+                "attachments": store.attachments(run_id=run_id, limit=10_000),
                 "cases": store.cases(),
             }
         coverage: dict[str, int] = {}
@@ -619,7 +565,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ] = "json",
         table: Annotated[
             str,
-            Query(pattern="^(run|checks|profiles|posts|links|clusters|entities|edges|history)$"),
+            Query(
+                pattern="^(run|checks|profiles|posts|links|clusters|entities|edges|history|attachments)$"
+            ),
         ] = "profiles",
         redact: bool = False,
     ):
@@ -631,6 +579,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return _export_response(
             payload, format, table, redact, f"larpharvester-run{run_id}.{format}"
         )
+
+    @app.get("/evidence/{attachment_id}")
+    def evidence_download(attachment_id: int):
+        with _open() as store:
+            row = store.attachment(attachment_id)
+            if row is None:
+                raise HTTPException(status_code=404, detail="attachment not found")
+            path = evidence_path(store, row["sha256"])
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="evidence blob missing")
+        return FileResponse(
+            path,
+            media_type=row.get("media_type") or "application/octet-stream",
+            filename=row["filename"],
+        )
+
+    @app.get("/api/evidence/{attachment_id}")
+    def api_evidence(attachment_id: int):
+        with _open() as store:
+            row = store.attachment(attachment_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="attachment not found")
+        return row
 
     @app.get("/diff", response_class=HTMLResponse)
     def diff_page(
@@ -769,6 +740,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             targets = {name} | {f"{s}:{u}" for s, u in profiles}
             tags = [tag for tag in store.tags() if tag["target"] in targets]
             notes = [note for note in store.notes() if note["target"] in targets]
+            attachments: list[dict[str, Any]] = []
+            seen_attachments: set[str] = set()
+            for run_id in run_ids:
+                for attachment in store.attachments(run_id=run_id, limit=10_000):
+                    if attachment["sha256"] not in seen_attachments:
+                        seen_attachments.add(attachment["sha256"])
+                        attachments.append(attachment)
         return _render(
             request,
             "case_detail.html",
@@ -779,6 +757,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "entities": entities[:500],
                 "tags": tags,
                 "notes": notes,
+                "attachments": attachments,
                 "formats": sorted(EXPORTERS),
                 "active": "cases",
             },
@@ -792,7 +771,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ] = "json",
         table: Annotated[
             str,
-            Query(pattern="^(run|checks|profiles|posts|links|clusters|entities|edges|history)$"),
+            Query(
+                pattern="^(run|checks|profiles|posts|links|clusters|entities|edges|history|attachments)$"
+            ),
         ] = "profiles",
         redact: bool = False,
     ):
@@ -800,7 +781,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             case = store.case(name)
             if case is None:
                 raise HTTPException(status_code=404, detail=f"no such case: {name}")
-            payload = _case_payload(store, case)
+            payload = merge_case_payload(store, case)
         return _export_response(
             payload, format, table, redact, f"larpharvester-case-{name}.{format}"
         )
@@ -815,7 +796,113 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return _render(
             request,
             "tools.html",
-            {"post_sources": post_sources, "result": None, "tool": None, "active": "tools"},
+            {
+                "post_sources": post_sources,
+                "external_tools": list_tools(),
+                "result": None,
+                "tool": None,
+                "active": "tools",
+            },
+        )
+
+    def _tools_context(**extra: Any) -> dict[str, Any]:
+        post_sources = sorted(
+            name for name, src in SOURCES.items() if src.kind == "username" and src.supports_posts
+        )
+        return {
+            "post_sources": post_sources,
+            "external_tools": list_tools(),
+            "result": None,
+            "tool": None,
+            "active": "tools",
+            **extra,
+        }
+
+    @app.post("/tools/external", response_class=HTMLResponse)
+    async def tools_external(
+        request: Request,
+        tool: Annotated[str, Form(min_length=1)],
+        target: Annotated[str, Form(min_length=1)],
+        save: Annotated[bool, Form()] = False,
+    ):
+        if _rate_limited(request):
+            raise HTTPException(status_code=429, detail="rate limit exceeded")
+        error: str | None = None
+        payload: dict[str, Any] | None = None
+        try:
+            result = await asyncio.to_thread(run_tool, tool, target)
+            run_id = None
+            if save:
+                with _open() as store:
+                    run_id = persist_tool_result(store, result)
+            payload = {
+                "tool": tool,
+                "target": target,
+                "summary": result.summary,
+                "run_id": run_id,
+                "profiles": [asdict(profile) for profile in result.profiles[:50]],
+                "entities": [asdict(entity) for entity in result.entities[:100]],
+            }
+        except (ToolUnavailable, ToolError) as exc:
+            error = str(exc)
+        return _render(
+            request,
+            "tools.html",
+            _tools_context(
+                external_result=payload,
+                external_error=error,
+                external_tool=tool,
+                external_target=target,
+            ),
+        )
+
+    @app.post("/tools/ingest", response_class=HTMLResponse)
+    async def tools_ingest(
+        request: Request,
+        file: Annotated[UploadFile, File()],
+        format: Annotated[str, Form()] = "auto",
+        save: Annotated[bool, Form()] = False,
+    ):
+        if _rate_limited(request):
+            raise HTTPException(status_code=429, detail="rate limit exceeded")
+        error: str | None = None
+        payload: dict[str, Any] | None = None
+        data = await file.read()
+        if len(data) > MAX_UPLOAD:
+            raise HTTPException(status_code=413, detail="upload exceeds 50 MB")
+        suffix = Path(file.filename or "import.json").suffix
+        temp_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as handle:
+                handle.write(data)
+                temp_path = Path(handle.name)
+            chosen, parsed, raw = ingest_file(temp_path, format)
+            run_id = None
+            if save:
+                with _open() as store:
+                    run_id = persist_ingest(
+                        store,
+                        str(file.filename or temp_path.name),
+                        chosen,
+                        parsed,
+                        raw,
+                    )
+            payload = {
+                "format": chosen,
+                "summary": parsed.summary,
+                "run_id": run_id,
+                "profiles": [asdict(profile) for profile in parsed.profiles[:50]],
+                "entities": [asdict(entity) for entity in parsed.entities[:100]],
+            }
+        except ToolError as exc:
+            error = str(exc)
+        finally:
+            if temp_path is not None:
+                temp_path.unlink(missing_ok=True)
+        return _render(
+            request,
+            "tools.html",
+            _tools_context(ingest_result=payload, ingest_error=error),
         )
 
     @app.post("/tools/run", response_class=HTMLResponse)
@@ -926,6 +1013,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "tools.html",
             {
                 "post_sources": post_sources,
+                "external_tools": list_tools(),
                 "tool": tool,
                 "target": cleaned if tool != "pwned" else "",
                 "result": result,
@@ -938,6 +1026,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/pivot", response_class=HTMLResponse)
     def pivot_page(request: Request):
         return _render(request, "pivot.html", {"active": "pivot"})
+
+    @app.get("/help", response_class=HTMLResponse)
+    def help_page(request: Request):
+        return _render(request, "help.html", {"active": "help"})
 
     # -- pivot jobs & SSE streaming -----------------------------------------
 
@@ -1042,7 +1134,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         expand: Annotated[bool, Form()] = False,
         depth: Annotated[int, Form(ge=1, le=5)] = 1,
         variants: Annotated[bool, Form()] = False,
-        avatar_hash: Annotated[bool, Form()] = True,
+        avatar_hash: Annotated[bool, Form()] = False,
     ):
         if _rate_limited(request):
             raise HTTPException(status_code=429, detail="rate limit exceeded")

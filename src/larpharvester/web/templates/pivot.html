@@ -13,7 +13,7 @@
   <label>
     Source scope
     <select name="scope" id="scope">
-      <option value="curated">Curated sources ({{ groups | join(", ") }})</option>
+      <option value="curated">Curated sources ({{ curated_groups | join(", ") }})</option>
       <option value="web">Curated + 460-site web corpus ({{ source_count }} total)</option>
       <option value="custom">Custom source list</option>
     </select>

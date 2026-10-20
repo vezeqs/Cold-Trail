@@ -125,9 +125,7 @@ async def hash_avatars(fetcher, profiles: list[Profile]) -> int:
     targets = [
         profile
         for profile in profiles
-        if profile.avatar
-        and not profile.avatar_hash
-        and not profile.source.startswith("web.")
+        if profile.avatar and not profile.avatar_hash and not profile.source.startswith("web.")
     ]
     if not targets:
         return 0

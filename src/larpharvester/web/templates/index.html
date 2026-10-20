@@ -6,7 +6,8 @@
 <section class="cards">
   {% for label, key in [("Runs", "runs"), ("Checks", "checks"), ("Profiles", "profiles"),
                         ("Posts", "posts"), ("Links", "links"), ("Clusters", "clusters"),
-                        ("Entities", "entities"), ("Cases", "cases")] %}
+                        ("Entities", "entities"), ("Evidence", "attachments"),
+                        ("Cases", "cases")] %}
   <div class="card">
     <div class="num">{{ stats[key] }}</div>
     <div class="lbl">{{ label }}</div>

@@ -314,3 +314,21 @@ async def test_tui_action_diff_runs(settings):
         output = str(app.query_one("#tool-output").renderable)
         assert '"run_a"' in output
         assert "gitlab" in output
+
+
+async def test_tui_number_shortcuts_switch_tabs(settings):
+    from textual.widgets import TabbedContent
+
+    app = LarpharvesterTUI(settings)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        tabs = app.query_one(TabbedContent)
+        await pilot.press("7")
+        await pilot.pause()
+        assert tabs.active == "tab-help"
+        await pilot.press("2")
+        await pilot.pause()
+        assert tabs.active == "tab-pivot"
+        await pilot.press("5")
+        await pilot.pause()
+        assert tabs.active == "tab-tools"

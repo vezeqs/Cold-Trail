@@ -13,7 +13,7 @@ from ._app import _settings, app, console
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 
-@app.command()
+@app.command(rich_help_panel="Interfaces")
 def tui(ctx: typer.Context) -> None:
     """Open the interactive terminal UI."""
     settings = _settings(ctx)
@@ -25,7 +25,7 @@ def tui(ctx: typer.Context) -> None:
     run_tui(settings)
 
 
-@app.command()
+@app.command(rich_help_panel="Interfaces")
 def serve(
     ctx: typer.Context,
     host: Annotated[str, typer.Option("--host", help="Bind address")] = "127.0.0.1",

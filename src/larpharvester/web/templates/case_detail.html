@@ -105,6 +105,27 @@
 </section>
 {% endif %}
 
+{% if attachments %}
+<section class="panel">
+  <h2>Evidence ({{ attachments | length }})</h2>
+  <table>
+    <thead><tr><th>#</th><th>File</th><th>Size</th><th>SHA-256</th><th>Note</th><th>Download</th></tr></thead>
+    <tbody>
+      {% for attachment in attachments %}
+      <tr>
+        <td>{{ attachment.id }}</td>
+        <td class="mono">{{ attachment.filename }}</td>
+        <td>{{ attachment.size | filesize }}</td>
+        <td class="mono">{{ attachment.sha256[:16] }}…</td>
+        <td>{{ attachment.note | short(60) }}</td>
+        <td><a class="chip" href="/evidence/{{ attachment.id }}">download</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
 {% if tags %}
 <section class="panel">
   <h2>Tags</h2>

@@ -46,26 +46,29 @@ src/larpharvester/
 ├── cli/            Typer commands (entry point: larpharvester.cli:app)
 │   ├── _app.py       app, global callback (settings/audit/source sync), renderers
 │   ├── collect.py    pivot, harvest, graph, watch
-│   ├── query.py      profiles, posts, links, clusters, entities, runs, edges, search, timeline, history
-│   ├── osint.py      sources, source list/test, dorks, analyze, archive, domain, ip, phone
+│   ├── query.py      profiles, posts, links, clusters, entities, runs, edges, search, timeline, history, diff
+│   ├── osint.py      sources, source list/test, dorks, analyze, archive, domain, ip, phone, ct
 │   ├── output.py     export, report, decrypt
-│   ├── cases.py      case new/list/add/show, tag(s), note(s)
+│   ├── cases.py      case new/list/add/show/export, tag(s), note(s)
 │   ├── ops.py        audit, doctor, prune, db
 │   ├── breach.py     breach (HIBP / --all multi-provider), pwned (Pwned Passwords)
+│   ├── evidence.py   evidence add/list/export/verify (content-addressed files)
+│   ├── integrations.py integrations, run, ingest (external tools/imports)
+│   ├── menu.py       interactive menu for common workflows
 │   └── interfaces.py tui, serve
-├── tui/app.py      Textual app: Dashboard / Pivot / Browse / Search / Tools / Cases
+├── tui/app.py      Textual app: Dashboard / Pivot / Browse / Search / Tools / Cases / Help
 ├── web/
-│   ├── app.py        create_app(settings) -> FastAPI (pages, JSON API, jobs, SSE, graph, tools)
-│   ├── templates/    Jinja2 templates (autoescape on)
-│   └── static/       style.css, app.js (scope toggle, SSE stream, canvas graph)
+│   ├── app.py        create_app(settings) -> FastAPI (pages, JSON API, jobs, SSE, graph, tools, evidence)
+│   ├── templates/    Jinja2 templates (autoescape on; help.html, run.html evidence)
+│   └── static/       style.css, app.js (scope toggle, SSE stream, canvas graph, source filter)
 ├── store/          Store composed from mixins (public API: from larpharvester.store import Store)
-│   ├── schema.py     DDL, FTS definitions, column migrations, SCHEMA_VERSION
+│   ├── schema.py     DDL, FTS definitions, column migrations, SCHEMA_VERSION (4)
 │   ├── base.py       connection, PRAGMA setup, user_version gate, row helpers
 │   ├── runs.py       runs, count_runs
 │   ├── writes.py     checks/profiles/posts/links/clusters/entities/edges/history writes
 │   ├── queries.py    read queries + FTS search + timeline
 │   ├── caches.py     http_cache, raw, probe_cache, cursors
-│   ├── cases.py      audit, cases, tags, notes
+│   ├── cases.py      audit, cases, tags, notes, attachments
 │   └── maintenance.py export_run, stats, check_stats, profile_hints, prune, vacuum, db_info
 ├── pivot.py        probing, variants, multi-hop expansion (depth), streaming on_result, persist_pivot()
 ├── harvest.py      profile + posts collection, follows
@@ -73,13 +76,16 @@ src/larpharvester/
 ├── http.py         pacing, cache/ETag, circuit breaker, budget, WAF/bot-wall detection, proxy/Tor, replay
 ├── sources/        curated sources (subclass Source, @register) + declarative engine
 ├── data/sites.toml 459 generated site definitions (Sherlock v0.16.2, MIT)
-├── correlate.py    pair scoring, Jaro-Winkler handle similarity, clusters, recluster_rows()
+├── correlate.py    pair scoring, Jaro-Winkler handle similarity, clusters, recluster_rows(), diff_runs()
 ├── analysis.py     entity extraction (email/btc/eth/xmr/onion/pgp/ssh/matrix/…), language, timezone, stylometry
 ├── report.py       JSON/JSONL/CSV/GraphML/GEXF/DOT/HTML/Markdown/STIX/Maltego, redaction, encryption
 ├── breach.py       HIBP + HudsonRock + LeakCheck metadata, Pwned Passwords k-anonymity
 ├── contracts.py    source contracts, fixture recording, offline replay verification
 ├── domain.py       RDAP, DNS, crt.sh, SPF/DMARC, security.txt, favicon MMH3, takeovers,
 │                   ASN/BGP, TLS certificate inspection, CT identity search
+├── integrations.py external tool registry/runners/parsers + Maltego/SpiderFoot/theHarvester importers
+├── evidence.py     content-addressed evidence store (SHA-256, dedupe, verify)
+├── casework.py     merge_case_payload() shared by CLI and web case dossiers
 ├── domain.py, phone.py, wayback.py, dorks.py, alerts.py, avatars.py, variants.py, sites.py
 ├── config.py       Settings (TOML + env)
 └── models.py       dataclasses
@@ -105,7 +111,11 @@ tests/fixtures/contracts/ (recorded source fixtures)
 - Source tests live in `tests/test_sources.py`, `tests/test_new_sources.py`, and
   `tests/test_sources_expanded.py`; engine upgrades in `tests/test_engine_upgrades.py`;
   multi-hop/batch/recluster in `tests/test_workflows.py`; contract tests in
-  `tests/test_contracts.py`; v0.5.0 core fixes in `tests/test_v050_core.py`.
+  `tests/test_contracts.py`; v0.5.0 core fixes in `tests/test_v050_core.py`;
+  evidence in `tests/test_evidence.py`; external tools/importers in
+  `tests/test_integrations.py`; case dossiers in `tests/test_casework.py`;
+  live-investigation regressions in `tests/test_investigation_regressions.py`
+  and `tests/test_twitch_regression.py`.
 - **Contract fixtures** (`tests/fixtures/contracts/*.json`) are recorded real exchanges.
   Re-record with `larpharvester source verify --record -s <source>` and commit the JSON.
   Fixtures embed decompressed bodies; raw rows in SQLite are zlib-compressed, so always
@@ -154,7 +164,24 @@ tests/fixtures/contracts/ (recorded source fixtures)
   Do not add a global `Accept: application/json`; GitHub returns a 410
   API-retirement page for HTML requests with it.
 - **Schema changes** must keep the `PRAGMA user_version` migration path working
-  (current version: 3). Add columns via `store/schema.py::COLUMNS`.
+  (current version: 4). Add columns via `store/schema.py::COLUMNS`.
+- **Evidence is content-addressed:** `evidence.add_evidence()` hashes bytes,
+  writes `<db dir>/evidence/<sha[:2]>/<sha>` atomically, and inserts an
+  `attachments` row. Never store evidence only in the DB; `evidence verify`
+  must be able to detect missing/corrupted blobs.
+- **External tools run via argument vectors, never a shell.** `integrations.run_tool`
+  uses `subprocess.run(list, shell=False, timeout=..., cwd=tempdir)` and preserves
+  the environment (`HOME`, proxies, tokens) with `NO_COLOR`/`TERM=dumb` overrides.
+  Missing binaries raise `ToolUnavailable` with an install hint.
+- **Importers normalize to models:** Maltego CSV → profiles/links/entities;
+  SpiderFoot JSON → entities/profiles; theHarvester JSON → entities; generic JSON
+  → profiles/entities. Add a new format to `INGEST_FORMATS` + `detect_format` + tests.
+- **Menus:** commands are grouped with `rich_help_panel=` (Start here / Collect /
+  Query / Intel / Integrations / Evidence / Casework / Output / Interfaces /
+  Operations). `app.add_typer(..., rich_help_panel=...)` groups sub-apps. The
+  interactive `menu` command reuses library functions, not Typer callbacks.
+- **Case dossiers** go through `casework.merge_case_payload()`; CLI `case export`
+  and web `/cases/{name}/export` must stay identical.
 - **Declarative corpus** entries that collide with curated source names are
   skipped at load time. `scripts/build_sites.py --fetch` pins a Sherlock git
   ref and stamps ref+sha256 into the file header; bump `PINNED_REF` deliberately.
@@ -258,3 +285,26 @@ Export formats: `json`, `jsonl`, `csv` (`&table=`), `graphml`, `gexf`, `dot`,
   - `web.*` avatars are never downloaded/hashed (site logos, excluded from correlation).
   - `pivot` renders found-only by default; `--all-checks` shows every check. JSON/JSONL
     paths are unaffected and must remain complete.
+- **Evidence (0.6.0):** blobs live at `<db dir>/evidence/<sha[:2]>/<sha>`; the
+  `attachments` table stores metadata only. `evidence verify` must stay able to
+  detect missing/tampered blobs. Moving a database means moving `evidence/` too.
+- **External tool runners (0.6.0):** `integrations.run_tool` uses an argument
+  vector (`shell=False`), a temp cwd, an inherited environment plus
+  `NO_COLOR`/`TERM=dumb`, and a timeout. Missing binaries raise `ToolUnavailable`
+  with an install hint. Never call a blocking runner directly in an async web
+  handler — use `asyncio.to_thread`.
+- **Import formats:** add new formats to `INGEST_FORMATS`, `detect_format`, and
+  `tests/test_integrations.py`. Maltego alias→alias rows become links; alias→typed
+  rows become entities.
+- **Web checkbox defaults:** checked HTML checkboxes send `"true"`, unchecked send
+  nothing. A route parameter for a checked-by-default checkbox must default to
+  `False`, otherwise unchecking is a no-op (fixed for avatar hashing, tool save,
+  and ingest save).
+- **Table CSS:** never set `display: block` on `<table>`; it makes `tbody` rows
+  shrink-wrap to content even though the table box is full width. Use
+  `.panel { overflow-x: auto }` for wide tables.
+- **Menu grouping:** `@app.command(rich_help_panel="…")` and
+  `app.add_typer(..., rich_help_panel="…")` build the categorized help. Keep new
+  commands in a panel; otherwise they appear under a generic "Commands" panel.
+- **TUI shortcuts:** `1`–`7` switch tabs via `Binding(..., show=False)`; the
+  Footer only shows q/r/p/h/d so it stays readable at 80 columns.

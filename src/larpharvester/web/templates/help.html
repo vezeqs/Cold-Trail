@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Help · larpharvester{% endblock %}
+{% block content %}
+<h1>Help</h1>
+<p class="muted">Three interfaces over one local database: CLI, TUI, and this web UI.</p>
+
+<section class="grid-2">
+  <div class="panel">
+    <h2>Start here</h2>
+    <ol class="steps">
+      <li><a href="/pivot">Run a pivot</a> for a username or email (curated sources or the full web corpus).</li>
+      <li>Open the resulting <a href="/runs">run</a> to see profiles, correlations, entities, posts, and evidence.</li>
+      <li><a href="/tools">Harvest posts, collect a follow graph, or run an external tool</a>.</li>
+      <li>Attach runs to a <a href="/cases">case</a> and export a merged dossier.</li>
+    </ol>
+  </div>
+  <div class="panel">
+    <h2>Global options</h2>
+    <p>Options such as <code>--db</code>, <code>--config</code>, <code>--concurrency</code>,
+      <code>--timeout</code>, <code>--proxy</code>, <code>--tor</code>, and
+      <code>--max-requests</code> must come <strong>before</strong> the command:</p>
+    <pre class="code-box">larpharvester --db case.db pivot alice</pre>
+    <p class="muted">Default database: <span class="mono">{{ settings.db_path }}</span></p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>CLI cheat sheet</h2>
+  <table>
+    <thead><tr><th>Goal</th><th>Command</th></tr></thead>
+    <tbody>
+      <tr><td>Interactive menu</td><td class="mono">larpharvester menu</td></tr>
+      <tr><td>Pivot a handle/email</td><td class="mono">larpharvester pivot alice --expand --depth 2</td></tr>
+      <tr><td>Pivot the web corpus</td><td class="mono">larpharvester pivot alice --web --all-checks</td></tr>
+      <tr><td>Harvest posts</td><td class="mono">larpharvester harvest alice -s github -n 50</td></tr>
+      <tr><td>Follow graph</td><td class="mono">larpharvester graph alice -s bluesky</td></tr>
+      <tr><td>Monitor changes</td><td class="mono">larpharvester watch alice -s github --interval 3600</td></tr>
+      <tr><td>Search posts</td><td class="mono">larpharvester search "crypto wallet"</td></tr>
+      <tr><td>Compare runs</td><td class="mono">larpharvester diff 3 4</td></tr>
+      <tr><td>External tools</td><td class="mono">larpharvester integrations · larpharvester run sherlock alice</td></tr>
+      <tr><td>Import another tool</td><td class="mono">larpharvester ingest export.json</td></tr>
+      <tr><td>Evidence files</td><td class="mono">larpharvester evidence add shot.png --run 3</td></tr>
+      <tr><td>Dossier</td><td class="mono">larpharvester export 3 --format html -o dossier.html</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="grid-2">
+  <div class="panel">
+    <h2>TUI keys</h2>
+    <table>
+      <tbody>
+        <tr><td class="mono">q</td><td>quit</td></tr>
+        <tr><td class="mono">r</td><td>refresh</td></tr>
+        <tr><td class="mono">p</td><td>pivot the focused row</td></tr>
+        <tr><td class="mono">h</td><td>harvest the focused row</td></tr>
+        <tr><td class="mono">d</td><td>diff the two latest runs</td></tr>
+        <tr><td class="mono">Enter</td><td>open the highlighted run</td></tr>
+      </tbody>
+    </table>
+    <p class="muted">Launch with <code>larpharvester tui</code>.</p>
+  </div>
+  <div class="panel">
+    <h2>External tools &amp; evidence</h2>
+    <p><code>larpharvester integrations</code> lists detected binaries and install hints.
+      Run one with <code>larpharvester run &lt;tool&gt; &lt;target&gt;</code>; raw output is stored as
+      evidence.</p>
+    <p>Imports accept Maltego CSV, SpiderFoot JSON, theHarvester JSON, and generic JSON.
+      Evidence is content-addressed (SHA-256) and can be downloaded from each run page or via
+      <code>larpharvester evidence export ID -o file</code>.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Web API</h2>
+  <p>Interactive docs: <a href="/api/docs">/api/docs</a>. Key endpoints:
+    <code>POST /api/pivot</code>, <code>GET /api/runs</code>,
+    <code>GET /api/runs/{id}/graph</code>, <code>GET /api/diff</code>,
+    <code>GET /api/jobs/{id}/stream</code>, <code>GET /healthz</code>.</p>
+</section>
+{% endblock %}

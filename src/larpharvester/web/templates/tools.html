@@ -53,4 +53,75 @@
   <pre class="code-box">{{ result_json }}</pre>
 </section>
 {% endif %}
+
+<section class="panel">
+  <h2>External OSINT tools</h2>
+  <p class="muted">Runs a locally installed binary; raw output is stored as evidence. Missing tools show an install hint.</p>
+  {% if external_error %}<p class="badge status-error">{{ external_error }}</p>{% endif %}
+  {% if external_result %}
+  <p>
+    <span class="badge status-found">{{ external_result.summary }}</span>
+    {% if external_result.run_id %}<a class="chip" href="/runs/{{ external_result.run_id }}">Saved as run #{{ external_result.run_id }} →</a>{% endif %}
+  </p>
+  <pre class="code-box">{{ external_result | tojson(indent=2) }}</pre>
+  {% endif %}
+  <table>
+    <thead><tr><th>Tool</th><th>Category</th><th>Installed</th><th>Description</th><th>Install</th></tr></thead>
+    <tbody>
+      {% for item in external_tools %}
+      <tr>
+        <td class="mono">{{ item.name }}</td>
+        <td>{{ item.category }}</td>
+        <td>{{ "yes" if item.installed else "no" }}</td>
+        <td>{{ item.description }}</td>
+        <td class="mono">{{ "" if item.installed else item.install }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <form method="post" action="/tools/external" class="stack external-form">
+    <h3>Run a tool</h3>
+    <div class="inline-form">
+      <label>Tool
+        <select name="tool">
+          {% for item in external_tools if item.runner %}
+          <option value="{{ item.name }}">{{ item.name }}{{ "" if item.installed else " (not installed)" }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Target
+        <input type="text" name="target" placeholder="username / email / domain / URL / IP / file" required>
+      </label>
+      <label class="check"><input type="checkbox" name="save" value="true" checked> Save run + evidence</label>
+      <button type="submit">Run external tool</button>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Import another tool's export</h2>
+  <p class="muted">Maltego CSV, SpiderFoot JSON, theHarvester JSON, or generic JSON. The source file is stored as evidence.</p>
+  {% if ingest_error %}<p class="badge status-error">{{ ingest_error }}</p>{% endif %}
+  {% if ingest_result %}
+  <p>
+    <span class="badge status-found">{{ ingest_result.format }} · {{ ingest_result.summary }}</span>
+    {% if ingest_result.run_id %}<a class="chip" href="/runs/{{ ingest_result.run_id }}">Saved as run #{{ ingest_result.run_id }} →</a>{% endif %}
+  </p>
+  <pre class="code-box">{{ ingest_result | tojson(indent=2) }}</pre>
+  {% endif %}
+  <form method="post" action="/tools/ingest" enctype="multipart/form-data" class="inline-form">
+    <label>File <input type="file" name="file" required></label>
+    <label>Format
+      <select name="format">
+        <option value="auto">auto-detect</option>
+        <option value="maltego">Maltego CSV</option>
+        <option value="spiderfoot">SpiderFoot JSON</option>
+        <option value="theharvester">theHarvester JSON</option>
+        <option value="json">generic JSON</option>
+      </select>
+    </label>
+    <label class="check"><input type="checkbox" name="save" value="true" checked> Save run + evidence</label>
+    <button type="submit">Import</button>
+  </form>
+</section>
 {% endblock %}

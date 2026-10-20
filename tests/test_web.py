@@ -704,3 +704,147 @@ def test_rate_limit_on_pivot(settings, monkeypatch):
     assert first.status_code == 202
     second = client.post("/api/pivot", json={"target": "bob"})
     assert second.status_code == 429
+
+
+# -- 0.6.0: help, integrations, evidence ------------------------------------
+
+
+def test_help_page(client):
+    response = client.get("/help")
+    assert response.status_code == 200
+    assert "Start here" in response.text
+    assert "External tools" in response.text
+
+
+def test_tools_page_lists_external_tools(client):
+    response = client.get("/tools")
+    assert response.status_code == 200
+    assert "External OSINT tools" in response.text
+    assert "sherlock" in response.text
+
+
+def test_tools_external_runs_and_saves(client, settings, monkeypatch):
+    import larpharvester.web.app as app_module
+    from larpharvester.integrations import Parsed, ToolResult
+    from larpharvester.models import Entity
+
+    def fake_run_tool(tool, target, **kwargs):
+        return ToolResult(
+            tool=tool,
+            target=target,
+            command=["sherlock", target],
+            returncode=0,
+            stdout="[+] GitHub: https://github.com/alice\n",
+            stderr="",
+            parsed=Parsed(
+                profiles=[
+                    Profile(
+                        source="sherlock:github",
+                        username=target,
+                        url="https://github.com/alice",
+                        extra={},
+                    )
+                ],
+                entities=[
+                    Entity(source="sherlock", username=target, kind="domain", value="github.com")
+                ],
+                summary="1 profile(s) found by sherlock",
+            ),
+        )
+
+    monkeypatch.setattr(app_module, "run_tool", fake_run_tool)
+    response = client.post(
+        "/tools/external",
+        data={"tool": "sherlock", "target": "alice", "save": "true"},
+    )
+    assert response.status_code == 200
+    assert "Saved as run #1" in response.text
+    with Store(settings.db_path) as store:
+        assert store.profiles(run_id=1)[0]["source"] == "sherlock:github"
+        assert store.attachments(run_id=1)
+
+
+def test_tools_ingest_upload(client, settings):
+    content = json.dumps(
+        [{"type": "EMAILADDR", "data": "alice@example.com", "module": "sfp_whois"}]
+    ).encode()
+    response = client.post(
+        "/tools/ingest",
+        data={"format": "auto", "save": "true"},
+        files={"file": ("spider.json", content, "application/json")},
+    )
+    assert response.status_code == 200
+    assert "spiderfoot" in response.text
+    with Store(settings.db_path) as store:
+        assert store.entities(run_id=1)[0]["value"] == "alice@example.com"
+        assert store.attachments(run_id=1)[0]["filename"] == "spider.json"
+
+
+def test_evidence_download_and_api(client, settings):
+    from larpharvester.evidence import add_evidence
+
+    with Store(settings.db_path) as store:
+        run_id = store.start_run("pivot", "alice")
+        payload = add_evidence(store, data=b"evidence bytes", filename="note.txt", run_id=run_id)
+        store.finish_run(run_id)
+    response = client.get(f"/evidence/{payload['id']}")
+    assert response.status_code == 200
+    assert response.content == b"evidence bytes"
+    meta = client.get(f"/api/evidence/{payload['id']}").json()
+    assert meta["filename"] == "note.txt"
+    assert client.get("/evidence/9999").status_code == 404
+
+
+def test_pivot_form_unchecked_avatar_hash_is_false(client, monkeypatch):
+    captured: dict = {}
+
+    async def fake_pivot(target, *, settings, store=None, on_result=None, **kwargs):
+        captured.update(kwargs)
+        return PivotReport(
+            target=target,
+            kind="username",
+            results=[],
+            links=[],
+            expanded=[],
+            clusters=[],
+            coverage={},
+        )
+
+    monkeypatch.setattr(web_app, "run_pivot", fake_pivot)
+    response = client.post(
+        "/pivot",
+        data={"target": "grace", "scope": "curated"},  # avatar_hash checkbox omitted
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    job = _wait_job(client, response.headers["location"].rsplit("/", 1)[-1])
+    assert job["status"] == "done"
+    assert captured["avatar_hash"] is False
+
+
+def test_tools_external_unchecked_save_does_not_persist(client, settings, monkeypatch):
+    import larpharvester.web.app as app_module
+    from larpharvester.integrations import Parsed, ToolResult
+
+    def fake_run_tool(tool, target, **kwargs):
+        return ToolResult(
+            tool=tool,
+            target=target,
+            command=["whois", target],
+            returncode=0,
+            stdout="",
+            stderr="",
+            parsed=Parsed(
+                profiles=[Profile(source="whois", username=target, url="", extra={})],
+                summary="fake",
+            ),
+        )
+
+    monkeypatch.setattr(app_module, "run_tool", fake_run_tool)
+    response = client.post(
+        "/tools/external",
+        data={"tool": "whois", "target": "example.com"},  # save omitted
+    )
+    assert response.status_code == 200
+    with Store(settings.db_path) as store:
+        assert store.runs() == []

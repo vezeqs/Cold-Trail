@@ -29,7 +29,7 @@ from ._app import _settings, app, console
 # -- export / report --------------------------------------------------------
 
 
-@app.command("export")
+@app.command("export", rich_help_panel="Output")
 def export_cmd(
     ctx: typer.Context,
     run_id: Annotated[int, typer.Argument(help="Run ID")],
@@ -71,7 +71,7 @@ def export_cmd(
     console.print(f"wrote {out}")
 
 
-@app.command()
+@app.command(rich_help_panel="Output")
 def report(
     ctx: typer.Context,
     run_id: Annotated[int, typer.Argument(help="Run ID")],
@@ -120,7 +120,7 @@ def _render_format(payload: dict[str, Any], fmt: str, table: str, redacted: bool
     raise typer.BadParameter(f"unknown format {fmt!r}")
 
 
-@app.command()
+@app.command(rich_help_panel="Output")
 def decrypt(
     input_file: Annotated[Path, typer.Argument()],
     output_file: Annotated[Path, typer.Argument()],

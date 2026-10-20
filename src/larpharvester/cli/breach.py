@@ -20,7 +20,7 @@ from ..http import Fetcher, FetchError
 from ._app import _print_json, _settings, app, console
 
 
-@app.command()
+@app.command(rich_help_panel="Intel")
 def breach(
     ctx: typer.Context,
     email: Annotated[str, typer.Argument(help="Email address to audit")],
@@ -87,7 +87,7 @@ def breach(
     console.print(table)
 
 
-@app.command()
+@app.command(rich_help_panel="Intel")
 def pwned(
     ctx: typer.Context,
     password_env: Annotated[

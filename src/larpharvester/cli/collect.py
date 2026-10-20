@@ -36,7 +36,7 @@ from ._app import (
 )
 
 
-@app.command()
+@app.command(rich_help_panel="Collect")
 def pivot(
     ctx: typer.Context,
     target: Annotated[str, typer.Argument(help="Username, handle, or email")],
@@ -113,6 +113,7 @@ def pivot(
                 )
             else:
                 with console.status(f"probing {target}…", spinner="dots") as status:
+
                     def report_progress(result) -> None:
                         on_result(result)
                         status.update(
@@ -184,7 +185,7 @@ def _save_pivot(settings: Settings, report: PivotReport) -> None:
         persist_pivot(store, report)
 
 
-@app.command()
+@app.command(rich_help_panel="Collect")
 def batch(
     ctx: typer.Context,
     targets: Annotated[
@@ -243,7 +244,7 @@ def batch(
         _print_json(reports)
 
 
-@app.command()
+@app.command(rich_help_panel="Collect")
 def recluster(
     ctx: typer.Context,
     run_id: Annotated[int | None, typer.Option("--run", help="Specific run (omit for all)")] = None,
@@ -287,7 +288,7 @@ def recluster(
 # -- harvest ----------------------------------------------------------------
 
 
-@app.command()
+@app.command(rich_help_panel="Collect")
 def harvest(
     ctx: typer.Context,
     username: Annotated[str, typer.Argument(help="Username on the chosen source")],
@@ -401,7 +402,7 @@ def harvest(
 # -- follows / graph --------------------------------------------------------
 
 
-@app.command()
+@app.command(rich_help_panel="Collect")
 def graph(
     ctx: typer.Context,
     username: Annotated[str, typer.Argument()],
@@ -460,7 +461,7 @@ def graph(
 # -- watch ------------------------------------------------------------------
 
 
-@app.command()
+@app.command(rich_help_panel="Collect")
 def watch(
     ctx: typer.Context,
     target: Annotated[str, typer.Argument(help="Username or email")],

@@ -108,3 +108,68 @@ class CasesMixin:
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         rows = self.conn.execute(f"SELECT * FROM notes {where} ORDER BY id DESC", params).fetchall()
         return [dict(row) for row in rows]
+
+    # -- attachments (evidence) ---------------------------------------------
+
+    def add_attachment(
+        self,
+        *,
+        run_id: int | None,
+        target_type: str,
+        target: str | None,
+        sha256: str,
+        filename: str,
+        media_type: str,
+        size: int,
+        note: str | None,
+    ) -> int:
+        with self.conn:
+            cursor = self.conn.execute(
+                """INSERT INTO attachments
+                   (run_id, target_type, target, sha256, filename, media_type,
+                    size, note, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    run_id,
+                    target_type,
+                    target,
+                    sha256,
+                    filename,
+                    media_type,
+                    size,
+                    note,
+                    now_iso(),
+                ),
+            )
+        return int(cursor.lastrowid)
+
+    def attachments(
+        self,
+        run_id: int | None = None,
+        target_type: str | None = None,
+        target: str | None = None,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        clauses: list[str] = []
+        params: list[Any] = []
+        if run_id is not None:
+            clauses.append("run_id = ?")
+            params.append(run_id)
+        if target_type:
+            clauses.append("target_type = ?")
+            params.append(target_type)
+        if target:
+            clauses.append("target = ? COLLATE NOCASE")
+            params.append(target)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        params.append(limit)
+        rows = self.conn.execute(
+            f"SELECT * FROM attachments {where} ORDER BY id DESC LIMIT ?", params
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def attachment(self, attachment_id: int) -> dict[str, Any] | None:
+        row = self.conn.execute(
+            "SELECT * FROM attachments WHERE id = ?", (attachment_id,)
+        ).fetchone()
+        return dict(row) if row else None

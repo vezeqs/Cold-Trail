@@ -220,3 +220,9 @@ def test_sources_query_filter():
     assert result.exit_code == 0, result.output
     assert "mastodon" in result.output
     assert "github" not in result.output
+
+
+def test_menu_exits_cleanly():
+    result = runner.invoke(app, ["menu"], input="0\n")
+    assert result.exit_code == 0, result.output
+    assert "larpharvester menu" in result.output

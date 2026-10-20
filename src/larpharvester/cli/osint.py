@@ -43,7 +43,7 @@ from ._app import (
 # -- sources ----------------------------------------------------------------
 
 
-@app.command()
+@app.command(rich_help_panel="Intel")
 def sources(
     group: Annotated[str | None, typer.Option("-g", "--group", help="Filter by group")] = None,
     all_sources: Annotated[bool, typer.Option("--all", help="Include web corpus")] = False,
@@ -94,16 +94,16 @@ def sources(
             row["homepage"],
         )
     console.print(table)
-    if not all_sources and not group:
+    if not all_sources and not group and not query:
         console.print("[dim]web corpus hidden; use --all or -g web[/dim]")
 
 
-@source_app.command("list")
+@source_app.command("list", rich_help_panel="Intel")
 def source_list() -> None:
     sources()
 
 
-@source_app.command("test")
+@source_app.command("test", rich_help_panel="Intel")
 def source_test(
     ctx: typer.Context,
     name: Annotated[str, typer.Argument(help="Source name")],
@@ -131,7 +131,7 @@ def source_test(
         console.print(f"[dim]{result.detail}[/dim]")
 
 
-@source_app.command("verify")
+@source_app.command("verify", rich_help_panel="Intel")
 def source_verify(
     ctx: typer.Context,
     name: Annotated[
@@ -199,7 +199,7 @@ def source_verify(
 # -- dorks ------------------------------------------------------------------
 
 
-@app.command()
+@app.command(rich_help_panel="Intel")
 def dorks(
     target: Annotated[str, typer.Argument(help="Handle or name")],
     engine: Annotated[list[str] | None, typer.Option("-e", "--engine")] = None,
@@ -229,7 +229,7 @@ def dorks(
 # -- analysis / enrichment --------------------------------------------------
 
 
-@app.command()
+@app.command(rich_help_panel="Intel")
 def analyze(
     ctx: typer.Context,
     run: Annotated[int | None, typer.Option("--run")] = None,
@@ -299,7 +299,7 @@ def analyze(
         console.print("[dim]no timezone or style signals available[/dim]")
 
 
-@app.command()
+@app.command(rich_help_panel="Intel")
 def archive(
     ctx: typer.Context,
     url: Annotated[str, typer.Argument(help="URL to look up in the Wayback Machine")],
@@ -360,7 +360,7 @@ def archive(
         raise typer.Exit(code=1)
 
 
-@app.command("ct")
+@app.command("ct", rich_help_panel="Intel")
 def ct_search(
     ctx: typer.Context,
     query: Annotated[str, typer.Argument(help="Domain, organization, or email identity")],
@@ -395,7 +395,7 @@ def ct_search(
     console.print(table)
 
 
-@app.command()
+@app.command(rich_help_panel="Intel")
 def domain(
     ctx: typer.Context,
     name: Annotated[str, typer.Argument(help="Domain name")],
@@ -463,7 +463,7 @@ def domain(
             console.print(f"  {subdomain}")
 
 
-@app.command("ip")
+@app.command("ip", rich_help_panel="Intel")
 def ip_cmd(
     ctx: typer.Context,
     address: Annotated[str, typer.Argument(help="IPv4 address")],
@@ -519,7 +519,7 @@ def ip_cmd(
         console.print(table)
 
 
-@app.command()
+@app.command(rich_help_panel="Intel")
 def phone(
     number: Annotated[str, typer.Argument(help="Phone number")],
     region: Annotated[str | None, typer.Option("--region", help="ISO region hint")] = None,
