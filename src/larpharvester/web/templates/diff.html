@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Run diff · larpharvester{% endblock %}
+{% block content %}
+<h1>Run diff</h1>
+<p class="muted">Compare two stored runs: added/removed/changed profiles, entities, links, clusters, and posts.</p>
+
+<form method="get" action="/diff" class="inline-form">
+  <label>Baseline
+    <select name="a">
+      {% for run in runs %}
+      <option value="{{ run.id }}" {{ 'selected' if a == run.id }}>#{{ run.id }} · {{ run.kind }} · {{ run.target }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Comparison
+    <select name="b">
+      {% for run in runs %}
+      <option value="{{ run.id }}" {{ 'selected' if b == run.id }}>#{{ run.id }} · {{ run.kind }} · {{ run.target }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button type="submit">Compare</button>
+</form>
+
+{% if payload %}
+<section class="panel">
+  <h2>Summary</h2>
+  <p>
+    <span class="badge status-found">profiles +{{ payload.profiles.added | length }} / -{{ payload.profiles.removed | length }} / ~{{ payload.profiles.changed | length }}</span>
+    <span class="badge">entities +{{ payload.entities.added | length }} / -{{ payload.entities.removed | length }}</span>
+    <span class="badge">links +{{ payload.links.added | length }} / -{{ payload.links.removed | length }}</span>
+    <span class="badge">clusters +{{ payload.clusters.added | length }} / -{{ payload.clusters.removed | length }}</span>
+    <span class="badge status-blocked">posts +{{ payload.posts.added | length }} / -{{ payload.posts.removed | length }} / tombstones {{ payload.posts.tombstoned | length }}</span>
+  </p>
+</section>
+
+{% if payload.profiles.changed %}
+<section class="panel">
+  <h2>Changed profiles</h2>
+  <table>
+    <thead><tr><th>Source</th><th>Username</th><th>Field</th><th>Old</th><th>New</th></tr></thead>
+    <tbody>
+      {% for row in payload.profiles.changed %}
+        {% for field, values in row.fields.items() %}
+        <tr>
+          <td>{{ row.source }}</td>
+          <td class="mono">{{ row.username }}</td>
+          <td>{{ field }}</td>
+          <td>{{ values[0] | short(60) }}</td>
+          <td>{{ values[1] | short(60) }}</td>
+        </tr>
+        {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+{% for title, rows in [("Added profiles", payload.profiles.added), ("Removed profiles", payload.profiles.removed)] %}
+{% if rows %}
+<section class="panel">
+  <h2>{{ title }} ({{ rows | length }})</h2>
+  <table>
+    <thead><tr><th>Source</th><th>Username</th></tr></thead>
+    <tbody>
+      {% for row in rows %}
+      <tr><td>{{ row.source }}</td><td class="mono">{{ row.username }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endfor %}
+
+{% for title, rows in [("Added entities", payload.entities.added), ("Removed entities", payload.entities.removed)] %}
+{% if rows %}
+<section class="panel">
+  <h2>{{ title }} ({{ rows | length }})</h2>
+  <table>
+    <thead><tr><th>Kind</th><th>Value</th><th>Observed on</th></tr></thead>
+    <tbody>
+      {% for row in rows %}
+      <tr><td>{{ row.kind }}</td><td class="mono">{{ row.value }}</td><td class="mono">{{ row.source }}:{{ row.username }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endblock %}

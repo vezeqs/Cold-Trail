@@ -1,0 +1,21 @@
+{
+  "source": "rubygems",
+  "target": "sferik",
+  "observed_status": "found",
+  "profile": {
+    "username": "sferik",
+    "url": "https://rubygems.org/profiles/sferik",
+    "display_name": "sferik",
+    "followers": null,
+    "extra_keys": [
+      "id"
+    ]
+  },
+  "exchanges": [
+    {
+      "url": "https://rubygems.org/api/v1/profiles/sferik.json",
+      "status": 200,
+      "body_b64": "eyJpZCI6Mjg0LCJoYW5kbGUiOiJzZmVyaWsiLCJlbWFpbCI6InNmZXJpa0BnbWFpbC5jb20ifQ=="
+    }
+  ]
+}

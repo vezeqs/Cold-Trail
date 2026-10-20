@@ -4,6 +4,7 @@ import asyncio
 import json
 import random
 import time
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -77,7 +78,6 @@ class Fetched:
 class Fetcher:
     """Shared async HTTP client: concurrency cap, per-host pacing, caching, retries,
     circuit breaking, optional proxy/Tor, raw capture and replay."""
-
     def __init__(
         self,
         settings: Settings,
@@ -444,3 +444,22 @@ def _looks_blocked(response: Fetched) -> bool:
     if response.status == 200 and "html" in content_type:
         return any(marker in low for marker in HARD_MARKERS)
     return False
+
+
+@asynccontextmanager
+async def shared_fetcher(
+    settings: Settings,
+    store: Store | None = None,
+    fetcher: Fetcher | None = None,
+    run_id: int | None = None,
+):
+    """Reuse a caller-provided Fetcher, or open (and close) a new one.
+
+    Multi-phase operations (watch cycles, pivot + harvest) must share a single
+    Fetcher so per-run budgets, host pacing, and circuit state apply globally.
+    """
+    if fetcher is not None:
+        yield fetcher
+        return
+    async with Fetcher(settings, store=store, run_id=run_id) as owned:
+        yield owned

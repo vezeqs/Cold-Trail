@@ -202,26 +202,38 @@ def recluster(
     ctx: typer.Context,
     run_id: Annotated[int | None, typer.Option("--run", help="Specific run (omit for all)")] = None,
     threshold: Annotated[float, typer.Option("--threshold", min=0.1, max=1.0)] = 0.5,
+    save: Annotated[
+        bool, typer.Option("--save/--no-save", help="Persist links/clusters back to the run")
+    ] = True,
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Re-run correlation and clustering over stored profiles (single run or cross-run)."""
     settings = _settings(ctx)
     with Store(settings.db_path) as store:
+        if run_id is not None and store.run(run_id) is None:
+            typer.echo(f"run {run_id} not found", err=True)
+            raise typer.Exit(code=1)
         rows = store.profiles(run_id=run_id, limit=None)
-    links, clusters = recluster_rows(rows, threshold=threshold)
+        links, clusters = recluster_rows(rows, threshold=threshold)
+        if save and run_id is not None:
+            store.replace_links_and_clusters(run_id, links, clusters)
     if json_out:
         _print_json(
             {
                 "profiles": len(rows),
+                "saved": bool(save and run_id is not None),
                 "links": [asdict(link) for link in links],
                 "clusters": [asdict(c) for c in clusters],
             }
         )
         return
+    saved_note = f" · saved to run #{run_id}" if save and run_id is not None else ""
     console.print(
         f"[bold]Recluster[/bold] — {len(rows)} profile row(s) → "
-        f"{len(links)} link(s), {len(clusters)} cluster(s)"
+        f"{len(links)} link(s), {len(clusters)} cluster(s){saved_note}"
     )
+    if save and run_id is None:
+        console.print("[dim]cross-run recluster is read-only; pass --run to persist[/dim]")
     if links:
         _render_links(links)
 

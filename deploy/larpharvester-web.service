@@ -1,0 +1,26 @@
+[Unit]
+Description=larpharvester local web UI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=larpharvester
+Group=larpharvester
+Environment=LARPHARVESTER_DB=/var/lib/larpharvester/larpharvester.db
+EnvironmentFile=-/etc/larpharvester/env
+ExecStart=/usr/local/bin/larpharvester serve --host 127.0.0.1 --port 8765
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/larpharvester
+CapabilityBoundingSet=
+AmbientCapabilities=
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+[Install]
+WantedBy=multi-user.target

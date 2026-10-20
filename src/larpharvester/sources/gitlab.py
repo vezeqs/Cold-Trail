@@ -1,13 +1,56 @@
 from __future__ import annotations
 
+import asyncio
 from urllib.parse import quote
 
-from ..http import Fetcher
+from ..http import Fetcher, FetchError
 from ..models import CheckResult, Post, Profile
-from ..utils import is_after
+from ..utils import is_after, ssh_fingerprint
 from .base import Source, register
 
 API = "https://gitlab.com/api/v4"
+
+
+def _select_user(users: list, target: str) -> dict | None:
+    """Pick the exact case-insensitive username match, else None."""
+    for user in users:
+        if str(user.get("username", "")).casefold() == target.casefold():
+            return user
+    return None
+
+
+async def _keys(fetcher: Fetcher, user_id: object) -> dict[str, list]:
+    """Fetch SSH and GPG keys for a GitLab user (best-effort)."""
+
+    async def ssh() -> list[dict]:
+        try:
+            status, data = await fetcher.get_json(f"{API}/users/{quote(str(user_id))}/keys")
+        except FetchError:
+            return []
+        if status != 200 or not isinstance(data, list):
+            return []
+        out = []
+        for item in data:
+            fingerprint = ssh_fingerprint(item.get("key"))
+            if fingerprint:
+                out.append({"id": item.get("id"), "fingerprint": fingerprint})
+        return out
+
+    async def gpg() -> list[dict]:
+        try:
+            status, data = await fetcher.get_json(f"{API}/users/{quote(str(user_id))}/gpg_keys")
+        except FetchError:
+            return []
+        if status != 200 or not isinstance(data, list):
+            return []
+        return [
+            {"id": item.get("id"), "key_id": item.get("key_id"), "emails": item.get("emails") or []}
+            for item in data
+            if item.get("key_id") or item.get("emails")
+        ]
+
+    ssh_keys, gpg_keys = await asyncio.gather(ssh(), gpg())
+    return {"ssh_keys": ssh_keys, "gpg_keys": gpg_keys}
 
 
 @register
@@ -21,10 +64,8 @@ class GitLab(Source):
     async def check(self, fetcher: Fetcher, target: str) -> CheckResult:
         status, data = await fetcher.get_json(f"{API}/users", params={"username": target})
         if status == 200 and isinstance(data, list) and data:
-            user = next(
-                (u for u in data if str(u.get("username", "")).casefold() == target.casefold()),
-                data[0],
-            )
+            user = _select_user(data, target) or data[0]
+            key_material = await _keys(fetcher, user.get("id"))
             return self.ok(
                 target,
                 Profile(
@@ -42,6 +83,7 @@ class GitLab(Source):
                         "public_email": user.get("public_email"),
                         "location": user.get("location"),
                         "organization": user.get("organization"),
+                        **key_material,
                     },
                 ),
             )
@@ -57,7 +99,10 @@ class GitLab(Source):
         status, data = await fetcher.get_json(f"{API}/users", params={"username": target})
         if status != 200 or not isinstance(data, list) or not data:
             return []
-        user_id = data[0].get("id")
+        user = _select_user(data, target)
+        if user is None:
+            return []
+        user_id = user.get("id")
         if not user_id:
             return []
         posts: list[Post] = []

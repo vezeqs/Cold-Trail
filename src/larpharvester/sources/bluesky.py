@@ -2,12 +2,38 @@ from __future__ import annotations
 
 from urllib.parse import quote
 
-from ..http import Fetcher
+from ..http import Fetcher, FetchError
 from ..models import CheckResult, Edge, Post, Profile
 from ..utils import is_after
 from .base import Source, register
 
 PUBLIC_API = "https://public.api.bsky.app/xrpc"
+PLC_DIRECTORY = "https://plc.directory"
+
+
+async def _plc_history(fetcher: Fetcher, did: str) -> dict:
+    """Resolve DID document + audit log history (handle changes, PDS host)."""
+    try:
+        status, data = await fetcher.get_json(f"{PLC_DIRECTORY}/{quote(did)}/log/audit")
+    except FetchError:
+        return {}
+    if status != 200 or not isinstance(data, list):
+        return {}
+    handles: list[str] = []
+    pds: str | None = None
+    for entry in data:
+        operation = entry.get("operation") or {}
+        handle = operation.get("handle")
+        if handle and handle not in handles:
+            handles.append(handle)
+        for aka in operation.get("alsoKnownAs") or []:
+            if isinstance(aka, str) and aka.startswith("at://"):
+                alias = aka.removeprefix("at://")
+                if alias not in handles:
+                    handles.append(alias)
+        if operation.get("service"):
+            pds = operation["service"]
+    return {"handle_history": handles, "pds": pds, "plc_entries": len(data)}
 
 
 @register
@@ -24,6 +50,14 @@ class Bluesky(Source):
         )
         if status == 200 and isinstance(data, dict) and data.get("did"):
             handle = data.get("handle") or target
+            extra = {
+                "did": data.get("did"),
+                "follows": data.get("followsCount"),
+                "posts": data.get("postsCount"),
+                "labels": data.get("labels"),
+            }
+            if str(data.get("did", "")).startswith("did:plc:"):
+                extra.update(await _plc_history(fetcher, str(data["did"])))
             return self.ok(
                 target,
                 Profile(
@@ -35,12 +69,7 @@ class Bluesky(Source):
                     avatar=data.get("avatar"),
                     created_at=data.get("createdAt"),
                     followers=data.get("followersCount"),
-                    extra={
-                        "did": data.get("did"),
-                        "follows": data.get("followsCount"),
-                        "posts": data.get("postsCount"),
-                        "labels": data.get("labels"),
-                    },
+                    extra=extra,
                 ),
             )
         if status in (400, 404):

@@ -15,3 +15,4 @@ exports/
 .pytest_cache/
 .ruff_cache/
 .env
+tests/fixtures/contracts/_record.db*

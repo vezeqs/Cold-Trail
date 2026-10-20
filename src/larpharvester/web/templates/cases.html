@@ -82,7 +82,7 @@
       {% for case in cases %}
       <tr>
         <td>{{ case.id }}</td>
-        <td class="mono">{{ case.name }}</td>
+        <td><a class="mono" href="/cases/{{ case.name }}">{{ case.name }}</a></td>
         <td>{{ case.runs }}</td>
         <td>{{ case.created_at | ts }}</td>
         <td>{{ case.notes | short(80) }}</td>

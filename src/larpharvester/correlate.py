@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from itertools import combinations
 
@@ -309,25 +310,86 @@ def score_pair(a: Profile, b: Profile) -> tuple[float, list[str]]:
     score += _timezone_signal(a, b, reasons)
     score += _language_signal(a, b, reasons)
     score += _extracted_entity_signal(a, b, reasons)
+    score += _crypto_key_signal(a, b, reasons)
+    score += _avatar_meta_signal(a, b, reasons)
     score += _handle_similarity_signal(a, b, reasons)
 
     return max(0.0, score), reasons
 
 
 # Kinds that are strong identity evidence when two profiles share them.
-STRONG_ENTITY_KINDS = {
-    "email",
-    "btc",
-    "eth",
-    "xmr",
-    "onion",
-    "pgp_fingerprint",
-    "ssh_key",
-    "matrix",
-    "discord",
-    "telegram",
-    "phone",
-}
+STRONG_ENTITY_KINDS = {"email", "discord", "telegram", "phone", "matrix", "onion"}
+
+# Cryptographic / chain-level identifiers: an exact match is near-proof.
+CRYPTO_ENTITY_KINDS = {"ssh_key", "pgp_fingerprint", "did", "nostr_key", "eth", "btc", "xmr"}
+
+
+def calibrate_probability(raw_score: float) -> float:
+    """Map additive evidence weight to a bounded confidence in [0.0, 0.99].
+
+    Canonical link scores remain additive (interpretable evidence strength);
+    this is the probability-flavoured view used in reports.
+    """
+    calibrated = 1.0 / (1.0 + math.exp(-3.0 * (raw_score - 0.5)))
+    return round(min(0.99, max(0.0, calibrated)), 3)
+
+
+def _profile_crypto_keys(profile: Profile) -> set[tuple[str, str]]:
+    keys: set[tuple[str, str]] = set()
+    extra = profile.extra or {}
+    for key in extra.get("ssh_keys") or []:
+        if isinstance(key, dict) and key.get("fingerprint"):
+            keys.add(("ssh_key", str(key["fingerprint"]).casefold()))
+    for key in extra.get("gpg_keys") or []:
+        if isinstance(key, dict) and key.get("key_id"):
+            keys.add(("pgp_fingerprint", str(key["key_id"]).casefold()))
+    if extra.get("did"):
+        keys.add(("did", str(extra["did"]).casefold()))
+    if extra.get("pubkey"):
+        keys.add(("nostr_key", str(extra["pubkey"]).casefold()))
+    if extra.get("eth_address"):
+        keys.add(("eth", str(extra["eth_address"]).casefold()))
+    for entity in extra.get("extracted_entities") or []:
+        if isinstance(entity, dict) and entity.get("kind") in CRYPTO_ENTITY_KINDS:
+            keys.add((str(entity["kind"]), str(entity.get("value", "")).casefold()))
+    return keys
+
+
+def _crypto_key_signal(a: Profile, b: Profile, reasons: list[str]) -> float:
+    shared = _profile_crypto_keys(a) & _profile_crypto_keys(b)
+    if not shared:
+        return 0.0
+    for kind, value in sorted(shared):
+        reasons.append(f"identical cryptographic identifier ({kind}: {value[:24]})")
+    return 0.95
+
+
+def _avatar_meta_signal(a: Profile, b: Profile, reasons: list[str]) -> float:
+    meta_a = a.extra.get("avatar_meta") or {}
+    meta_b = b.extra.get("avatar_meta") or {}
+    if not isinstance(meta_a, dict) or not isinstance(meta_b, dict):
+        return 0.0
+    serial = meta_a.get("camera_serial")
+    if serial and len(str(serial)) >= 4 and str(serial) == str(meta_b.get("camera_serial")):
+        reasons.append("same camera serial in avatar EXIF")
+        return 0.4
+    taken = meta_a.get("taken_at")
+    model = meta_a.get("camera_model")
+    if (
+        taken
+        and model
+        and str(taken) == str(meta_b.get("taken_at"))
+        and str(model) == str(meta_b.get("camera_model"))
+    ):
+        reasons.append("same capture time and camera in avatar EXIF")
+        return 0.4
+    artist = meta_a.get("exif_artist") or meta_a.get("author") or meta_a.get("artist")
+    if artist and len(str(artist)) >= 3:
+        other = meta_b.get("exif_artist") or meta_b.get("author") or meta_b.get("artist")
+        if str(artist).casefold() == str(other).casefold():
+            reasons.append("same author tag in avatar EXIF")
+            return 0.3
+    return 0.0
 
 
 def jaro_winkler(left: str, right: str) -> float:
@@ -553,3 +615,125 @@ def recluster_rows(
     links = correlate(profiles, threshold=threshold)
     clusters = build_clusters(profiles, links, threshold=threshold)
     return links, clusters
+
+
+_PROFILE_FIELDS = (
+    "display_name",
+    "bio",
+    "avatar",
+    "avatar_hash",
+    "website",
+    "followers",
+    "lang",
+    "timezone",
+)
+
+
+def _profile_key(row: dict) -> tuple[str, str]:
+    return (str(row["source"]), str(row["username"]).casefold())
+
+
+def _entity_key(row: dict) -> tuple[str, str, str, str]:
+    return (
+        str(row["source"]),
+        str(row["username"]).casefold(),
+        str(row["kind"]),
+        str(row["value"]).casefold(),
+    )
+
+
+def _link_key(row: dict) -> tuple[str, str, str, str]:
+    a = (str(row["source_a"]), str(row["username_a"]).casefold())
+    b = (str(row["source_b"]), str(row["username_b"]).casefold())
+    return (a[0], a[1], b[0], b[1]) if a <= b else (b[0], b[1], a[0], a[1])
+
+
+def diff_runs(store, run_a: int, run_b: int) -> dict:
+    """Compare two stored runs: profiles, entities, links, clusters, and posts."""
+    profiles_a = {_profile_key(row): row for row in store.profiles(run_id=run_a, limit=None)}
+    profiles_b = {_profile_key(row): row for row in store.profiles(run_id=run_b, limit=None)}
+    entities_a = {
+        _entity_key(row): row for row in store.entities(run_id=run_a, limit=10_000_000)
+    }
+    entities_b = {
+        _entity_key(row): row for row in store.entities(run_id=run_b, limit=10_000_000)
+    }
+    links_a = {_link_key(row): row for row in store.links(run_id=run_a, limit=10_000_000)}
+    links_b = {_link_key(row): row for row in store.links(run_id=run_b, limit=10_000_000)}
+    clusters_a = {
+        str(row["cluster_key"]) for row in store.clusters(run_id=run_a, limit=10_000_000)
+    }
+    clusters_b = {
+        str(row["cluster_key"]) for row in store.clusters(run_id=run_b, limit=10_000_000)
+    }
+    posts_a = {
+        (str(row["source"]), str(row["post_id"])): row
+        for row in store.posts(run_id=run_a, limit=None)
+    }
+    posts_b = {
+        (str(row["source"]), str(row["post_id"])): row
+        for row in store.posts(run_id=run_b, limit=None)
+    }
+
+    changed = []
+    for key in profiles_a.keys() & profiles_b.keys():
+        old, new = profiles_a[key], profiles_b[key]
+        fields = {
+            field: [old.get(field), new.get(field)]
+            for field in _PROFILE_FIELDS
+            if str(old.get(field)) != str(new.get(field))
+        }
+        if fields:
+            changed.append(
+                {
+                    "source": key[0],
+                    "username": old["username"],
+                    "fields": fields,
+                }
+            )
+
+    def _public(row: dict) -> dict:
+        return {
+            "source": row["source"],
+            "username": row["username"],
+            "kind": row.get("kind"),
+            "value": row.get("value"),
+            "score": row.get("score"),
+        }
+
+    return {
+        "run_a": run_a,
+        "run_b": run_b,
+        "profiles": {
+            "added": [_public(profiles_b[k]) for k in profiles_b.keys() - profiles_a.keys()],
+            "removed": [_public(profiles_a[k]) for k in profiles_a.keys() - profiles_b.keys()],
+            "changed": changed,
+        },
+        "entities": {
+            "added": [_public(entities_b[k]) for k in entities_b.keys() - entities_a.keys()],
+            "removed": [_public(entities_a[k]) for k in entities_a.keys() - entities_b.keys()],
+        },
+        "links": {
+            "added": [_public(links_b[k]) for k in links_b.keys() - links_a.keys()],
+            "removed": [_public(links_a[k]) for k in links_a.keys() - links_b.keys()],
+        },
+        "clusters": {
+            "added": sorted(clusters_b - clusters_a),
+            "removed": sorted(clusters_a - clusters_b),
+        },
+        "posts": {
+            "added": [
+                {"source": key[0], "post_id": key[1]}
+                for key in posts_b.keys() - posts_a.keys()
+            ],
+            "removed": [
+                {"source": key[0], "post_id": key[1]}
+                for key in posts_a.keys() - posts_b.keys()
+            ],
+            "tombstoned": [
+                {"source": key[0], "post_id": key[1]}
+                for key, row in posts_b.items()
+                if row.get("deleted_at") and not (posts_a.get(key) or {}).get("deleted_at")
+            ],
+        },
+    }

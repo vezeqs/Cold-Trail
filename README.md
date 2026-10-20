@@ -6,14 +6,19 @@ the result as JSON, CSV, GraphML, GEXF, DOT, or a self-contained HTML dossier.
 
 Three interfaces over one database:
 
-- **CLI** — 40 commands, scriptable, JSON/JSONL output
-- **TUI** — six-tab terminal console (dashboard, pivot, browse, search, tools, cases)
+- **CLI** — 42 commands, scriptable, JSON/JSONL output
+- **TUI** — six-tab terminal console with row drill-down (`p` pivot, `h` harvest, `d` diff)
 - **Web UI** — local FastAPI app with a JSON API, live SSE pivot streaming, an interactive
-  identity graph, an OSINT workbench, case management, and export downloads
+  identity graph, an OSINT workbench, run diffing, case dossiers, optional auth, and export downloads
 
-493 sources out of the box: 40 hand-written API sources plus 453 declarative definitions generated
+495 sources out of the box: 42 hand-written API sources plus 453 declarative definitions generated
 from the [Sherlock](https://github.com/sherlock-project/sherlock) dataset (MIT). No API keys needed
 for most of it; optional keys unlock GitHub rate limits, HIBP, and EmailRep.
+
+v0.5.0 adds cryptographic identity collection (SSH/GPG keys, Gists, Bluesky DID history, Nostr
+NIP-05, ENS), avatar EXIF/GPS metadata, live TLS certificate inspection, BGP/ASN enrichment,
+certificate-transparency search, Wayback profile recovery, run-to-run diffing, source contract
+testing with recorded fixtures, and Docker/systemd deployment.
 
 ## Install
 
@@ -121,7 +126,7 @@ uv run larpharvester archive https://example.com/ --snapshot 20200101000000
 
 | Group | Sources |
 | --- | --- |
-| `social` | reddit, hackernews, mastodon, bluesky, telegram, youtube, twitch, steam, chesscom, lichess, roblox, duolingo, tiktok, medium, substack, linktree, matrix |
+| `social` | reddit, hackernews, mastodon, bluesky, telegram, youtube, twitch, steam, chesscom, lichess, roblox, duolingo, tiktok, medium, substack, linktree, matrix, nostr, ens |
 | `dev` | github, gitlab, codeberg, stackoverflow, kaggle, huggingface, npm, pypi, devto, hackerone, crates, dockerhub, rubygems, packagist |
 | `email` | gravatar, keybase, pgp, github-commits, hibp, emailrep, hudsonrock, leakcheck, libravatar |
 | `web` | 453 declarative sites (Sherlock corpus), selectable with `--web` or `-g web` |
@@ -150,7 +155,10 @@ into **clusters** (inferred identities, confidence = weakest edge):
 | Same website (generic roots ignored) | 0.6 |
 | ≥70% distinctive-token bio overlap | 0.5 |
 | Handle mentioned in the other bio | 0.5 |
-| Shared extracted entity (email, crypto, phone, chat handle, onion, PGP/SSH key, Matrix ID) | 0.8 |
+| Shared extracted entity (email, crypto, phone, chat handle, onion) | 0.8 |
+| Identical cryptographic identifier (SSH/GPG key, Bluesky DID, Nostr pubkey, ENS/chain address) | 0.95 |
+| Same camera serial / capture time+model in avatar EXIF | 0.4 |
+| Same author tag in avatar EXIF | 0.3 |
 | Handle differs only by separators (`alice_sec` ~ `alicesec`) | 0.2 |
 | Handle Jaro-Winkler similarity ≥ 0.92 | 0.15 |
 | Same display name | 0.3 |
@@ -161,7 +169,44 @@ into **clusters** (inferred identities, confidence = weakest edge):
 | Language mismatch | −0.05 |
 
 Coverage is reported explicitly (`found / not_found / blocked / error`), so a bot wall never looks
-like an absence.
+like an absence. Reports also show a calibrated **confidence** alongside the additive evidence
+score (logistic mapping, capped at 0.99); stored scores stay additive for interpretability.
+
+## Cryptographic keys, decentralized identity & metadata
+
+- **SSH / GPG keys** — GitHub, GitLab, and Codeberg key endpoints are collected during checks;
+  OpenSSH `SHA256:` fingerprints are computed locally and GPG UID emails are extracted. An exact
+  key match between two accounts is treated as near-proof (0.95).
+- **Gists** — GitHub public gists are harvested as posts alongside events.
+- **Bluesky DID history** — `did:plc:` accounts are resolved through the PLC audit log for
+  historical handles and the PDS host.
+- **Mastodon WebFinger** — `user@custom-domain` handles resolve to the real ActivityPub host.
+- **Nostr NIP-05** — `name@domain` (or `_@domain`) resolves to a hex pubkey and relays.
+- **ENS** — `.eth` names resolve to Ethereum addresses via public ENS metadata.
+- **Avatar EXIF** — camera make/model, serial, software, author, capture timestamps, and GPS
+  coordinates are extracted from downloaded avatars and fed into entity extraction/correlation.
+- **Wayback recovery** — `archive <url> --recover` rebuilds historical titles/descriptions from
+  archived captures (deleted bios, renamed accounts).
+
+## Infrastructure recon
+
+- `domain --deep` adds SPF/DMARC, security.txt, favicon MurmurHash3 (Shodan-compatible),
+  subdomain-takeover fingerprints, and a **live TLS handshake** (issuer, validity, SANs, TLS version).
+- `ip --asn` adds RIPE Stat ASN/prefix data and IP RDAP; BGP announced prefixes and the AS holder
+  are displayed.
+- `ct <query>` searches certificate-transparency logs for an identity string.
+
+## Run diffing & source contracts
+
+```bash
+uv run larpharvester diff 3 4                      # added/removed/changed profiles, entities, links, posts
+uv run larpharvester source verify -s github       # replay recorded fixtures offline
+uv run larpharvester source verify --record -s github   # capture fresh fixtures from live APIs
+uv run larpharvester source verify --live -s github     # probe live and validate the contract
+```
+
+Recorded fixtures live in `tests/fixtures/contracts/`; replaying them through the parsers catches
+upstream API drift and parser regressions without touching the network.
 
 ## Storage
 
@@ -223,6 +268,7 @@ machine. Exit code is `1` when exposed, `0` when clean — safe for CI/scripts.
 | `GET /api/stats` | Table counts, DB info, source health |
 | `GET /api/runs`, `/api/runs/{id}` | Run listing and full run export |
 | `GET /api/runs/{id}/graph` | Nodes + edges for the interactive identity graph |
+| `GET /api/diff?a=&b=` | Added/removed/changed profiles, entities, links, clusters, posts |
 | `GET /api/search?q=` | FTS5 post search |
 | `GET /api/sources` | Source registry |
 | `POST /api/pivot` | Queue a pivot (`{"target": "...", "include_web": false, "depth": 1, ...}`) → `202 {job_id}` |
@@ -230,11 +276,18 @@ machine. Exit code is `1` when exposed, `0` when clean — safe for CI/scripts.
 | `GET /api/jobs/{id}/stream` | Server-Sent Events: `check` per source, then `done` |
 
 Run exports are downloadable at `/runs/{id}/export?format=json|jsonl|csv|graphml|gexf|dot|html|md|stix|maltego`
-with optional `&redact=true` and `&table=` for CSV. Responses carry a strict CSP
-(`script-src 'self'`), `X-Frame-Options: DENY`, and harvested URLs are scheme-checked before
-becoming links. The web workbench at `/tools` runs domain, IP, phone, dorks, archive, breach,
+with optional `&redact=true` and `&table=` for CSV. Case pages (`/cases/{name}`) aggregate every
+run in the case and export a merged dossier at `/cases/{name}/export?format=…`. Responses carry a
+strict CSP (`script-src 'self'`), `X-Frame-Options: DENY`, and harvested URLs are scheme-checked
+before becoming links. The web workbench at `/tools` runs domain, IP, phone, dorks, archive, breach,
 Pwned Passwords, harvest, follow-graph, and re-clustering jobs; `/cases` supports creating cases,
-attaching runs, and adding tags/notes.
+attaching runs, and adding tags/notes; `/diff` compares any two runs; every profile/entity row has a
+one-click **Pivot →** action.
+
+**Optional auth:** set `LARPHARVESTER_WEB_TOKEN` (or `larpharvester serve --token …`) to require a
+bearer token (`Authorization: Bearer …` / `X-API-Key`), or sign in at `/login` to receive an
+HTTP-only cookie. `/healthz` stays public for container probes. Expensive endpoints are rate
+limited per client (20 requests/minute).
 
 ## Configuration
 
@@ -254,6 +307,7 @@ attaching runs, and adding tags/notes.
 | `keep_raw` / `LARPHARVESTER_KEEP_RAW` | `true` | Retain raw bodies |
 | `retention_days` / `LARPHARVESTER_RETENTION_DAYS` | `0` | Auto-prune age |
 | `respect_robots` | `false` | Honour robots.txt |
+| `web_token` / `LARPHARVESTER_WEB_TOKEN` | unset | Require auth for the web UI/API |
 | `mastodon_instances` | 3 instances | Instances to search |
 | `GITHUB_TOKEN` | unset | 60 → 5000 req/h |
 | `HIBP_API_KEY` | unset | HIBP source |
@@ -263,10 +317,45 @@ attaching runs, and adding tags/notes.
 ## Development
 
 ```bash
-uv run pytest                # 315 tests, no network required
+uv run pytest                # 348 tests, no network required
 uv run ruff check .
 uv run ruff format --check .
 ```
+
+## Deployment
+
+**Docker / Compose**
+
+```bash
+docker build -t larpharvester:0.5.0 .
+docker run --rm -p 127.0.0.1:8765:8765 \
+  -v larpharvester-data:/data \
+  -e LARPHARVESTER_WEB_TOKEN=change-me \
+  larpharvester:0.5.0
+
+# Compose with an optional Tor sidecar:
+LARPHARVESTER_WEB_TOKEN=change-me docker compose up -d
+LARPHARVESTER_WEB_TOKEN=change-me LARPHARVESTER_PROXY=socks5h://tor:9050 \
+  docker compose --profile tor up -d
+```
+
+The image runs as a non-root user, stores the database in the `/data` volume, exposes port 8765,
+and ships a `/healthz` healthcheck.
+
+**systemd**
+
+`deploy/larpharvester-web.service` serves the UI on `127.0.0.1:8765` with hardening
+(`NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, empty capability set).
+`deploy/larpharvester-watch@.service` is a template for 24/7 monitoring:
+
+```bash
+sudo cp deploy/larpharvester-web.service /etc/systemd/system/
+sudo cp deploy/larpharvester-watch@.service /etc/systemd/system/
+sudo systemctl enable --now larpharvester-web
+sudo systemctl enable --now larpharvester-watch@alice
+```
+
+Configuration lives in `/etc/larpharvester/env` (see `deploy/env.example`; `chmod 600`).
 
 ## Responsible use
 

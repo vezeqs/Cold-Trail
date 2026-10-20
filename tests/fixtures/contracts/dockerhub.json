@@ -1,0 +1,24 @@
+{
+  "source": "dockerhub",
+  "target": "docker",
+  "observed_status": "found",
+  "profile": {
+    "username": "docker",
+    "url": "https://hub.docker.com/u/docker",
+    "display_name": "Docker, Inc.",
+    "followers": null,
+    "extra_keys": [
+      "company",
+      "id",
+      "location",
+      "type"
+    ]
+  },
+  "exchanges": [
+    {
+      "url": "https://hub.docker.com/v2/users/docker/",
+      "status": 200,
+      "body_b64": "eyJpZCI6IjU3YjQ1OTM0NzRjMDExZTRiZWE0MDI0MmFjMTEwMDFiIiwidXVpZCI6IjU3YjQ1OTM0LTc0YzAtMTFlNC1iZWE0LTAyNDJhYzExMDAxYiIsIm9yZ25hbWUiOiJkb2NrZXIiLCJmdWxsX25hbWUiOiJEb2NrZXIsIEluYy4iLCJsb2NhdGlvbiI6IlNhbiBGcmFuY2lzY28sIENBLCBVU0EiLCJjb21wYW55IjoiRG9ja2VyLCBJbmMuIiwicHJvZmlsZV91cmwiOiJodHRwczovL3d3dy5kb2NrZXIuY29tIiwiZGF0ZV9qb2luZWQiOiIyMDE0LTA1LTI3VDIxOjExOjAwLjAyMzY5OFoiLCJncmF2YXRhcl91cmwiOiJodHRwczovL3d3dy5ncmF2YXRhci5jb20vYXZhdGFyLzBmYjU3MzRiYzAzM2M0M2M0NTZhMjMzNzM5ZDFlYjA1P3M9ODBcdTAwMjZyPWdcdTAwMjZkPW1tIiwiZ3JhdmF0YXJfZW1haWwiOiIiLCJ0eXBlIjoiT3JnYW5pemF0aW9uIiwiYmFkZ2UiOiJ2ZXJpZmllZF9wdWJsaXNoZXIiLCJpc19hY3RpdmUiOnRydWV9Cg=="
+    }
+  ]
+}

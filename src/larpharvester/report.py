@@ -12,6 +12,7 @@ from xml.sax.saxutils import escape
 
 from cryptography.fernet import Fernet, InvalidToken
 
+from .correlate import calibrate_probability
 from .dorks import dorks
 from .utils import short_key
 
@@ -69,33 +70,37 @@ def to_json(payload: dict[str, Any]) -> str:
     return json.dumps(payload, indent=2, ensure_ascii=False, default=str)
 
 
-def to_jsonl(payload: dict[str, Any]) -> str:
-    lines = []
+def iter_jsonl(payload: dict[str, Any]):
+    """Yield JSONL records one at a time (streaming-friendly for large runs)."""
     if payload.get("run"):
-        lines.append(json.dumps({"type": "run", **payload["run"]}, ensure_ascii=False, default=str))
+        yield json.dumps({"type": "run", **payload["run"]}, ensure_ascii=False, default=str)
     for check in payload.get("checks", []):
-        lines.append(json.dumps({"type": "check", **check}, ensure_ascii=False, default=str))
+        yield json.dumps({"type": "check", **check}, ensure_ascii=False, default=str)
     for profile in payload.get("profiles", []):
-        lines.append(json.dumps({"type": "profile", **profile}, ensure_ascii=False, default=str))
+        yield json.dumps({"type": "profile", **profile}, ensure_ascii=False, default=str)
     for post in payload.get("posts", []):
-        lines.append(json.dumps({"type": "post", **post}, ensure_ascii=False, default=str))
+        yield json.dumps({"type": "post", **post}, ensure_ascii=False, default=str)
     for entity in payload.get("entities", []):
-        lines.append(json.dumps({"type": "entity", **entity}, ensure_ascii=False, default=str))
+        yield json.dumps({"type": "entity", **entity}, ensure_ascii=False, default=str)
     for link in payload.get("links", []):
-        lines.append(json.dumps({"type": "link", **link}, ensure_ascii=False, default=str))
+        yield json.dumps({"type": "link", **link}, ensure_ascii=False, default=str)
     for cluster in payload.get("clusters", []):
-        lines.append(json.dumps({"type": "cluster", **cluster}, ensure_ascii=False, default=str))
+        yield json.dumps({"type": "cluster", **cluster}, ensure_ascii=False, default=str)
     for edge in payload.get("edges", []):
-        lines.append(json.dumps({"type": "edge", **edge}, ensure_ascii=False, default=str))
+        yield json.dumps({"type": "edge", **edge}, ensure_ascii=False, default=str)
     for change in payload.get("history", []):
-        lines.append(json.dumps({"type": "history", **change}, ensure_ascii=False, default=str))
-    return "\n".join(lines)
+        yield json.dumps({"type": "history", **change}, ensure_ascii=False, default=str)
 
 
-def to_csv(payload: dict[str, Any], table: str = "profiles") -> str:
+def to_jsonl(payload: dict[str, Any]) -> str:
+    return "\n".join(iter_jsonl(payload))
+
+
+def iter_csv(payload: dict[str, Any], table: str = "profiles"):
+    """Yield a CSV header then one row at a time."""
     rows = payload.get(table) or []
     if not rows:
-        return ""
+        return
     flat_rows = []
     for row in rows:
         flat = {}
@@ -109,8 +114,16 @@ def to_csv(payload: dict[str, Any], table: str = "profiles") -> str:
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=fieldnames)
     writer.writeheader()
-    writer.writerows(flat_rows)
-    return buffer.getvalue()
+    yield buffer.getvalue()
+    for row in flat_rows:
+        buffer.seek(0)
+        buffer.truncate(0)
+        writer.writerow(row)
+        yield buffer.getvalue()
+
+
+def to_csv(payload: dict[str, Any], table: str = "profiles") -> str:
+    return "".join(iter_csv(payload, table))
 
 
 def _node_id(profile: dict[str, Any]) -> str:
@@ -257,13 +270,14 @@ def to_markdown(payload: dict[str, Any], redacted: bool = False) -> str:
 
     if links:
         lines.extend(["## Correlated Pairs", ""])
-        lines.append("| Account A | Account B | Score | Reasons |")
-        lines.append("| --- | --- | --- | --- |")
+        lines.append("| Account A | Account B | Score | Confidence | Reasons |")
+        lines.append("| --- | --- | --- | --- | --- |")
         for row in links:
+            score = float(row.get("score") or 0)
             lines.append(
                 f"| `{row.get('source_a')}:{row.get('username_a')}` "
                 f"| `{row.get('source_b')}:{row.get('username_b')}` "
-                f"| {float(row.get('score') or 0):.2f} "
+                f"| {score:.2f} | {calibrate_probability(score):.2f} "
                 f"| {', '.join(row.get('reasons') or [])} |"
             )
         lines.append("")
@@ -487,6 +501,7 @@ def to_html(payload: dict[str, Any], redacted: bool = False) -> str:
             f"{escape(str(row.get('source_a')))}:{escape(str(row.get('username_a')))}",
             f"{escape(str(row.get('source_b')))}:{escape(str(row.get('username_b')))}",
             f"{float(row.get('score') or 0):.2f}",
+            f"{calibrate_probability(float(row.get('score') or 0)):.2f}",
             escape(", ".join(row.get("reasons") or [])),
         ]
         for row in links
@@ -548,7 +563,7 @@ def to_html(payload: dict[str, Any], redacted: bool = False) -> str:
             "Profiles",
             table(["Source", "Username", "Name", "Bio", "Followers", "URL"], profile_rows),
         ),
-        ("Correlation links", table(["A", "B", "Score", "Reasons"], link_rows)),
+        ("Correlation links", table(["A", "B", "Score", "Confidence", "Reasons"], link_rows)),
         ("Entities", table(["Kind", "Value", "Observed on", "Context"], entity_rows)),
         ("Timeline", table(["When", "Source", "Username", "Text", "URL"], post_rows)),
         ("Profile changes", table(["Target", "Field", "Old", "New", "Observed"], history_rows)),

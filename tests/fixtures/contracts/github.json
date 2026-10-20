@@ -1,0 +1,39 @@
+{
+  "source": "github",
+  "target": "octocat",
+  "observed_status": "found",
+  "profile": {
+    "username": "octocat",
+    "url": "https://github.com/octocat",
+    "display_name": "The Octocat",
+    "followers": 24668,
+    "extra_keys": [
+      "company",
+      "email",
+      "gpg_keys",
+      "hireable",
+      "id",
+      "location",
+      "public_repos",
+      "ssh_keys",
+      "twitter_username"
+    ]
+  },
+  "exchanges": [
+    {
+      "url": "https://api.github.com/users/octocat",
+      "status": 200,
+      "body_b64": "eyJsb2dpbiI6Im9jdG9jYXQiLCJpZCI6NTgzMjMxLCJub2RlX2lkIjoiTURRNlZYTmxjalU0TXpJek1RPT0iLCJhdmF0YXJfdXJsIjoiaHR0cHM6Ly9hdmF0YXJzLmdpdGh1YnVzZXJjb250ZW50LmNvbS91LzU4MzIzMT92PTQiLCJncmF2YXRhcl9pZCI6IiIsInVybCI6Imh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvb2N0b2NhdCIsImh0bWxfdXJsIjoiaHR0cHM6Ly9naXRodWIuY29tL29jdG9jYXQiLCJmb2xsb3dlcnNfdXJsIjoiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9vY3RvY2F0L2ZvbGxvd2VycyIsImZvbGxvd2luZ191cmwiOiJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL29jdG9jYXQvZm9sbG93aW5ney9vdGhlcl91c2VyfSIsImdpc3RzX3VybCI6Imh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvb2N0b2NhdC9naXN0c3svZ2lzdF9pZH0iLCJzdGFycmVkX3VybCI6Imh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvb2N0b2NhdC9zdGFycmVkey9vd25lcn17L3JlcG99Iiwic3Vic2NyaXB0aW9uc191cmwiOiJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL29jdG9jYXQvc3Vic2NyaXB0aW9ucyIsIm9yZ2FuaXphdGlvbnNfdXJsIjoiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9vY3RvY2F0L29yZ3MiLCJyZXBvc191cmwiOiJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL29jdG9jYXQvcmVwb3MiLCJldmVudHNfdXJsIjoiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9vY3RvY2F0L2V2ZW50c3svcHJpdmFjeX0iLCJyZWNlaXZlZF9ldmVudHNfdXJsIjoiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9vY3RvY2F0L3JlY2VpdmVkX2V2ZW50cyIsInR5cGUiOiJVc2VyIiwidXNlcl92aWV3X3R5cGUiOiJwdWJsaWMiLCJzaXRlX2FkbWluIjpmYWxzZSwibmFtZSI6IlRoZSBPY3RvY2F0IiwiY29tcGFueSI6IkBnaXRodWIiLCJibG9nIjoiaHR0cHM6Ly9naXRodWIuYmxvZyIsImxvY2F0aW9uIjoiU2FuIEZyYW5jaXNjbyIsImVtYWlsIjpudWxsLCJoaXJlYWJsZSI6bnVsbCwiYmlvIjpudWxsLCJ0d2l0dGVyX3VzZXJuYW1lIjpudWxsLCJwdWJsaWNfcmVwb3MiOjgsInB1YmxpY19naXN0cyI6OCwiZm9sbG93ZXJzIjoyNDY2OCwiZm9sbG93aW5nIjo5LCJjcmVhdGVkX2F0IjoiMjAxMS0wMS0yNVQxODo0NDozNloiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wOS0yMlQxMTo0Njo0NFoifQ=="
+    },
+    {
+      "url": "https://api.github.com/users/octocat/keys",
+      "status": 200,
+      "body_b64": "W10="
+    },
+    {
+      "url": "https://api.github.com/users/octocat/gpg_keys",
+      "status": 200,
+      "body_b64": "W10="
+    }
+  ]
+}

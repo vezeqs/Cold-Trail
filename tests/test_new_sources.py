@@ -208,6 +208,12 @@ async def test_codeberg(settings):
             },
         )
     )
+    respx.get("https://codeberg.org/api/v1/users/alice/keys").mock(
+        return_value=httpx.Response(200, json=[])
+    )
+    respx.get("https://codeberg.org/api/v1/users/alice/gpg_keys").mock(
+        return_value=httpx.Response(200, json=[])
+    )
     async with Fetcher(settings) as fetcher:
         result = await SOURCES["codeberg"].check(fetcher, "alice")
     assert result.status == "found"

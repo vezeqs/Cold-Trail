@@ -1,0 +1,21 @@
+{
+  "source": "crates",
+  "target": "dtolnay",
+  "observed_status": "found",
+  "profile": {
+    "username": "dtolnay",
+    "url": "https://github.com/dtolnay",
+    "display_name": "David Tolnay",
+    "followers": null,
+    "extra_keys": [
+      "id"
+    ]
+  },
+  "exchanges": [
+    {
+      "url": "https://crates.io/api/v1/users/dtolnay",
+      "status": 200,
+      "body_b64": "eyJ1c2VyIjp7ImlkIjozNjE4LCJsb2dpbiI6ImR0b2xuYXkiLCJuYW1lIjoiRGF2aWQgVG9sbmF5IiwiYXZhdGFyIjoiaHR0cHM6Ly9hdmF0YXJzLmdpdGh1YnVzZXJjb250ZW50LmNvbS91LzE5NDA0OTA/dj00IiwidXJsIjoiaHR0cHM6Ly9naXRodWIuY29tL2R0b2xuYXkiLCJnaXRodWJfdXNlcm5hbWVfbWF0Y2hlcyI6dHJ1ZSwiY3JlYXRlZF9hdCI6IjIwMTItMDctMDlUMDM6NTU6NDBaIn19"
+    }
+  ]
+}

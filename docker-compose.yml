@@ -1,0 +1,41 @@
+services:
+  larpharvester:
+    build: .
+    image: larpharvester:0.5.0
+    container_name: larpharvester
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - larpharvester-data:/data
+    environment:
+      LARPHARVESTER_DB: /data/larpharvester.db
+      # Strongly recommended when publishing the port or sharing the host.
+      LARPHARVESTER_WEB_TOKEN: ${LARPHARVESTER_WEB_TOKEN:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      HIBP_API_KEY: ${HIBP_API_KEY:-}
+      EMAILREP_API_KEY: ${EMAILREP_API_KEY:-}
+      SHODAN_API_KEY: ${SHODAN_API_KEY:-}
+      # Route through the tor sidecar (enable with: --profile tor).
+      LARPHARVESTER_PROXY: ${LARPHARVESTER_PROXY:-}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8765/healthz', timeout=4).status == 200 else 1)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  tor:
+    image: dperson/torproxy:latest
+    container_name: larpharvester-tor
+    restart: unless-stopped
+    profiles: ["tor"]
+    expose:
+      - "9050"
+
+volumes:
+  larpharvester-data:

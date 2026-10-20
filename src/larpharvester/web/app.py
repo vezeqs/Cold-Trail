@@ -13,6 +13,7 @@ Design notes:
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import logging
 import re
@@ -38,7 +39,7 @@ from .. import __version__
 from ..analysis import entities_from_posts
 from ..breach import full_breach_audit, pwned_password
 from ..config import Settings
-from ..correlate import recluster_rows
+from ..correlate import diff_runs, recluster_rows
 from ..domain import asn_lookup, lookup_domain, ptr, rdap_ip, reverse_ip, shodan_host
 from ..dorks import dorks as build_dorks
 from ..dorks import reverse_image_links
@@ -50,8 +51,9 @@ from ..phone import lookup as phone_lookup
 from ..pivot import entities_for_profiles, persist_pivot
 from ..pivot import pivot as run_pivot
 from ..report import (
+    iter_csv,
+    iter_jsonl,
     redact_payload,
-    to_csv,
     to_dot,
     to_gexf,
     to_graphml,
@@ -87,6 +89,9 @@ EXPORTERS = {
 
 MAX_JOBS = 200
 JOB_RETENTION = 3600.0
+RATE_LIMIT = 20
+RATE_WINDOW = 60.0
+PUBLIC_PATHS = {"/healthz", "/api/health", "/login"}
 
 
 @dataclass
@@ -287,6 +292,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.jobs = {}
     app.state.tasks = set()
     app.state.pivot_lock = asyncio.Lock()
+    app.state.rate = {}
 
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.filters["short"] = _short
@@ -303,9 +309,184 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def _open() -> Store:
         return Store(settings.db_path)
 
-    def _render(request: Request, name: str, context: dict[str, Any] | None = None):
+    def _render(
+        request: Request,
+        name: str,
+        context: dict[str, Any] | None = None,
+        status_code: int = 200,
+    ):
         payload = {"settings": settings, **(context or {})}
-        return templates.TemplateResponse(request, name, payload)
+        return templates.TemplateResponse(request, name, payload, status_code=status_code)
+
+    def _rate_limited(request: Request) -> bool:
+        """Simple per-client sliding-window limiter for expensive endpoints."""
+        client = request.client.host if request.client else "local"
+        now = time.time()
+        stamps = [stamp for stamp in app.state.rate.get(client, []) if now - stamp < RATE_WINDOW]
+        if len(stamps) >= RATE_LIMIT:
+            app.state.rate[client] = stamps
+            return True
+        stamps.append(now)
+        app.state.rate[client] = stamps
+        return False
+
+    def _export_response(
+        payload: dict[str, Any],
+        fmt: str,
+        table: str,
+        redact: bool,
+        filename: str,
+    ) -> Response:
+        if redact:
+            payload = redact_payload(payload)
+        media_type, renderer = EXPORTERS[fmt]
+        headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+        if fmt == "jsonl":
+            return StreamingResponse(
+                (line + "\n" for line in iter_jsonl(payload)),
+                media_type=media_type,
+                headers=headers,
+            )
+        if fmt == "csv":
+            return StreamingResponse(
+                iter_csv(payload, table), media_type=media_type, headers=headers
+            )
+        if fmt == "html":
+            body = to_html(payload, redacted=redact)
+        elif fmt == "md":
+            body = to_markdown(payload, redacted=redact)
+        else:
+            body = renderer(payload)
+        return Response(content=body.encode(), media_type=media_type, headers=headers)
+
+    def _case_payload(store: Store, case: dict[str, Any]) -> dict[str, Any]:
+        """Merge every run in a case into a single exportable dossier payload."""
+        runs = case.get("runs") or []
+        merged: dict[str, Any] = {
+            "run": {
+                "id": f"case:{case['name']}",
+                "kind": "case",
+                "target": case["name"],
+                "started_at": runs[0]["started_at"] if runs else case["created_at"],
+                "finished_at": runs[-1].get("finished_at") if runs else None,
+                "status": "ok",
+            },
+            "checks": [],
+            "profiles": [],
+            "posts": [],
+            "links": [],
+            "clusters": [],
+            "entities": [],
+            "edges": [],
+            "history": [],
+        }
+        seen_profiles: set[tuple[str, str]] = set()
+        seen_posts: set[tuple[str, str]] = set()
+        seen_links: set[tuple[str, str, str, str]] = set()
+        seen_clusters: set[str] = set()
+        seen_entities: set[tuple[str, str, str, str]] = set()
+        seen_edges: set[tuple[str, str, str, str]] = set()
+        for run in runs:
+            try:
+                payload = store.export_run(run["id"])
+            except KeyError:
+                continue
+            merged["checks"].extend(payload.get("checks") or [])
+            merged["history"].extend(payload.get("history") or [])
+            for profile in payload.get("profiles") or []:
+                key = (profile["source"], profile["username"].casefold())
+                if key not in seen_profiles:
+                    seen_profiles.add(key)
+                    merged["profiles"].append(profile)
+            for post in payload.get("posts") or []:
+                key = (post["source"], str(post["post_id"]))
+                if key not in seen_posts:
+                    seen_posts.add(key)
+                    merged["posts"].append(post)
+            for link in payload.get("links") or []:
+                key = (
+                    link["source_a"],
+                    link["username_a"].casefold(),
+                    link["source_b"],
+                    link["username_b"].casefold(),
+                )
+                if key not in seen_links:
+                    seen_links.add(key)
+                    merged["links"].append(link)
+            for cluster in payload.get("clusters") or []:
+                key = str(cluster.get("cluster_key"))
+                if key not in seen_clusters:
+                    seen_clusters.add(key)
+                    merged["clusters"].append(cluster)
+            for entity in payload.get("entities") or []:
+                key = (
+                    entity["source"],
+                    entity["username"].casefold(),
+                    entity["kind"],
+                    str(entity["value"]).casefold(),
+                )
+                if key not in seen_entities:
+                    seen_entities.add(key)
+                    merged["entities"].append(entity)
+            for edge in payload.get("edges") or []:
+                key = (
+                    edge["platform"],
+                    edge["actor"].casefold(),
+                    edge["target"].casefold(),
+                    edge.get("direction") or "follows",
+                )
+                if key not in seen_edges:
+                    seen_edges.add(key)
+                    merged["edges"].append(edge)
+        return merged
+
+    # -- optional auth ------------------------------------------------------
+
+    @app.middleware("http")
+    async def _auth(request: Request, call_next):
+        token = settings.web_token
+        if not token:
+            return await call_next(request)
+        path = request.url.path
+        if path in PUBLIC_PATHS or path.startswith("/static"):
+            return await call_next(request)
+        supplied = ""
+        authorization = request.headers.get("authorization", "")
+        if authorization.lower().startswith("bearer "):
+            supplied = authorization[7:].strip()
+        elif request.headers.get("x-api-key"):
+            supplied = request.headers["x-api-key"].strip()
+        elif request.cookies.get("larp_token"):
+            supplied = request.cookies["larp_token"]
+        if supplied and hmac.compare_digest(supplied, token):
+            return await call_next(request)
+        if path.startswith("/api"):
+            return JSONResponse({"detail": "unauthorized"}, status_code=401)
+        return RedirectResponse("/login", status_code=303)
+
+    @app.get("/login", response_class=HTMLResponse)
+    def login_page(request: Request):
+        return _render(request, "login.html", {"error": None, "active": "login"})
+
+    @app.post("/login", response_class=HTMLResponse)
+    async def login_submit(request: Request, token: Annotated[str, Form()] = ""):
+        expected = settings.web_token or ""
+        if expected and hmac.compare_digest(token.strip(), expected):
+            response = RedirectResponse("/", status_code=303)
+            response.set_cookie(
+                "larp_token",
+                token.strip(),
+                httponly=True,
+                samesite="strict",
+                max_age=86_400,
+            )
+            return response
+        return _render(
+            request,
+            "login.html",
+            {"error": "invalid token", "active": "login"},
+            status_code=401,
+        )
 
     # -- security headers ---------------------------------------------------
 
@@ -447,23 +628,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 payload = store.export_run(run_id)
             except KeyError as exc:
                 raise HTTPException(status_code=404, detail=str(exc)) from exc
-        if redact:
-            payload = redact_payload(payload)
-        media_type, renderer = EXPORTERS[format]
-        if format == "csv":
-            body = to_csv(payload, table)
-        elif format == "html":
-            body = to_html(payload, redacted=redact)
-        elif format == "md":
-            body = to_markdown(payload, redacted=redact)
-        else:
-            body = renderer(payload)
-        filename = f"larpharvester-run{run_id}.{format}"
-        return Response(
-            content=body.encode(),
-            media_type=media_type,
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        return _export_response(
+            payload, format, table, redact, f"larpharvester-run{run_id}.{format}"
         )
+
+    @app.get("/diff", response_class=HTMLResponse)
+    def diff_page(
+        request: Request,
+        a: Annotated[int | None, Query(ge=1)] = None,
+        b: Annotated[int | None, Query(ge=1)] = None,
+    ):
+        payload = None
+        with _open() as store:
+            runs = store.runs(limit=100)
+            if a is not None and b is not None:
+                if store.run(a) is None or store.run(b) is None:
+                    raise HTTPException(status_code=404, detail="run not found")
+                payload = diff_runs(store, a, b)
+        return _render(
+            request,
+            "diff.html",
+            {"runs": runs, "payload": payload, "a": a, "b": b, "active": "diff"},
+        )
+
+    @app.get("/api/diff")
+    def api_diff(
+        a: Annotated[int, Query(ge=1)],
+        b: Annotated[int, Query(ge=1)],
+    ):
+        with _open() as store:
+            if store.run(a) is None or store.run(b) is None:
+                raise HTTPException(status_code=404, detail="run not found")
+            return diff_runs(store, a, b)
 
     @app.get("/search", response_class=HTMLResponse)
     def search_page(
@@ -555,6 +751,60 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             store.add_note(target_type, target.strip(), note.strip())
         return RedirectResponse("/cases", status_code=303)
 
+    @app.get("/cases/{name}", response_class=HTMLResponse)
+    def case_detail(request: Request, name: str):
+        with _open() as store:
+            case = store.case(name)
+            if case is None:
+                raise HTTPException(status_code=404, detail=f"no such case: {name}")
+            run_ids = [run["id"] for run in case["runs"]]
+            profiles: dict[tuple[str, str], dict[str, Any]] = {}
+            clusters: list[dict[str, Any]] = []
+            entities: list[dict[str, Any]] = []
+            for run_id in run_ids:
+                for profile in store.profiles(run_id=run_id, limit=None):
+                    profiles.setdefault((profile["source"], profile["username"]), profile)
+                clusters.extend(store.clusters(run_id=run_id, limit=10_000))
+                entities.extend(store.entities(run_id=run_id, limit=10_000))
+            targets = {name} | {f"{s}:{u}" for s, u in profiles}
+            tags = [tag for tag in store.tags() if tag["target"] in targets]
+            notes = [note for note in store.notes() if note["target"] in targets]
+        return _render(
+            request,
+            "case_detail.html",
+            {
+                "case": case,
+                "profiles": list(profiles.values()),
+                "clusters": clusters,
+                "entities": entities[:500],
+                "tags": tags,
+                "notes": notes,
+                "formats": sorted(EXPORTERS),
+                "active": "cases",
+            },
+        )
+
+    @app.get("/cases/{name}/export")
+    def case_export(
+        name: str,
+        format: Annotated[
+            str, Query(pattern="^(json|jsonl|csv|graphml|gexf|dot|html|md|stix|maltego)$")
+        ] = "json",
+        table: Annotated[
+            str,
+            Query(pattern="^(run|checks|profiles|posts|links|clusters|entities|edges|history)$"),
+        ] = "profiles",
+        redact: bool = False,
+    ):
+        with _open() as store:
+            case = store.case(name)
+            if case is None:
+                raise HTTPException(status_code=404, detail=f"no such case: {name}")
+            payload = _case_payload(store, case)
+        return _export_response(
+            payload, format, table, redact, f"larpharvester-case-{name}.{format}"
+        )
+
     # -- OSINT tools workbench ----------------------------------------------
 
     @app.get("/tools", response_class=HTMLResponse)
@@ -583,6 +833,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         post_sources = sorted(
             name for name, src in SOURCES.items() if src.kind == "username" and src.supports_posts
         )
+        if _rate_limited(request):
+            raise HTTPException(status_code=429, detail="rate limit exceeded")
         cleaned = target.strip()
         result: Any = None
         run_id: int | None = None
@@ -783,6 +1035,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/pivot")
     async def pivot_submit(
+        request: Request,
         target: Annotated[str, Form(min_length=1, max_length=320)],
         scope: Annotated[str, Form(pattern="^(curated|web|custom)$")] = "curated",
         sources: Annotated[str, Form()] = "",
@@ -791,6 +1044,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         variants: Annotated[bool, Form()] = False,
         avatar_hash: Annotated[bool, Form()] = True,
     ):
+        if _rate_limited(request):
+            raise HTTPException(status_code=429, detail="rate limit exceeded")
         names = _split_names(sources)
         include_web = scope == "web"
         if scope == "custom" and not names:
@@ -850,7 +1105,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return StreamingResponse(_event_gen(), media_type="text/event-stream")
 
     @app.post("/api/pivot", status_code=202)
-    async def api_pivot(payload: PivotRequest):
+    async def api_pivot(payload: PivotRequest, request: Request):
+        if _rate_limited(request):
+            raise HTTPException(status_code=429, detail="rate limit exceeded")
         job = _start_job(
             payload.target.strip(),
             sources=payload.sources,

@@ -1,11 +1,30 @@
 from __future__ import annotations
 
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
-from ..http import Fetcher
+from ..http import Fetcher, FetchError
 from ..models import CheckResult, Edge, Post, Profile
 from ..utils import is_after, strip_html
 from .base import Source, register
+
+
+async def _webfinger_instance(fetcher: Fetcher, user: str, domain: str) -> str | None:
+    """Resolve the real ActivityPub host for user@custom-domain via WebFinger."""
+    try:
+        status, data = await fetcher.get_json(
+            f"https://{domain}/.well-known/webfinger",
+            params={"resource": f"acct:{user}@{domain}"},
+        )
+    except FetchError:
+        return None
+    if status != 200 or not isinstance(data, dict):
+        return None
+    for link in data.get("links") or []:
+        if isinstance(link, dict) and link.get("rel") == "self" and link.get("href"):
+            host = urlsplit(str(link["href"])).netloc
+            if host:
+                return host
+    return None
 
 
 @register
@@ -26,7 +45,11 @@ class Mastodon(Source):
             if len(parts) == 2:
                 handle, instance = parts
                 if instance not in instances:
-                    instances.insert(0, instance)
+                    resolved = await _webfinger_instance(fetcher, handle, instance)
+                    if resolved and resolved not in instances:
+                        instances.insert(0, resolved)
+                    if instance not in instances:
+                        instances.append(instance)
         for instance in instances:
             status, data = await fetcher.get_json(
                 f"https://{instance}/api/v1/accounts/lookup", params={"acct": handle}

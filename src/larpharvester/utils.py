@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import html
 import re
@@ -8,6 +9,21 @@ from urllib.parse import urlsplit
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
+
+
+def ssh_fingerprint(key_line: str | None) -> str | None:
+    """Compute the OpenSSH SHA256 fingerprint of an authorized_keys line."""
+    if not key_line:
+        return None
+    parts = key_line.strip().split()
+    if len(parts) < 2:
+        return None
+    try:
+        blob = base64.b64decode(parts[1], validate=True)
+    except (ValueError, TypeError):
+        return None
+    digest = base64.b64encode(hashlib.sha256(blob).digest()).decode().rstrip("=")
+    return f"SHA256:{digest}"
 
 
 def now_iso() -> str:

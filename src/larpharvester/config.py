@@ -55,6 +55,7 @@ class Settings:
     max_requests: int = 0
     retention_days: int = 0
     replay: bool = False
+    web_token: str | None = None
     sites_path: Path = field(
         default_factory=lambda: Path(__file__).resolve().parent / "data" / "sites.toml"
     )
@@ -105,6 +106,8 @@ class Settings:
             self.tor = value.lower() in ("1", "true", "yes")
         if value := env.get("LARPHARVESTER_KEEP_RAW"):
             self.keep_raw = value.lower() in ("1", "true", "yes")
+        if value := env.get("LARPHARVESTER_WEB_TOKEN"):
+            self.web_token = value
         self.github_token = env.get("GITHUB_TOKEN") or self.github_token
         self.hibp_api_key = env.get("HIBP_API_KEY") or self.hibp_api_key
         self.emailrep_api_key = env.get("EMAILREP_API_KEY") or self.emailrep_api_key

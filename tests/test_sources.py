@@ -34,12 +34,25 @@ async def test_github_found(settings):
             },
         )
     )
+    import base64
+
+    key_blob = base64.b64encode(b"fake-ssh-key-material").decode()
+    respx.get("https://api.github.com/users/octocat/keys").mock(
+        return_value=httpx.Response(200, json=[{"id": 1, "key": f"ssh-ed25519 {key_blob} octo"}])
+    )
+    respx.get("https://api.github.com/users/octocat/gpg_keys").mock(
+        return_value=httpx.Response(
+            200, json=[{"id": 2, "key_id": "ABCDEF1234567890", "emails": ["octo@example.com"]}]
+        )
+    )
     async with Fetcher(settings) as fetcher:
         result = await SOURCES["github"].check(fetcher, "octocat")
     assert result.status == "found"
     assert result.profile.username == "octocat"
     assert result.profile.followers == 9000
     assert result.profile.extra["public_repos"] == 8
+    assert result.profile.extra["ssh_keys"][0]["fingerprint"].startswith("SHA256:")
+    assert result.profile.extra["gpg_keys"][0]["key_id"] == "ABCDEF1234567890"
 
 
 @respx.mock
@@ -76,6 +89,9 @@ async def test_github_posts(settings):
                 }
             ],
         )
+    )
+    respx.get("https://api.github.com/users/octocat/gists").mock(
+        return_value=httpx.Response(200, json=[])
     )
     async with Fetcher(settings) as fetcher:
         posts = await SOURCES["github"].posts(fetcher, "octocat", 10)
@@ -197,10 +213,27 @@ async def test_bluesky_found(settings):
             },
         )
     )
+    respx.get("https://plc.directory/did:plc:abc/log/audit").mock(
+        return_value=httpx.Response(
+            200,
+            json=[
+                {
+                    "operation": {
+                        "type": "plc_operation",
+                        "handle": "alice.bsky.social",
+                        "service": "https://bsky.social",
+                        "alsoKnownAs": ["at://alice.bsky.social"],
+                    }
+                }
+            ],
+        )
+    )
     async with Fetcher(settings) as fetcher:
         result = await SOURCES["bluesky"].check(fetcher, "alice.bsky.social")
     assert result.status == "found"
     assert result.profile.extra["did"] == "did:plc:abc"
+    assert "alice.bsky.social" in result.profile.extra["handle_history"]
+    assert result.profile.extra["pds"] == "https://bsky.social"
 
 
 @respx.mock
@@ -312,6 +345,12 @@ async def test_retries_on_429_then_succeeds(settings, monkeypatch):
         httpx.Response(429, headers={"Retry-After": "0"}),
         httpx.Response(200, json={"login": "octocat"}),
     ]
+    respx.get("https://api.github.com/users/octocat/keys").mock(
+        return_value=httpx.Response(200, json=[])
+    )
+    respx.get("https://api.github.com/users/octocat/gpg_keys").mock(
+        return_value=httpx.Response(200, json=[])
+    )
     async with Fetcher(settings) as fetcher:
         result = await SOURCES["github"].check(fetcher, "octocat")
     assert result.status == "found"

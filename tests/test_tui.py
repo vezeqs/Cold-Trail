@@ -244,3 +244,72 @@ async def test_tui_annotations_render(settings):
         await pilot.pause()
         annotations = app.query_one("#annotations-table", DataTable)
         assert annotations.row_count == 2
+
+
+# -- 0.5.0: drill-down actions ----------------------------------------------
+
+
+async def test_tui_action_pivot_row(settings, seeded, monkeypatch):
+    monkeypatch.setattr(tui_app, "run_pivot", _fake_pivot)
+    app = LarpharvesterTUI(settings)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        browse = app.query_one("#browse-runs", DataTable)
+        browse.focus()
+        await pilot.press("enter")
+        await pilot.pause()
+        profiles = app.query_one("#browse-profiles", DataTable)
+        profiles.focus()
+        await pilot.press("p")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        assert app.query_one("#target", Input).value == "alice"
+        assert app.query_one("#pivot-results", DataTable).row_count == 2
+
+
+async def test_tui_action_harvest_row(settings, seeded, monkeypatch):
+    from larpharvester.models import CheckResult
+
+    async def fake_harvest(source_name, username, *, settings, limit, store=None,
+                           run_id=None, fetcher=None, **kwargs):
+        return CheckResult(source_name, username, "not_found"), []
+
+    monkeypatch.setattr(tui_app, "run_harvest", fake_harvest)
+    app = LarpharvesterTUI(settings)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        browse = app.query_one("#browse-runs", DataTable)
+        browse.focus()
+        await pilot.press("enter")
+        await pilot.pause()
+        profiles = app.query_one("#browse-profiles", DataTable)
+        profiles.focus()
+        await pilot.press("h")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        assert app.query_one("#tool-target", Input).value == "alice"
+        assert "not_found" in str(app.query_one("#tool-output").renderable)
+
+
+async def test_tui_action_diff_runs(settings):
+    with Store(settings.db_path) as store:
+        first = store.start_run("pivot", "alice")
+        store.save_profiles(first, [Profile("github", "alice", "https://x/a", extra={})])
+        store.finish_run(first)
+        second = store.start_run("pivot", "alice")
+        store.save_profiles(
+            second,
+            [
+                Profile("github", "alice", "https://x/a", extra={}),
+                Profile("gitlab", "alice", "https://x/b", extra={}),
+            ],
+        )
+        store.finish_run(second)
+    app = LarpharvesterTUI(settings)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("d")
+        await pilot.pause()
+        output = str(app.query_one("#tool-output").renderable)
+        assert '"run_a"' in output
+        assert "gitlab" in output

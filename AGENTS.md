@@ -7,10 +7,12 @@ Operating guide for contributors and coding agents working on `larpharvester`.
 `larpharvester` is a production OSINT CLI with three interfaces over one
 SQLite store:
 
-- **CLI** (Typer + Rich) — `larpharvester <command>` (40 commands)
-- **TUI** (Textual) — `larpharvester tui` (Dashboard / Pivot / Browse / Search / Tools / Cases)
+- **CLI** (Typer + Rich) — `larpharvester <command>` (42 commands)
+- **TUI** (Textual) — `larpharvester tui` (Dashboard / Pivot / Browse / Search / Tools / Cases;
+  `p` pivots the focused row, `h` harvests it, `d` diffs the two latest runs)
 - **Local web UI + JSON API** (FastAPI/uvicorn) — `larpharvester serve` (pages, JSON API,
-  SSE-streamed pivot jobs, interactive identity graph, OSINT workbench, case management)
+  SSE-streamed pivot jobs, interactive identity graph, OSINT workbench, run diffing,
+  case dossiers, optional bearer/cookie auth, rate limiting)
 
 Python 3.11+, `uv` project, `src/` layout, async `httpx` sources, Pydantic v2,
 SQLite with FTS5.
@@ -28,7 +30,11 @@ uv run larpharvester --help
 uv run larpharvester tui                          # interactive terminal UI
 uv run larpharvester serve --port 8765 --open     # local web UI
 uv run larpharvester batch -f targets.txt          # multi-target pivots
-uv run larpharvester recluster --run 3             # re-correlate stored profiles
+uv run larpharvester recluster --run 3             # re-correlate stored profiles (persists)
+uv run larpharvester diff 3 4                      # compare two runs
+uv run larpharvester source verify -s github       # replay contract fixtures offline
+uv run larpharvester source verify --record -s github  # record fresh fixtures
+uv run larpharvester ct example.com                # certificate-transparency search
 uv run larpharvester export 3 --format stix -o bundle.json
 python scripts/build_sites.py --fetch             # regenerate declarative corpus (pinned ref)
 ```
@@ -71,10 +77,15 @@ src/larpharvester/
 ├── analysis.py     entity extraction (email/btc/eth/xmr/onion/pgp/ssh/matrix/…), language, timezone, stylometry
 ├── report.py       JSON/JSONL/CSV/GraphML/GEXF/DOT/HTML/Markdown/STIX/Maltego, redaction, encryption
 ├── breach.py       HIBP + HudsonRock + LeakCheck metadata, Pwned Passwords k-anonymity
-├── domain.py       RDAP, DNS, crt.sh, SPF/DMARC, security.txt, favicon MMH3, takeovers, ASN, IP RDAP
+├── contracts.py    source contracts, fixture recording, offline replay verification
+├── domain.py       RDAP, DNS, crt.sh, SPF/DMARC, security.txt, favicon MMH3, takeovers,
+│                   ASN/BGP, TLS certificate inspection, CT identity search
 ├── domain.py, phone.py, wayback.py, dorks.py, alerts.py, avatars.py, variants.py, sites.py
 ├── config.py       Settings (TOML + env)
 └── models.py       dataclasses
+
+Dockerfile, docker-compose.yml, deploy/ (systemd units + env example),
+tests/fixtures/contracts/ (recorded source fixtures)
 ```
 
 ## Testing rules
@@ -93,7 +104,12 @@ src/larpharvester/
 - Every bug fix gets a regression test (`tests/test_regressions.py`).
 - Source tests live in `tests/test_sources.py`, `tests/test_new_sources.py`, and
   `tests/test_sources_expanded.py`; engine upgrades in `tests/test_engine_upgrades.py`;
-  multi-hop/batch/recluster in `tests/test_workflows.py`.
+  multi-hop/batch/recluster in `tests/test_workflows.py`; contract tests in
+  `tests/test_contracts.py`; v0.5.0 core fixes in `tests/test_v050_core.py`.
+- **Contract fixtures** (`tests/fixtures/contracts/*.json`) are recorded real exchanges.
+  Re-record with `larpharvester source verify --record -s <source>` and commit the JSON.
+  Fixtures embed decompressed bodies; raw rows in SQLite are zlib-compressed, so always
+  decompress when writing a recorder (see `contracts.record_contract`).
 
 ## Architecture rules
 
@@ -117,6 +133,16 @@ src/larpharvester/
 - **The tools workbench** (`/tools`, `POST /tools/run`) runs OSINT modules in-process
   and renders JSON; harvest/graph runs are persisted. Pwned Passwords input is never
   echoed back to the page.
+- **Optional auth:** when `settings.web_token` is set, the `_auth` middleware requires
+  `Authorization: Bearer`, `X-API-Key`, or the `larp_token` cookie; `/healthz`,
+  `/api/health`, `/login`, and `/static` stay public. HTML requests redirect to
+  `/login`, API requests get 401. Keep `/healthz` public for container probes.
+- **Rate limiting:** `POST /pivot`, `POST /api/pivot`, and `POST /tools/run` share a
+  per-client sliding window (`RATE_LIMIT`/`RATE_WINDOW`, default 20/min) → HTTP 429.
+- **Case dossiers:** `_case_payload(store, case)` merges all runs in a case (deduped
+  profiles/posts/links/clusters/entities/edges) for `/cases/{name}/export`.
+- **Run diff:** `correlate.diff_runs(store, a, b)` powers `larpharvester diff`,
+  `GET /diff`, `GET /api/diff`, and the TUI `d` binding.
 - **Untrusted data:** harvested URLs may be malicious. Templates use the
   `| url` Jinja filter (http/https only); `report.py` blocks
   `javascript:`/`data:`/`vbscript:` hrefs. Keep it that way.
@@ -148,8 +174,10 @@ Pages: `/`, `/runs`, `/runs/{id}`, `/runs/{id}/export?format=…`, `/search`,
 `/healthz`, `/api/docs`.
 
 JSON: `/api/health`, `/api/stats`, `/api/runs`, `/api/runs/{id}`,
-`/api/runs/{id}/graph`, `/api/search?q=`, `/api/sources`, `/api/jobs/{id}`,
-`/api/jobs/{id}/stream` (SSE), `POST /api/pivot`.
+`/api/runs/{id}/graph`, `/api/diff?a=&b=`, `/api/search?q=`, `/api/sources`,
+`/api/jobs/{id}`, `/api/jobs/{id}/stream` (SSE), `POST /api/pivot`.
+
+Auth (when `web_token` is set): bearer/`X-API-Key`/cookie; `/login` page sets the cookie.
 
 Export formats: `json`, `jsonl`, `csv` (`&table=`), `graphml`, `gexf`, `dot`,
 `html`, `md`, `stix`, `maltego`; `&redact=true` for redacted payloads.
@@ -177,3 +205,20 @@ Export formats: `json`, `jsonl`, `csv` (`&table=`), `graphml`, `gexf`, `dot`,
 - **Multi-hop expansion** (`pivot(depth=N)`) tracks a visited set so a target is
   never re-probed; each hop flips kind (email ↔ username). `on_result` fires for
   every check (including probe-cache hits) exactly once.
+- **Shared fetchers:** `http.shared_fetcher(settings, store, fetcher)` reuses a
+  caller-provided Fetcher or opens one. `pivot`, `harvest`, `collect_follows`, and
+  `watch` all accept `fetcher=...` so budgets/pacing/circuit state span a whole
+  watch cycle or pivot+harvest phase. Never open a second Fetcher inside those flows.
+- **Key material:** SSH fingerprints use OpenSSH `SHA256:` format (`utils.ssh_fingerprint`);
+  GPG key IDs/emails come from forge APIs. These become `ssh_key`/`pgp_fingerprint`
+  entities and feed the 0.95 cryptographic-identifier signal.
+- **EXIF:** `avatars.extract_image_metadata` returns camera/software/author/GPS fields;
+  stored under `profile.extra["avatar_meta"]`, extracted as entities, and compared by
+  `_avatar_meta_signal` (serial/capture-time 0.4, author 0.3).
+- **Reports show calibrated confidence** (`correlate.calibrate_probability`) next to the
+  additive score. Do not replace stored additive scores — tests and thresholds rely on them.
+- **Deployment:** Dockerfile builds a wheel with `uv` and installs into a non-root
+  python:3.12-slim image (`/data` volume, port 8765, `/healthz` healthcheck).
+  `docker-compose.yml` has an optional `tor` profile (`socks5h://tor:9050`).
+  systemd units in `deploy/` are hardened (`ProtectSystem=strict`, empty capability set).
+  OCI builds ignore `HEALTHCHECK` (podman warning); that is expected.

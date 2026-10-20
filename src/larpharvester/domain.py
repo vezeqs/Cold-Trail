@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
+import ssl
 import struct
 from typing import Any
 
@@ -11,6 +13,8 @@ from .utils import dedupe
 RDAP = "https://rdap.org/domain"
 RDAP_IP = "https://rdap.org/ip"
 RIPE_ASN = "https://stat.ripe.net/data/network-info/data.json"
+RIPE_PREFIXES = "https://stat.ripe.net/data/announced-prefixes/data.json"
+RIPE_OVERVIEW = "https://stat.ripe.net/data/as-overview/data.json"
 DOH = "https://dns.google/resolve"
 CRTSH = "https://crt.sh/"
 
@@ -236,16 +240,18 @@ async def lookup_domain(fetcher: Fetcher, domain: str, *, deep: bool = False) ->
     if spf:
         result["spf"] = spf
     if deep:
-        dmarc, sec_txt, fav_hash, takeover = await asyncio.gather(
+        dmarc, sec_txt, fav_hash, takeover, tls = await asyncio.gather(
             fetch_dmarc(fetcher, domain),
             fetch_security_txt(fetcher, domain),
             fetch_favicon_hash(fetcher, domain),
             check_subdomain_takeover(fetcher, domain, cname),
+            tls_cert_info(domain),
         )
         result["dmarc"] = dmarc
         result["security_txt"] = sec_txt
         result["favicon_mmh3"] = fav_hash
         result["takeover"] = takeover
+        result["tls"] = tls
     return result
 
 
@@ -302,6 +308,103 @@ async def asn_lookup(fetcher: Fetcher, address: str) -> dict[str, Any] | None:
     if not asns and not prefix:
         return None
     return {"asns": [str(a) for a in asns], "prefix": prefix}
+
+
+async def bgp_prefixes(fetcher: Fetcher, resource: str) -> dict[str, Any] | None:
+    """RIPE Stat ASN overview + announced prefixes (accepts ASN or IP)."""
+    value = resource.strip().upper()
+    if value.startswith("AS"):
+        asn = value
+    elif "." in value or ":" in value:
+        info = await asn_lookup(fetcher, value)
+        if not info or not info.get("asns"):
+            return None
+        asn = f"AS{info['asns'][0]}"
+    else:
+        asn = f"AS{value}"
+    try:
+        status, data = await fetcher.get_json(RIPE_PREFIXES, params={"resource": asn})
+        status2, overview = await fetcher.get_json(RIPE_OVERVIEW, params={"resource": asn})
+    except FetchError:
+        return None
+    prefixes: list[str] = []
+    if status == 200 and isinstance(data, dict):
+        for item in (data.get("data") or {}).get("prefixes") or []:
+            if isinstance(item, dict) and item.get("prefix"):
+                prefixes.append(str(item["prefix"]))
+    holder = None
+    if status2 == 200 and isinstance(overview, dict):
+        holder = (overview.get("data") or {}).get("holder")
+    if not prefixes and not holder:
+        return None
+    return {"asn": asn, "holder": holder, "announced": dedupe(prefixes)}
+
+
+async def crtsh_identities(fetcher: Fetcher, query: str, limit: int = 100) -> list[dict[str, Any]]:
+    """Search certificate transparency for certificates matching an identity query."""
+    try:
+        status, data = await fetcher.get_json(CRTSH, params={"q": query, "output": "json"})
+    except FetchError:
+        return []
+    if status != 200 or not isinstance(data, list):
+        return []
+    out: dict[tuple[str, str], dict[str, Any]] = {}
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        common = entry.get("common_name") or entry.get("name_value")
+        issuer = entry.get("issuer_name") or ""
+        if not common:
+            continue
+        key = (str(common), str(issuer))
+        if key in out:
+            continue
+        out[key] = {
+            "common_name": str(common),
+            "issuer": str(issuer),
+            "not_before": entry.get("not_before"),
+            "not_after": entry.get("not_after"),
+        }
+        if len(out) >= limit:
+            break
+    return list(out.values())
+
+
+async def tls_cert_info(
+    domain: str, port: int = 443, timeout: float = 6.0
+) -> dict[str, Any] | None:
+    """Perform a live TLS handshake and extract subject, issuer, SANs, and validity."""
+    context = ssl.create_default_context()
+    try:
+        _reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(domain, port, ssl=context, server_hostname=domain),
+            timeout=timeout,
+        )
+    except (TimeoutError, OSError, ssl.SSLError):
+        return None
+    try:
+        ssl_object = writer.get_extra_info("ssl_object")
+        if ssl_object is None:
+            return None
+        cert = ssl_object.getpeercert() or {}
+        subject = {key: value for item in cert.get("subject", ()) for key, value in item}
+        issuer = {key: value for item in cert.get("issuer", ()) for key, value in item}
+        sans = [value for key, value in cert.get("subjectAltName", ()) if key == "DNS"]
+        return {
+            "subject_cn": subject.get("commonName"),
+            "subject_org": subject.get("organizationName"),
+            "issuer_cn": issuer.get("commonName"),
+            "issuer_org": issuer.get("organizationName"),
+            "not_before": cert.get("notBefore"),
+            "not_after": cert.get("notAfter"),
+            "serial": cert.get("serialNumber"),
+            "sans": sans,
+            "tls_version": ssl_object.version(),
+        }
+    finally:
+        writer.close()
+        with contextlib.suppress(Exception):
+            await writer.wait_closed()
 
 
 async def rdap_ip(fetcher: Fetcher, address: str) -> dict[str, Any] | None:

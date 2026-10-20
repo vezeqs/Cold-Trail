@@ -602,3 +602,107 @@ def test_pivot_form_accepts_depth(client, monkeypatch):
     assert job["status"] == "done"
     assert captured["depth"] == 2
     assert captured["expand"] is True
+
+
+def test_jsonl_export_is_streamed(client, seeded):
+    response = client.get("/runs/1/export?format=jsonl")
+    assert response.status_code == 200
+    assert response.text.splitlines()
+    assert '"type": "profile"' in response.text
+
+
+# -- 0.5.0: auth, diff, case dossiers, rate limiting, one-click pivot --------
+
+
+@pytest.fixture
+def auth_client(settings):
+    settings.web_token = "sekret"
+    return TestClient(create_app(settings))
+
+
+def test_auth_redirects_pages_and_rejects_api(auth_client):
+    response = auth_client.get("/", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/login"
+    assert auth_client.get("/api/stats").status_code == 401
+    assert auth_client.get("/healthz").status_code == 200
+
+
+def test_auth_accepts_bearer_and_api_key(auth_client):
+    bearer = {"Authorization": "Bearer sekret"}
+    api_key = {"X-API-Key": "sekret"}
+    assert auth_client.get("/api/stats", headers=bearer).status_code == 200
+    assert auth_client.get("/api/stats", headers=api_key).status_code == 200
+    wrong = {"Authorization": "Bearer wrong"}
+    assert auth_client.get("/api/stats", headers=wrong).status_code == 401
+
+
+def test_login_cookie_flow(auth_client):
+    response = auth_client.post(
+        "/login", data={"token": "sekret"}, follow_redirects=False
+    )
+    assert response.status_code == 303
+    assert auth_client.get("/").status_code == 200
+    bad = auth_client.post("/login", data={"token": "nope"}, follow_redirects=False)
+    assert bad.status_code == 401
+
+
+def test_diff_api_and_page(client, settings):
+    with Store(settings.db_path) as store:
+        first = store.start_run("pivot", "alice")
+        store.save_profiles(first, [Profile("github", "alice", "https://x/a", extra={})])
+        store.finish_run(first)
+        second = store.start_run("pivot", "alice")
+        store.save_profiles(
+            second,
+            [
+                Profile("github", "alice", "https://x/a", extra={}),
+                Profile("gitlab", "alice", "https://x/b", extra={}),
+            ],
+        )
+        store.finish_run(second)
+    payload = client.get("/api/diff?a=1&b=2").json()
+    assert payload["profiles"]["added"][0]["source"] == "gitlab"
+    page = client.get("/diff?a=1&b=2")
+    assert page.status_code == 200
+    assert "Run diff" in page.text
+    assert client.get("/api/diff?a=1&b=999").status_code == 404
+    assert client.get("/diff?a=1&b=999").status_code == 404
+
+
+def test_case_detail_and_dossier_export(client, seeded):
+    client.post("/cases/new", data={"name": "op-aurora"}, follow_redirects=False)
+    client.post(
+        "/cases/add-run",
+        data={"case_name": "op-aurora", "run_id": 1},
+        follow_redirects=False,
+    )
+    page = client.get("/cases/op-aurora")
+    assert page.status_code == 200
+    assert "op-aurora" in page.text
+    assert "alice" in page.text
+
+    payload = client.get("/cases/op-aurora/export?format=json").json()
+    assert payload["run"]["id"] == "case:op-aurora"
+    assert payload["profiles"]
+    assert client.get("/cases/op-aurora/export?format=md").status_code == 200
+    assert client.get("/cases/nope").status_code == 404
+    assert client.get("/cases/nope/export?format=json").status_code == 404
+
+
+def test_run_page_has_one_click_pivot_forms(client, seeded):
+    body = client.get("/runs/1").text
+    assert 'action="/pivot"' in body
+    assert 'name="target" value="alice"' in body
+
+
+def test_rate_limit_on_pivot(settings, monkeypatch):
+    import larpharvester.web.app as app_module
+
+    monkeypatch.setattr(app_module, "RATE_LIMIT", 1)
+    monkeypatch.setattr(app_module, "run_pivot", _fake_pivot)
+    client = TestClient(create_app(settings))
+    first = client.post("/api/pivot", json={"target": "alice"})
+    assert first.status_code == 202
+    second = client.post("/api/pivot", json={"target": "bob"})
+    assert second.status_code == 429

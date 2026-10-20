@@ -174,6 +174,17 @@ class WritesMixin:
                 [(run_id, e.source, e.username, e.kind, e.value, e.context) for e in entities],
             )
 
+    def replace_links_and_clusters(
+        self, run_id: int, links: list[Link], clusters: list[Cluster]
+    ) -> None:
+        """Replace a run's stored correlation output (used by `recluster --save`)."""
+        with self.conn:
+            self.conn.execute("DELETE FROM cluster_members WHERE run_id = ?", (run_id,))
+            self.conn.execute("DELETE FROM clusters WHERE run_id = ?", (run_id,))
+            self.conn.execute("DELETE FROM links WHERE run_id = ?", (run_id,))
+        self.save_links(run_id, links)
+        self.save_clusters(run_id, clusters)
+
     def save_edges(self, run_id: int, edges: list[Edge]) -> None:
         with self.conn:
             self.conn.executemany(
@@ -185,6 +196,13 @@ class WritesMixin:
     def record_profile_history(self, run_id: int, profiles: list[Profile]) -> list[ProfileChange]:
         changes: list[ProfileChange] = []
         observed = now_iso()
+
+        def normalize(value: object) -> str | None:
+            if value is None:
+                return None
+            text = str(value)
+            return text if text != "" else None
+
         for profile in profiles:
             previous = self.conn.execute(
                 """SELECT * FROM profiles
@@ -204,19 +222,22 @@ class WritesMixin:
                 "lang",
                 "timezone",
             ):
-                old = previous[field]
-                new = getattr(profile, field)
-                if str(old) != str(new):
-                    changes.append(
-                        ProfileChange(
-                            source=profile.source,
-                            username=profile.username,
-                            field=field,
-                            old_value=str(old) if old is not None else None,
-                            new_value=str(new) if new is not None else None,
-                            observed_at=observed,
-                        )
+                old = normalize(previous[field])
+                new = normalize(getattr(profile, field))
+                if old == new:
+                    continue
+                if old is None and new is None:
+                    continue
+                changes.append(
+                    ProfileChange(
+                        source=profile.source,
+                        username=profile.username,
+                        field=field,
+                        old_value=old,
+                        new_value=new,
+                        observed_at=observed,
                     )
+                )
         if changes:
             with self.conn:
                 self.conn.executemany(

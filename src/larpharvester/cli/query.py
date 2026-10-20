@@ -268,3 +268,83 @@ def history(
         _print_json(rows)
         return
     _render_history(rows)
+
+
+@app.command()
+def diff(
+    ctx: typer.Context,
+    run_a: Annotated[int, typer.Argument(help="Baseline run ID")],
+    run_b: Annotated[int, typer.Argument(help="Comparison run ID")],
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Compare two stored runs: added/removed/changed profiles, entities, links, posts."""
+    from ..correlate import diff_runs
+
+    with Store(_settings(ctx).db_path) as store:
+        missing = [run_id for run_id in (run_a, run_b) if store.run(run_id) is None]
+        if missing:
+            typer.echo(f"run(s) not found: {', '.join(map(str, missing))}", err=True)
+            raise typer.Exit(code=1)
+        payload = diff_runs(store, run_a, run_b)
+    if json_out:
+        _print_json(payload)
+        return
+
+    profiles = payload["profiles"]
+    entities = payload["entities"]
+    links = payload["links"]
+    clusters = payload["clusters"]
+    posts = payload["posts"]
+    console.print(f"[bold]Diff[/bold] run #{run_a} → run #{run_b}")
+    console.print(
+        f"  profiles: +{len(profiles['added'])} / -{len(profiles['removed'])}"
+        f" / ~{len(profiles['changed'])}"
+    )
+    console.print(f"  entities: +{len(entities['added'])} / -{len(entities['removed'])}")
+    console.print(f"  links:    +{len(links['added'])} / -{len(links['removed'])}")
+    console.print(f"  clusters: +{len(clusters['added'])} / -{len(clusters['removed'])}")
+    console.print(
+        f"  posts:    +{len(posts['added'])} / -{len(posts['removed'])}"
+        f" / tombstoned {len(posts['tombstoned'])}"
+    )
+
+    for title, rows in (
+        ("Added profiles", profiles["added"]),
+        ("Removed profiles", profiles["removed"]),
+    ):
+        if not rows:
+            continue
+        table = Table(title=title)
+        for column in ("Source", "Username"):
+            table.add_column(column, overflow="fold")
+        for row in rows:
+            table.add_row(row["source"], row["username"])
+        console.print(table)
+
+    if profiles["changed"]:
+        table = Table(title="Changed profiles")
+        for column in ("Source", "Username", "Field", "Old", "New"):
+            table.add_column(column, overflow="fold")
+        for row in profiles["changed"]:
+            for field, (old, new) in row["fields"].items():
+                table.add_row(
+                    row["source"],
+                    row["username"],
+                    field,
+                    _truncate(str(old), 40),
+                    _truncate(str(new), 40),
+                )
+        console.print(table)
+
+    for title, rows, columns in (
+        ("Added entities", entities["added"], ("Kind", "Value", "Observed on")),
+        ("Removed entities", entities["removed"], ("Kind", "Value", "Observed on")),
+    ):
+        if not rows:
+            continue
+        table = Table(title=title)
+        for column in columns:
+            table.add_column(column, overflow="fold")
+        for row in rows:
+            table.add_row(str(row["kind"]), str(row["value"]), f"{row['source']}:{row['username']}")
+        console.print(table)

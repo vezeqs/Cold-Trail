@@ -34,6 +34,7 @@ from textual.widgets import (
 from .. import __version__
 from ..breach import full_breach_audit
 from ..config import Settings
+from ..correlate import diff_runs
 from ..domain import asn_lookup, lookup_domain, ptr, rdap_ip, reverse_ip
 from ..dorks import dorks as build_dorks
 from ..harvest import harvest as run_harvest
@@ -50,6 +51,9 @@ class LarpharvesterTUI(App):
     BINDINGS = [
         ("q", "quit", "Quit"),
         ("r", "refresh", "Refresh"),
+        ("p", "pivot_row", "Pivot row"),
+        ("h", "harvest_row", "Harvest row"),
+        ("d", "diff_runs", "Diff runs"),
     ]
     CSS = """
     Screen { background: #0e1116; color: #d7dee8; }
@@ -208,6 +212,78 @@ class LarpharvesterTUI(App):
         self.refresh_data()
         self.refresh_cases()
         self.notify("refreshed")
+
+    # -- drill-down actions -------------------------------------------------
+
+    def _focused_row(self) -> tuple[str, list[str]] | None:
+        widget = self.focused
+        if not isinstance(widget, DataTable) or widget.row_count == 0:
+            return None
+        try:
+            values = widget.get_row_at(widget.cursor_row)
+        except Exception:
+            return None
+        return widget.id or "", [str(value) for value in values]
+
+    def action_pivot_row(self) -> None:
+        row = self._focused_row()
+        if row is None:
+            self.notify("focus a data row first", severity="warning")
+            return
+        table_id, values = row
+        if table_id == "browse-profiles":
+            target = values[1]
+        elif table_id == "browse-posts":
+            target = values[2]
+        elif table_id == "pivot-results":
+            target = values[3] or values[2]
+        elif table_id == "search-results":
+            target = values[2]
+        elif table_id == "annotations-table" and len(values) > 1:
+            target = values[1].split(":")[-1]
+        else:
+            self.notify("no pivotable row focused", severity="warning")
+            return
+        if not target:
+            self.notify("selected row has no handle", severity="warning")
+            return
+        self.query_one(TabbedContent).active = "tab-pivot"
+        self.query_one("#target", Input).value = target
+        self.start_pivot()
+
+    def action_harvest_row(self) -> None:
+        row = self._focused_row()
+        if row is None:
+            self.notify("focus a data row first", severity="warning")
+            return
+        table_id, values = row
+        if table_id == "browse-profiles":
+            source, username = values[0], values[1]
+        elif table_id == "browse-posts":
+            source, username = values[1], values[2]
+        elif table_id == "pivot-results":
+            source, username = values[0], (values[3] or values[2])
+        else:
+            self.notify("no harvestable row focused", severity="warning")
+            return
+        self.query_one(TabbedContent).active = "tab-tools"
+        self.query_one("#tool-select", Select).value = "harvest"
+        self.query_one("#tool-source", Input).value = source
+        self.query_one("#tool-target", Input).value = username
+        self.start_tool()
+
+    def action_diff_runs(self) -> None:
+        with Store(self.settings.db_path) as store:
+            runs = store.runs(limit=2)
+            if len(runs) < 2:
+                self.notify("need at least two runs to diff", severity="warning")
+                return
+            payload = diff_runs(store, runs[1]["id"], runs[0]["id"])
+        self.query_one(TabbedContent).active = "tab-tools"
+        self.query_one("#tool-output", Static).update(
+            json.dumps(payload, indent=2, ensure_ascii=False, default=str)
+        )
+        self.notify(f"diff run #{runs[1]['id']} → #{runs[0]['id']}")
 
     def refresh_data(self) -> None:
         with Store(self.settings.db_path) as store:

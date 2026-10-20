@@ -12,8 +12,8 @@ from .analysis import enrich_profile, entities_from_posts, extract_entities
 from .avatars import hash_avatars
 from .config import Settings
 from .correlate import build_clusters, correlate
-from .http import BlockedError, BudgetExceeded, Fetcher, FetchError
-from .models import CheckResult, Kind, PivotReport, Profile
+from .http import BlockedError, BudgetExceeded, Fetcher, FetchError, shared_fetcher
+from .models import CheckResult, Entity, Kind, PivotReport, Profile
 from .sources import GROUPS, SOURCES, Source
 from .variants import email_variants
 from .variants import variants as handle_variants
@@ -129,6 +129,7 @@ async def pivot(
     use_cache: bool = True,
     store=None,
     on_result: Callable[[CheckResult], None] | None = None,
+    fetcher: Fetcher | None = None,
 ) -> PivotReport:
     target = target.strip().lstrip("@")
     kind: Kind = "email" if "@" in target else "username"
@@ -155,16 +156,16 @@ async def pivot(
             else:
                 pending.append((source, probe))
 
-    async with Fetcher(settings, store=store) as fetcher:
+    async with shared_fetcher(settings, store, fetcher) as active_fetcher:
         fetched = await asyncio.gather(
-            *(_check(source, fetcher, probe, on_result) for source, probe in pending)
+            *(_check(source, active_fetcher, probe, on_result) for source, probe in pending)
         )
         results.extend(fetched)
         if store is not None and ttl:
             for result in fetched:
                 if result.status == "not_found":
                     store.probe_put(result.source, result.target, result.status, result.detail)
-        await _enrich(results, fetcher, avatar_hash, store)
+        await _enrich(results, active_fetcher, avatar_hash, store)
 
         expanded: list[str] = []
         if expand:
@@ -190,7 +191,7 @@ async def pivot(
                 extra_results = list(
                     await asyncio.gather(
                         *(
-                            _check(source, fetcher, candidate, on_result)
+                            _check(source, active_fetcher, candidate, on_result)
                             for candidate in candidates
                             for source in extra_sources
                         )
@@ -198,7 +199,7 @@ async def pivot(
                 )
                 expanded.extend(candidates)
                 results.extend(extra_results)
-                await _enrich(extra_results, fetcher, avatar_hash, store)
+                await _enrich(extra_results, active_fetcher, avatar_hash, store)
                 frontier_results = extra_results
                 current_kind = probe_kind
 
@@ -243,7 +244,50 @@ def profile_entities(profile: Profile) -> list:
             ents.extend(extract_entities(field.get("value"), profile.source, profile.username))
     for key in ("public_email", "email", "location"):
         ents.extend(extract_entities(profile.extra.get(key), profile.source, profile.username))
+    ents.extend(_extra_entities(profile))
     return ents
+
+
+def _extra_entities(profile: Profile) -> list:
+    """Entities derived from structured profile extras (keys, DIDs, EXIF, ENS)."""
+    out: list = []
+    extra = profile.extra or {}
+
+    def add(kind: str, value: object, context: str | None = None) -> None:
+        if isinstance(value, str) and value.strip():
+            out.append(
+                Entity(
+                    source=profile.source,
+                    username=profile.username,
+                    kind=kind,
+                    value=value.strip(),
+                    context=context,
+                )
+            )
+
+    for key in extra.get("ssh_keys") or []:
+        if isinstance(key, dict):
+            add("ssh_key", key.get("fingerprint"), "SSH key published on profile")
+    for key in extra.get("gpg_keys") or []:
+        if isinstance(key, dict):
+            add("pgp_fingerprint", key.get("key_id"), "GPG key published on profile")
+            for email in key.get("emails") or []:
+                add("email", email, "GPG key UID email")
+    if extra.get("did"):
+        add("did", extra.get("did"), "Bluesky DID")
+    if extra.get("pubkey"):
+        add("nostr_key", extra.get("pubkey"), "Nostr NIP-05 pubkey")
+    if extra.get("eth_address"):
+        add("eth", extra.get("eth_address"), "ENS resolved address")
+    meta = extra.get("avatar_meta") or {}
+    if isinstance(meta, dict):
+        for key in ("gps", "coords"):
+            add("coords", meta.get(key), "EXIF GPS from avatar")
+        for key in ("author", "artist", "exif_artist", "comment", "description"):
+            value = meta.get(key)
+            if isinstance(value, str):
+                out.extend(extract_entities(value, profile.source, profile.username))
+    return out
 
 
 _HANDLE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$")
@@ -269,6 +313,11 @@ def discovered_usernames(results: list[CheckResult], limit: int | None = MAX_EXP
                 _add(found, _username_from_url(proof.get("url") or proof.get("proof_url")))
         for login in profile.extra.get("logins") or []:
             _add(found, login)
+        for handle in profile.extra.get("handle_history") or []:
+            _add(found, handle)
+        nip05 = profile.extra.get("nip05")
+        if isinstance(nip05, str):
+            _add(found, nip05.split("@", 1)[0])
     return found if limit in (None, 0) else found[:limit]
 
 

@@ -34,9 +34,15 @@ def serve(
         bool, typer.Option("--open/--no-open", help="Open a browser window")
     ] = False,
     log_level: Annotated[str, typer.Option("--log-level")] = "info",
+    token: Annotated[
+        str | None,
+        typer.Option("--token", help="Require this bearer token / login cookie"),
+    ] = None,
 ) -> None:
     """Serve the local web UI (FastAPI + uvicorn)."""
     settings = _settings(ctx)
+    if token:
+        settings.web_token = token
     try:
         import uvicorn
     except ImportError as exc:
@@ -48,6 +54,8 @@ def serve(
     url = f"http://{host}:{port}/"
     if host not in LOCAL_HOSTS:
         console.print(f"[yellow]warning:[/yellow] binding {host} exposes the UI beyond localhost")
+    if settings.web_token:
+        console.print("[bold]auth:[/bold] bearer token / login required")
     console.print(f"larpharvester web UI on [bold]{url}[/bold]  (Ctrl+C to stop)")
     console.print(f"[dim]database: {settings.db_path}[/dim]")
     if open_browser:

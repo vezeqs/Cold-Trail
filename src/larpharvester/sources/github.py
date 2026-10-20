@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 from urllib.parse import quote
 
-from ..http import Fetcher
+from ..http import Fetcher, FetchError
 from ..models import CheckResult, Edge, Post, Profile
-from ..utils import is_after
+from ..utils import is_after, ssh_fingerprint
 from .base import Source, register
 
 API = "https://api.github.com"
@@ -24,32 +25,78 @@ class GitHub(Source):
             headers["Authorization"] = f"Bearer {fetcher.settings.github_token}"
         return headers
 
+    async def _keys(self, fetcher: Fetcher, target: str) -> dict[str, list]:
+        """Fetch SSH and GPG keys (best-effort; never fails the profile check)."""
+        headers = self._headers(fetcher)
+
+        async def ssh() -> list[dict]:
+            try:
+                status, data = await fetcher.get_json(
+                    f"{API}/users/{quote(target)}/keys", headers=headers
+                )
+            except FetchError:
+                return []
+            if status != 200 or not isinstance(data, list):
+                return []
+            out = []
+            for item in data:
+                fingerprint = ssh_fingerprint(item.get("key"))
+                if fingerprint:
+                    out.append({"id": item.get("id"), "fingerprint": fingerprint})
+            return out
+
+        async def gpg() -> list[dict]:
+            try:
+                status, data = await fetcher.get_json(
+                    f"{API}/users/{quote(target)}/gpg_keys", headers=headers
+                )
+            except FetchError:
+                return []
+            if status != 200 or not isinstance(data, list):
+                return []
+            return [
+                {
+                    "id": item.get("id"),
+                    "key_id": item.get("key_id"),
+                    "emails": item.get("emails") or [],
+                }
+                for item in data
+                if item.get("key_id") or item.get("emails")
+            ]
+
+        ssh_keys, gpg_keys = await asyncio.gather(ssh(), gpg())
+        return {"ssh_keys": ssh_keys, "gpg_keys": gpg_keys}
+
     async def check(self, fetcher: Fetcher, target: str) -> CheckResult:
         status, data = await fetcher.get_json(
             f"{API}/users/{quote(target)}", headers=self._headers(fetcher)
         )
         if status == 200 and isinstance(data, dict) and data.get("login"):
+            login = data["login"]
+            key_material = await self._keys(fetcher, login)
+            extra = {
+                "id": data.get("id"),
+                "public_repos": data.get("public_repos"),
+                "company": data.get("company"),
+                "location": data.get("location"),
+                "twitter_username": data.get("twitter_username"),
+                "hireable": data.get("hireable"),
+                "email": data.get("email"),
+                **key_material,
+            }
             return self.ok(
                 target,
                 Profile(
                     source=self.name,
-                    username=data["login"],
-                    url=data.get("html_url") or f"https://github.com/{data['login']}",
+                    username=login,
+                    url=data.get("html_url") or f"https://github.com/{login}",
                     display_name=data.get("name"),
                     bio=data.get("bio"),
                     avatar=data.get("avatar_url"),
                     website=data.get("blog") or None,
                     created_at=data.get("created_at"),
                     followers=data.get("followers"),
-                    extra={
-                        "id": data.get("id"),
-                        "public_repos": data.get("public_repos"),
-                        "company": data.get("company"),
-                        "location": data.get("location"),
-                        "twitter_username": data.get("twitter_username"),
-                        "hireable": data.get("hireable"),
-                        "email": data.get("email"),
-                    },
+                    extra=extra,
                 ),
             )
         if status == 404:
@@ -101,6 +148,32 @@ class GitHub(Source):
             if len(data) < per_page:
                 break
             page += 1
+        if len(posts) < limit:
+            try:
+                status, gists = await fetcher.get_json(
+                    f"{API}/users/{quote(target)}/gists",
+                    params={"per_page": min(100, limit - len(posts))},
+                    headers=self._headers(fetcher),
+                )
+            except FetchError:
+                status, gists = 0, None
+            if status == 200 and isinstance(gists, list):
+                for gist in gists:
+                    created = gist.get("created_at")
+                    if not is_after(created, since):
+                        continue
+                    files = list((gist.get("files") or {}).keys())
+                    posts.append(
+                        Post(
+                            source=self.name,
+                            username=target,
+                            post_id=f"gist:{gist.get('id')}",
+                            url=gist.get("html_url") or f"https://gist.github.com/{gist.get('id')}",
+                            created_at=created,
+                            text=f"gist: {gist.get('description') or ', '.join(files[:5])}".strip(),
+                            metrics={"type": "gist", "files": len(files)},
+                        )
+                    )
         return posts[:limit]
 
     async def follows(self, fetcher: Fetcher, target: str, limit: int = 100) -> list[Edge]:
