@@ -41,6 +41,7 @@ src/larpharvester/
 │   ├── output.py     export, report, decrypt
 │   ├── cases.py      case new/list/add/show, tag(s), note(s)
 │   ├── ops.py        audit, doctor, prune, db
+│   ├── breach.py     breach (HIBP metadata), pwned (Pwned Passwords k-anonymity)
 │   └── interfaces.py tui, serve
 ├── tui/app.py      Textual app: Dashboard / Pivot / Browse / Search tabs
 ├── web/
@@ -65,6 +66,7 @@ src/larpharvester/
 ├── correlate.py    pair scoring, clusters
 ├── analysis.py     entity extraction, language, timezone, stylometry
 ├── report.py       JSON/JSONL/CSV/GraphML/GEXF/DOT/HTML, redaction, encryption
+├── breach.py       HIBP breach metadata + Pwned Passwords k-anonymity lookup
 ├── domain.py, phone.py, wayback.py, dorks.py, alerts.py, avatars.py, variants.py, sites.py
 ├── config.py       Settings (TOML + env)
 └── models.py       dataclasses
@@ -115,6 +117,11 @@ src/larpharvester/
 - **No guard rails that weaken collection:** do not add artificial caps,
   allowlists, or "safety" filters that reduce source coverage or pivot breadth.
   Rate limiting/pacing is politeness, not restriction — keep it.
+- **`breach.py` is lookup-only by design.** It may report breach metadata and
+  exposure counts; it must never retrieve, dump, crack, or reconstruct
+  credentials. `pwned_password` transmits only the 5-char SHA-1 prefix
+  (k-anonymity) — never add the full hash, the password, or request logging
+  that could capture them. Tests assert the privacy property; keep them.
 
 ## Web API surface
 

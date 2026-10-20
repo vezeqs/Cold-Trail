@@ -6,7 +6,7 @@ the result as JSON, CSV, GraphML, GEXF, DOT, or a self-contained HTML dossier.
 
 Three interfaces over one database:
 
-- **CLI** — 36 commands, scriptable, JSON/JSONL output
+- **CLI** — 38 commands, scriptable, JSON/JSONL output
 - **TUI** — full-screen terminal console (dashboard, pivot, browse, search)
 - **Web UI** — local FastAPI app with a JSON API, pivot job queue, and export downloads
 
@@ -156,6 +156,25 @@ uv run larpharvester note profile github:alice "check the avatar"
 uv run larpharvester audit
 ```
 
+## Breach exposure auditing
+
+Defensive checks against industry-standard breach APIs — these answer "was this
+exposed?", never "what is it?":
+
+```bash
+# Which breaches does an email appear in? (needs HIBP_API_KEY)
+uv run larpharvester breach alice@example.com
+uv run larpharvester breach alice@example.com --json
+
+# Is a password in the Pwned Passwords corpus? (no key needed)
+uv run larpharvester pwned                          # hidden prompt
+uv run larpharvester pwned --password-env MY_PW     # scripting
+```
+
+`pwned` uses SHA-1 k-anonymity: only the first five hex characters of the hash
+are transmitted, so neither the password nor the full hash ever leaves the
+machine. Exit code is `1` when exposed, `0` when clean — safe for CI/scripts.
+
 ## Operational features
 
 - **Politeness:** per-host rate limit (`requests_per_second`), jitter, circuit breaker after 5
@@ -215,7 +234,7 @@ becoming links.
 ## Development
 
 ```bash
-uv run pytest                # 240 tests, no network required
+uv run pytest                # 252 tests, no network required
 uv run ruff check .
 uv run ruff format --check .
 ```
