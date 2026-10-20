@@ -1,26 +1,99 @@
 {% extends "base.html" %}
 {% block title %}Cases · larpharvester{% endblock %}
 {% block content %}
-<h1>Cases</h1>
+<h1>Cases &amp; Annotations</h1>
 
-{% if cases %}
-<table>
-  <thead><tr><th>#</th><th>Name</th><th>Runs</th><th>Created</th><th>Notes</th></tr></thead>
-  <tbody>
-    {% for case in cases %}
-    <tr>
-      <td>{{ case.id }}</td>
-      <td class="mono">{{ case.name }}</td>
-      <td>{{ case.runs }}</td>
-      <td>{{ case.created_at | ts }}</td>
-      <td>{{ case.notes | short(80) }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% else %}
-<p class="muted">No cases yet — create one with <code>larpharvester case new NAME</code>.</p>
-{% endif %}
+<section class="grid-2">
+  <div class="panel">
+    <h2>Create case</h2>
+    <form method="post" action="/cases/new" class="stack">
+      <label>Case name <input type="text" name="name" placeholder="op-aurora" required maxlength="120"></label>
+      <label>Notes <input type="text" name="notes" placeholder="Investigation context"></label>
+      <button type="submit">Create case</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2>Attach run to case</h2>
+    <form method="post" action="/cases/add-run" class="stack">
+      <label>Case name
+        <input type="text" name="case_name" placeholder="op-aurora" required list="case-list">
+        <datalist id="case-list">
+          {% for c in cases %}<option value="{{ c.name }}">{% endfor %}
+        </datalist>
+      </label>
+      <label>Run ID
+        <select name="run_id">
+          {% for r in runs %}
+          <option value="{{ r.id }}">#{{ r.id }} · {{ r.kind }} · {{ r.target }}</option>
+          {% else %}
+          <option value="1">#1</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="submit">Attach run</button>
+    </form>
+  </div>
+</section>
+
+<section class="grid-2">
+  <div class="panel">
+    <h2>Add tag</h2>
+    <form method="post" action="/tags/new" class="stack">
+      <label>Target type
+        <select name="target_type">
+          <option value="profile">profile</option>
+          <option value="run">run</option>
+          <option value="entity">entity</option>
+          <option value="post">post</option>
+          <option value="case">case</option>
+        </select>
+      </label>
+      <label>Identifier <input type="text" name="target" placeholder="github:alice" required></label>
+      <label>Tag <input type="text" name="tag" placeholder="suspect / verified / primary" required></label>
+      <button type="submit">Add tag</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2>Add note</h2>
+    <form method="post" action="/notes/new" class="stack">
+      <label>Target type
+        <select name="target_type">
+          <option value="profile">profile</option>
+          <option value="run">run</option>
+          <option value="entity">entity</option>
+          <option value="case">case</option>
+        </select>
+      </label>
+      <label>Identifier <input type="text" name="target" placeholder="github:alice" required></label>
+      <label>Note <input type="text" name="note" placeholder="Shared PGP key with GitLab profile" required></label>
+      <button type="submit">Save note</button>
+    </form>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Cases ({{ cases | length }})</h2>
+  {% if cases %}
+  <table>
+    <thead><tr><th>#</th><th>Name</th><th>Runs</th><th>Created</th><th>Notes</th></tr></thead>
+    <tbody>
+      {% for case in cases %}
+      <tr>
+        <td>{{ case.id }}</td>
+        <td class="mono">{{ case.name }}</td>
+        <td>{{ case.runs }}</td>
+        <td>{{ case.created_at | ts }}</td>
+        <td>{{ case.notes | short(80) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No cases yet — create one above or with <code>larpharvester case new NAME</code>.</p>
+  {% endif %}
+</section>
 
 {% if tags %}
 <section class="panel">
@@ -29,7 +102,7 @@
     <thead><tr><th>Type</th><th>Target</th><th>Tag</th></tr></thead>
     <tbody>
       {% for tag in tags %}
-      <tr><td>{{ tag.target_type }}</td><td class="mono">{{ tag.target }}</td><td>{{ tag.tag }}</td></tr>
+      <tr><td>{{ tag.target_type }}</td><td class="mono">{{ tag.target }}</td><td><span class="badge status-found">{{ tag.tag }}</span></td></tr>
       {% endfor %}
     </tbody>
   </table>

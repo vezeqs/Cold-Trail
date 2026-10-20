@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 
 import pytest
@@ -395,3 +396,209 @@ def test_health_reports_503_when_db_is_unusable(tmp_path):
     response = TestClient(create_app(broken)).get("/healthz")
     assert response.status_code == 503
     assert response.json()["status"] == "error"
+
+
+# -- 0.4.0: graph, SSE, tools, cases CRUD, new formats ----------------------
+
+
+def test_run_graph_endpoint(client, seeded):
+    payload = client.get("/api/runs/1/graph").json()
+    ids = {node["id"] for node in payload["nodes"]}
+    assert "github:alice" in ids
+    assert any(node["id"].startswith("entity:email:") for node in payload["nodes"])
+    kinds = {edge["kind"] for edge in payload["edges"]}
+    assert "correlation" in kinds
+    assert client.get("/api/runs/999/graph").status_code == 404
+
+
+def test_new_export_formats(client, seeded):
+    md = client.get("/runs/1/export?format=md")
+    assert md.status_code == 200
+    assert "# OSINT Dossier" in md.text
+
+    stix = client.get("/runs/1/export?format=stix")
+    assert stix.status_code == 200
+    bundle = json.loads(stix.text)
+    assert bundle["type"] == "bundle"
+
+    maltego = client.get("/runs/1/export?format=maltego")
+    assert maltego.status_code == 200
+    assert "SourceValue" in maltego.text
+
+
+async def _streaming_fake_pivot(target, *, settings, store=None, on_result=None, **kwargs):
+    profile = Profile(
+        source="github",
+        username=target,
+        url=f"https://github.com/{target}",
+        display_name=target,
+        bio="hi",
+        extra={},
+    )
+    result = CheckResult("github", target, "found", profile=profile)
+    if on_result is not None:
+        on_result(result)
+    return PivotReport(
+        target=target,
+        kind="username",
+        results=[result],
+        links=[],
+        expanded=[],
+        clusters=[],
+        coverage={"found": 1},
+    )
+
+
+def test_sse_stream_replays_events_and_done(client, monkeypatch):
+    monkeypatch.setattr(web_app, "run_pivot", _streaming_fake_pivot)
+    response = client.post("/api/pivot", json={"target": "erin"})
+    job_id = response.json()["job_id"]
+    job = _wait_job(client, job_id)
+    assert job["status"] == "done"
+    events: list[str] = []
+    with client.stream("GET", f"/api/jobs/{job_id}/stream") as stream:
+        for line in stream.iter_lines():
+            if line:
+                events.append(line)
+    joined = "\n".join(events)
+    assert "event: check" in joined
+    assert "event: done" in joined
+    assert '"status": "done"' in joined
+    assert "github" in joined
+    assert client.get("/api/jobs/nope/stream").status_code == 404
+
+
+def test_job_api_includes_events(client, monkeypatch):
+    monkeypatch.setattr(web_app, "run_pivot", _streaming_fake_pivot)
+    response = client.post("/api/pivot", json={"target": "frank"})
+    job = _wait_job(client, response.json()["job_id"])
+    assert job["events"]
+    assert job["events"][0]["source"] == "github"
+    assert job["found_count"] == 1
+
+
+def test_tools_page(client):
+    response = client.get("/tools")
+    assert response.status_code == 200
+    assert "OSINT Workbench" in response.text
+
+
+def test_tools_run_phone(client):
+    response = client.post(
+        "/tools/run", data={"tool": "phone", "target": "+14155552671", "limit": 10}
+    )
+    assert response.status_code == 200
+    assert "e164" in response.text
+
+
+def test_tools_run_dorks(client):
+    response = client.post("/tools/run", data={"tool": "dorks", "target": "alice"})
+    assert response.status_code == 200
+    assert "google" in response.text
+
+
+def test_tools_run_rejects_unknown_tool(client):
+    response = client.post("/tools/run", data={"tool": "nope", "target": "x"})
+    assert response.status_code == 422
+
+
+def test_tools_run_harvest_persists(client, settings, monkeypatch):
+    import larpharvester.web.app as app_module
+
+    async def fake_harvest(source, target, *, settings, limit, store=None, **kwargs):
+        from larpharvester.models import CheckResult, Post, Profile
+
+        profile = Profile(
+            source=source,
+            username=target,
+            url=f"https://example.test/{target}",
+            display_name=target,
+            extra={},
+        )
+        return (
+            CheckResult(source, target, "found", profile=profile),
+            [
+                Post(
+                    source=source,
+                    username=target,
+                    post_id="p1",
+                    url="https://example.test/p1",
+                    created_at="2024-01-01T00:00:00Z",
+                    text="hello world",
+                )
+            ],
+        )
+
+    monkeypatch.setattr(app_module, "run_harvest", fake_harvest)
+    response = client.post(
+        "/tools/run", data={"tool": "harvest", "target": "alice", "source": "github"}
+    )
+    assert response.status_code == 200
+    assert "Saved as run" in response.text
+    with Store(settings.db_path) as store:
+        assert store.posts()[0]["text"] == "hello world"
+
+
+def test_cases_crud_flow(client, seeded):
+    created = client.post(
+        "/cases/new", data={"name": "op-aurora", "notes": "test case"}, follow_redirects=False
+    )
+    assert created.status_code == 303
+    page = client.get("/cases")
+    assert "op-aurora" in page.text
+
+    attached = client.post(
+        "/cases/add-run", data={"case_name": "op-aurora", "run_id": 1}, follow_redirects=False
+    )
+    assert attached.status_code == 303
+
+    tagged = client.post(
+        "/tags/new",
+        data={"target_type": "profile", "target": "github:alice", "tag": "primary"},
+        follow_redirects=False,
+    )
+    assert tagged.status_code == 303
+
+    noted = client.post(
+        "/notes/new",
+        data={"target_type": "profile", "target": "github:alice", "note": "shared avatar"},
+        follow_redirects=False,
+    )
+    assert noted.status_code == 303
+
+    page = client.get("/cases")
+    assert "primary" in page.text
+    assert "shared avatar" in page.text
+
+
+def test_cases_add_run_unknown_case(client):
+    response = client.post("/cases/add-run", data={"case_name": "nope", "run_id": 1})
+    assert response.status_code == 404
+
+
+def test_pivot_form_accepts_depth(client, monkeypatch):
+    captured: dict = {}
+
+    async def fake_pivot(target, *, settings, store=None, on_result=None, **kwargs):
+        captured.update(kwargs)
+        return PivotReport(
+            target=target,
+            kind="username",
+            results=[],
+            links=[],
+            expanded=[],
+            clusters=[],
+            coverage={},
+        )
+
+    monkeypatch.setattr(web_app, "run_pivot", fake_pivot)
+    response = client.post(
+        "/pivot",
+        data={"target": "grace", "scope": "curated", "depth": 2, "expand": "true"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    job = _wait_job(client, response.headers["location"].rsplit("/", 1)[-1])
+    assert job["status"] == "done"
+    assert captured["depth"] == 2
+    assert captured["expand"] is True

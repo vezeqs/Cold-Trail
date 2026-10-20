@@ -10,7 +10,7 @@ import typer
 from rich.table import Table
 
 from ..analysis import entities_from_posts, infer_timezone, marker_overlap, style_similarity
-from ..domain import lookup_domain, ptr, reverse_ip, shodan_host
+from ..domain import asn_lookup, lookup_domain, ptr, rdap_ip, reverse_ip, shodan_host
 from ..dorks import dorks as build_dorks
 from ..http import Fetcher, FetchError
 from ..models import Post
@@ -262,14 +262,18 @@ def archive(
 def domain(
     ctx: typer.Context,
     name: Annotated[str, typer.Argument(help="Domain name")],
+    deep: Annotated[
+        bool,
+        typer.Option("--deep", help="Also query DMARC, security.txt, favicon MMH3, and takeovers"),
+    ] = False,
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    """RDAP, DNS records, and certificate-transparency subdomains."""
+    """RDAP, DNS records, certificate-transparency subdomains, and optional deep recon."""
     settings = _settings(ctx)
 
     async def collect():
         async with Fetcher(settings) as fetcher:
-            return await lookup_domain(fetcher, name)
+            return await lookup_domain(fetcher, name, deep=deep)
 
     try:
         payload = asyncio.run(collect())
@@ -280,6 +284,17 @@ def domain(
         _print_json(payload)
         return
     console.print(f"[bold]{payload['domain']}[/bold]")
+    if payload.get("mx_provider"):
+        console.print(f"  mail provider: {payload['mx_provider']}")
+    if payload.get("spf"):
+        console.print(f"  spf: {payload['spf']}")
+    if payload.get("dmarc"):
+        console.print(f"  dmarc: {payload['dmarc']}")
+    if payload.get("favicon_mmh3") is not None:
+        console.print(f"  favicon mmh3: {payload['favicon_mmh3']}")
+    if payload.get("takeover"):
+        tk = payload["takeover"]
+        console.print(f"  [yellow]takeover candidate: {tk['service']} ({tk['cname']})[/yellow]")
     rdap = payload.get("rdap")
     if rdap:
         for action, when in (rdap.get("events") or {}).items():
@@ -307,19 +322,24 @@ def domain(
 def ip_cmd(
     ctx: typer.Context,
     address: Annotated[str, typer.Argument(help="IPv4 address")],
+    asn: Annotated[bool, typer.Option("--asn", help="Include RIPE ASN & IP RDAP")] = False,
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    """PTR record, reverse-IP hostnames, and Shodan data for an address."""
+    """PTR record, reverse-IP hostnames, Shodan, and optional ASN/RDAP data for an address."""
     settings = _settings(ctx)
 
     async def collect():
         async with Fetcher(settings) as fetcher:
-            return {
+            out = {
                 "address": address,
                 "ptr": await ptr(fetcher, address),
                 "hostnames": await reverse_ip(fetcher, address, settings.shodan_api_key),
                 "shodan": await shodan_host(fetcher, address, settings.shodan_api_key),
             }
+            if asn:
+                out["asn"] = await asn_lookup(fetcher, address)
+                out["rdap"] = await rdap_ip(fetcher, address)
+            return out
 
     try:
         payload = asyncio.run(collect())

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import asdict
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -10,6 +11,7 @@ import typer
 from ..alerts import build_alerters
 from ..analysis import entities_from_posts
 from ..config import Settings
+from ..correlate import recluster_rows
 from ..harvest import collect_follows
 from ..harvest import harvest as run_harvest
 from ..models import PivotReport
@@ -24,6 +26,7 @@ from ._app import (
     _null,
     _print_json,
     _render_edges,
+    _render_links,
     _render_pivot,
     _render_posts,
     _render_profiles,
@@ -48,6 +51,9 @@ def pivot(
         bool, typer.Option("--expand", help="Cross-kind expansion (email <-> usernames)")
     ] = False,
     max_expand: Annotated[int, typer.Option("--max-expand", min=0, help="0 = unlimited")] = 5,
+    depth: Annotated[
+        int, typer.Option("--depth", min=1, max=5, help="Multi-hop expansion depth")
+    ] = 1,
     variants: Annotated[
         bool, typer.Option("--variants", help="Probe generated handle/email variants")
     ] = False,
@@ -86,6 +92,7 @@ def pivot(
                         sources=names,
                         expand=expand,
                         max_expand=max_expand,
+                        depth=depth,
                         use_variants=variants,
                         include_web=web,
                         avatar_hash=avatar_hash,
@@ -129,6 +136,94 @@ def _pivot_jsonl(report: PivotReport) -> None:
 def _save_pivot(settings: Settings, report: PivotReport) -> None:
     with Store(settings.db_path) as store:
         persist_pivot(store, report)
+
+
+@app.command()
+def batch(
+    ctx: typer.Context,
+    targets: Annotated[
+        list[str] | None, typer.Argument(help="Usernames or emails to pivot")
+    ] = None,
+    file: Annotated[
+        Path | None, typer.Option("-f", "--file", help="Newline-delimited target file")
+    ] = None,
+    source: Annotated[
+        list[str] | None, typer.Option("-s", "--source", help="Sources or groups")
+    ] = None,
+    expand: Annotated[bool, typer.Option("--expand")] = False,
+    depth: Annotated[int, typer.Option("--depth", min=1, max=5)] = 1,
+    web: Annotated[bool, typer.Option("--web")] = False,
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+    save: Annotated[bool, typer.Option("--save/--no-save")] = True,
+) -> None:
+    """Pivot multiple targets in sequence and correlate each."""
+    settings = _settings(ctx)
+    items: list[str] = list(targets or [])
+    if file is not None:
+        for line in file.read_text(encoding="utf-8").splitlines():
+            cleaned = line.strip()
+            if cleaned and not cleaned.startswith("#"):
+                items.append(cleaned)
+    if not items:
+        raise typer.BadParameter("provide at least one target argument or --file")
+
+    names = list(source) if source else None
+    reports: list[dict] = []
+    store = Store(settings.db_path) if save else None
+    try:
+        for target in items:
+            report = asyncio.run(
+                run_pivot(
+                    target,
+                    settings=settings,
+                    sources=names,
+                    expand=expand,
+                    depth=depth,
+                    include_web=web,
+                    use_cache=save and settings.negative_cache_ttl > 0,
+                    store=store,
+                )
+            )
+            if store is not None:
+                persist_pivot(store, report)
+            if not json_out:
+                _render_pivot(report)
+            reports.append(asdict(report))
+    finally:
+        if store is not None:
+            store.close()
+
+    if json_out:
+        _print_json(reports)
+
+
+@app.command()
+def recluster(
+    ctx: typer.Context,
+    run_id: Annotated[int | None, typer.Option("--run", help="Specific run (omit for all)")] = None,
+    threshold: Annotated[float, typer.Option("--threshold", min=0.1, max=1.0)] = 0.5,
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Re-run correlation and clustering over stored profiles (single run or cross-run)."""
+    settings = _settings(ctx)
+    with Store(settings.db_path) as store:
+        rows = store.profiles(run_id=run_id, limit=None)
+    links, clusters = recluster_rows(rows, threshold=threshold)
+    if json_out:
+        _print_json(
+            {
+                "profiles": len(rows),
+                "links": [asdict(link) for link in links],
+                "clusters": [asdict(c) for c in clusters],
+            }
+        )
+        return
+    console.print(
+        f"[bold]Recluster[/bold] — {len(rows)} profile row(s) → "
+        f"{len(links)} link(s), {len(clusters)} cluster(s)"
+    )
+    if links:
+        _render_links(links)
 
 
 # -- harvest ----------------------------------------------------------------

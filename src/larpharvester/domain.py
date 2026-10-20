@@ -1,16 +1,49 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import struct
 from typing import Any
 
 from .http import Fetcher, FetchError
 from .utils import dedupe
 
 RDAP = "https://rdap.org/domain"
+RDAP_IP = "https://rdap.org/ip"
+RIPE_ASN = "https://stat.ripe.net/data/network-info/data.json"
 DOH = "https://dns.google/resolve"
 CRTSH = "https://crt.sh/"
 
 RECORD_TYPES = ("A", "AAAA", "MX", "TXT", "NS", "CNAME")
+
+MX_PROVIDERS = {
+    "google.com": "Google Workspace",
+    "googlemail.com": "Google Workspace",
+    "outlook.com": "Microsoft 365",
+    "protection.outlook.com": "Microsoft 365",
+    "protonmail.ch": "Proton Mail",
+    "pphosted.com": "Proofpoint",
+    "mimecast.com": "Mimecast",
+    "zoho.com": "Zoho Mail",
+    "fastmail.com": "Fastmail",
+    "yahoodns.net": "Yahoo Mail",
+    "icloud.com": "Apple iCloud",
+    "cloudflare.net": "Cloudflare Email Routing",
+    "amazonaws.com": "Amazon SES",
+    "mailgun.org": "Mailgun",
+    "sendgrid.net": "SendGrid",
+}
+
+TAKEOVER_CNAMES: dict[str, tuple[str, str]] = {
+    "github.io": ("GitHub Pages", "There isn't a GitHub Pages site here"),
+    "herokuapp.com": ("Heroku", "No such app"),
+    "vercel.app": ("Vercel", "The deployment could not be found"),
+    "netlify.app": ("Netlify", "Not Found - Request ID"),
+    "azurewebsites.net": ("Azure App Service", "404 Web Site not found"),
+    "s3.amazonaws.com": ("AWS S3", "NoSuchBucket"),
+    "ghost.io": ("Ghost", "The thing you were looking for is no longer here"),
+    "myshopify.com": ("Shopify", "Sorry, this shop is currently unavailable"),
+}
 
 
 async def rdap(fetcher: Fetcher, domain: str) -> dict[str, Any] | None:
@@ -71,19 +104,149 @@ async def crtsh(fetcher: Fetcher, domain: str, limit: int = 200) -> list[str]:
     return dedupe(sorted(names))
 
 
-async def lookup_domain(fetcher: Fetcher, domain: str) -> dict[str, Any]:
+def guess_mx_provider(mx_records: list[str]) -> str | None:
+    for record in mx_records:
+        low = record.casefold().rstrip(".")
+        for suffix, provider in MX_PROVIDERS.items():
+            if low.endswith(suffix):
+                return provider
+    return None
+
+
+def extract_spf(txt_records: list[str]) -> str | None:
+    for record in txt_records:
+        cleaned = record.strip().strip('"')
+        if cleaned.casefold().startswith("v=spf1"):
+            return cleaned
+    return None
+
+
+async def fetch_dmarc(fetcher: Fetcher, domain: str) -> str | None:
+    records = await dns(fetcher, f"_dmarc.{domain}", "TXT")
+    for record in records:
+        cleaned = record.strip().strip('"')
+        if "v=dmarc1" in cleaned.casefold():
+            return cleaned
+    return None
+
+
+async def fetch_security_txt(fetcher: Fetcher, domain: str) -> str | None:
+    for path in (f"https://{domain}/.well-known/security.txt", f"https://{domain}/security.txt"):
+        try:
+            status, text = await fetcher.get_text(path)
+        except FetchError:
+            continue
+        if status == 200 and "contact:" in text.casefold():
+            return text.strip()[:2000]
+    return None
+
+
+def mmh3_32(data: bytes, seed: int = 0) -> int:
+    """Pure-Python 32-bit signed MurmurHash3 (matches Shodan's http.favicon.hash)."""
+    c1 = 0xCC9E2D51
+    c2 = 0x1B873593
+    length = len(data)
+    h1 = seed & 0xFFFFFFFF
+    rounded_end = length & ~0x3
+
+    for i in range(0, rounded_end, 4):
+        k1 = struct.unpack_from("<I", data, i)[0]
+        k1 = (k1 * c1) & 0xFFFFFFFF
+        k1 = ((k1 << 15) | (k1 >> 17)) & 0xFFFFFFFF
+        k1 = (k1 * c2) & 0xFFFFFFFF
+        h1 ^= k1
+        h1 = ((h1 << 13) | (h1 >> 19)) & 0xFFFFFFFF
+        h1 = (h1 * 5 + 0xE6546B64) & 0xFFFFFFFF
+
+    k1 = 0
+    tail = length & 3
+    if tail == 3:
+        k1 ^= data[rounded_end + 2] << 16
+    if tail >= 2:
+        k1 ^= data[rounded_end + 1] << 8
+    if tail >= 1:
+        k1 ^= data[rounded_end]
+        k1 = (k1 * c1) & 0xFFFFFFFF
+        k1 = ((k1 << 15) | (k1 >> 17)) & 0xFFFFFFFF
+        k1 = (k1 * c2) & 0xFFFFFFFF
+        h1 ^= k1
+
+    h1 ^= length
+    h1 ^= h1 >> 16
+    h1 = (h1 * 0x85EBCA6B) & 0xFFFFFFFF
+    h1 ^= h1 >> 13
+    h1 = (h1 * 0xC2B2AE35) & 0xFFFFFFFF
+    h1 ^= h1 >> 16
+    return h1 - 0x100000000 if h1 & 0x80000000 else h1
+
+
+def favicon_shodan_hash(raw: bytes) -> int:
+    """Compute Shodan's base64-with-newlines MurmurHash3 for a favicon."""
+    b64 = base64.encodebytes(raw)
+    return mmh3_32(b64)
+
+
+async def fetch_favicon_hash(fetcher: Fetcher, domain: str) -> int | None:
+    try:
+        response = await fetcher.get(f"https://{domain}/favicon.ico")
+    except FetchError:
+        return None
+    if response.status != 200 or not response.content:
+        return None
+    return favicon_shodan_hash(response.content)
+
+
+async def check_subdomain_takeover(
+    fetcher: Fetcher, domain: str, cname_records: list[str]
+) -> dict[str, str] | None:
+    for cname in cname_records:
+        low = cname.casefold().rstrip(".")
+        for suffix, (service, fingerprint) in TAKEOVER_CNAMES.items():
+            if low.endswith(suffix):
+                try:
+                    status, text = await fetcher.get_text(f"http://{domain}")
+                except FetchError:
+                    continue
+                if fingerprint.casefold() in text.casefold():
+                    return {"service": service, "cname": cname, "status": str(status)}
+    return None
+
+
+async def lookup_domain(fetcher: Fetcher, domain: str, *, deep: bool = False) -> dict[str, Any]:
     domain = domain.strip().casefold().removeprefix("http://").removeprefix("https://")
     domain = domain.split("/")[0]
     values = await asyncio.gather(
         *(dns(fetcher, domain, record_type) for record_type in RECORD_TYPES)
     )
     records = dict(zip(RECORD_TYPES, values, strict=True))
-    return {
+    dns_map = {key: value for key, value in records.items() if value}
+    result: dict[str, Any] = {
         "domain": domain,
         "rdap": await rdap(fetcher, domain),
-        "dns": {key: value for key, value in records.items() if value},
+        "dns": dns_map,
         "subdomains": await crtsh(fetcher, domain),
     }
+    mx = dns_map.get("MX") or []
+    txt = dns_map.get("TXT") or []
+    cname = dns_map.get("CNAME") or []
+    provider = guess_mx_provider(mx)
+    spf = extract_spf(txt)
+    if provider:
+        result["mx_provider"] = provider
+    if spf:
+        result["spf"] = spf
+    if deep:
+        dmarc, sec_txt, fav_hash, takeover = await asyncio.gather(
+            fetch_dmarc(fetcher, domain),
+            fetch_security_txt(fetcher, domain),
+            fetch_favicon_hash(fetcher, domain),
+            check_subdomain_takeover(fetcher, domain, cname),
+        )
+        result["dmarc"] = dmarc
+        result["security_txt"] = sec_txt
+        result["favicon_mmh3"] = fav_hash
+        result["takeover"] = takeover
+    return result
 
 
 def arpa_name(address: str) -> str | None:
@@ -123,6 +286,38 @@ async def reverse_ip(fetcher: Fetcher, address: str, key: str | None = None) -> 
     if "error" in low or "exceeded" in low or "quota" in low:
         return []
     return dedupe([line.strip() for line in text.splitlines() if line.strip()])[:200]
+
+
+async def asn_lookup(fetcher: Fetcher, address: str) -> dict[str, Any] | None:
+    """Query RIPE Stat for ASN and prefix announcement of an IP."""
+    try:
+        status, data = await fetcher.get_json(RIPE_ASN, params={"resource": address})
+    except FetchError:
+        return None
+    if status != 200 or not isinstance(data, dict):
+        return None
+    inner = data.get("data") or {}
+    asns = inner.get("asns") or []
+    prefix = inner.get("prefix")
+    if not asns and not prefix:
+        return None
+    return {"asns": [str(a) for a in asns], "prefix": prefix}
+
+
+async def rdap_ip(fetcher: Fetcher, address: str) -> dict[str, Any] | None:
+    try:
+        status, data = await fetcher.get_json(f"{RDAP_IP}/{address}")
+    except FetchError:
+        return None
+    if status != 200 or not isinstance(data, dict):
+        return None
+    return {
+        "name": data.get("name"),
+        "handle": data.get("handle"),
+        "country": data.get("country"),
+        "start_address": data.get("startAddress"),
+        "end_address": data.get("endAddress"),
+    }
 
 
 async def shodan_host(

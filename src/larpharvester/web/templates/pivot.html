@@ -25,9 +25,18 @@
     <span class="hint">Comma or space separated source names, groups, or <code>all</code>.</span>
   </label>
 
+  <label>
+    Expansion depth (hops when Expand is checked)
+    <select name="depth">
+      <option value="1" selected>1 hop (default)</option>
+      <option value="2">2 hops (email ↔ username ↔ email)</option>
+      <option value="3">3 hops</option>
+    </select>
+  </label>
+
   <fieldset>
     <legend>Options</legend>
-    <label class="check"><input type="checkbox" name="expand" value="true"> Expand: follow linked handles / emails from email sources</label>
+    <label class="check"><input type="checkbox" name="expand" value="true"> Expand: follow linked handles / emails across hops</label>
     <label class="check"><input type="checkbox" name="variants" value="true"> Probe generated handle/email variants</label>
     <label class="check"><input type="checkbox" name="avatar_hash" value="true" checked> Perceptual avatar hashing</label>
   </fieldset>

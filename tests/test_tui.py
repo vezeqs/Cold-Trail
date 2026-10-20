@@ -156,3 +156,91 @@ async def test_tui_custom_scope_requires_sources(settings):
         app.start_pivot()
         await pilot.pause()
         assert app.query_one("#pivot-results", DataTable).row_count == 0
+
+
+# -- 0.4.0: streaming, tools, cases -----------------------------------------
+
+
+async def test_tui_streams_rows_as_checks_finish(settings, seeded, monkeypatch):
+    async def streaming_pivot(target, *, settings, store=None, on_result=None, **kwargs):
+        results = []
+        for index in range(3):
+            profile = Profile(
+                source=f"src{index}",
+                username=target,
+                url=f"https://example.test/{index}",
+                extra={},
+            )
+            result = CheckResult(f"src{index}", target, "found", profile=profile)
+            results.append(result)
+            if on_result is not None:
+                on_result(result)
+        return PivotReport(
+            target=target,
+            kind="username",
+            results=results,
+            links=[],
+            expanded=[],
+            clusters=[],
+            coverage={"found": 3},
+        )
+
+    monkeypatch.setattr(tui_app, "run_pivot", streaming_pivot)
+    app = LarpharvesterTUI(settings)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.query_one("#target", Input).value = "bob"
+        app.start_pivot()
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        assert app.query_one("#pivot-results", DataTable).row_count == 3
+        status = str(app.query_one("#pivot-status").renderable)
+        assert "3 found" in status
+
+
+async def test_tui_tools_phone(settings):
+    from textual.widgets import Select
+
+    app = LarpharvesterTUI(settings)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.query_one("#tool-select", Select).value = "phone"
+        await pilot.pause()
+        app.query_one("#tool-target", Input).value = "+14155552671"
+        app.start_tool()
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        output = str(app.query_one("#tool-output").renderable)
+        assert "e164" in output
+
+
+async def test_tui_tools_requires_target(settings):
+    app = LarpharvesterTUI(settings)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.start_tool()
+        await pilot.pause()
+        assert str(app.query_one("#tool-output").renderable) == ""
+
+
+async def test_tui_cases_create_and_list(settings):
+    app = LarpharvesterTUI(settings)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.query_one("#case-name", Input).value = "op-aurora"
+        app.create_case()
+        await pilot.pause()
+        cases = app.query_one("#cases-table", DataTable)
+        assert cases.row_count == 1
+        assert app.query_one("#case-name", Input).value == ""
+
+
+async def test_tui_annotations_render(settings):
+    with Store(settings.db_path) as store:
+        store.add_tag("profile", "github:alice", "primary")
+        store.add_note("profile", "github:alice", "shared avatar")
+    app = LarpharvesterTUI(settings)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        annotations = app.query_one("#annotations-table", DataTable)
+        assert annotations.row_count == 2

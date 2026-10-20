@@ -1,14 +1,18 @@
 """Textual TUI for larpharvester.
 
-Layout: four tabs (Dashboard, Pivot, Browse, Search) over the same SQLite
-database the CLI uses. Pivots run in a background worker thread so the UI
-stays responsive; the worker opens its own Store connection (SQLite
-connections are thread-bound).
+Tabs: Dashboard, Pivot (live streaming results), Browse, Search, Tools
+(domain/ip/phone/dorks/breach/harvest), Cases (create cases, view tags/notes).
+
+Pivots and tool runs execute in background worker threads so the UI stays
+responsive; each worker opens its own Store connection (SQLite connections
+are thread-bound).
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import json
 from typing import Any
 
 from textual import work
@@ -28,7 +32,13 @@ from textual.widgets import (
 )
 
 from .. import __version__
+from ..breach import full_breach_audit
 from ..config import Settings
+from ..domain import asn_lookup, lookup_domain, ptr, rdap_ip, reverse_ip
+from ..dorks import dorks as build_dorks
+from ..harvest import harvest as run_harvest
+from ..http import Fetcher
+from ..phone import lookup as phone_lookup
 from ..pivot import persist_pivot
 from ..pivot import pivot as run_pivot
 from ..store import Store
@@ -68,12 +78,27 @@ class LarpharvesterTUI(App):
     #browse-posts { height: 1fr; }
     #search-q { width: 52; }
     #search-results { height: 1fr; }
+    #tool-select { width: 30; }
+    #tool-target { width: 40; }
+    #tool-source { width: 22; }
+    #tool-output {
+        background: #151b23;
+        border: solid #26303b;
+        padding: 1 2;
+        height: 1fr;
+        overflow-y: auto;
+    }
+    #case-name { width: 40; }
+    #cases-table { height: 12; margin-bottom: 1; }
+    #annotations-table { height: 1fr; }
     DataTable { background: #0e1116; }
     """
 
     def __init__(self, settings: Settings) -> None:
         super().__init__()
         self.settings = settings
+        self._live_checked = 0
+        self._live_found = 0
 
     # -- layout -------------------------------------------------------------
 
@@ -118,6 +143,36 @@ class LarpharvesterTUI(App):
                         yield Input(placeholder="full-text search over posts", id="search-q")
                         yield Button("Search", id="search-btn")
                     yield DataTable(id="search-results")
+            with TabPane("Tools", id="tab-tools"):
+                with Vertical():
+                    with Horizontal():
+                        yield Select(
+                            [
+                                ("domain intel", "domain"),
+                                ("ip intel", "ip"),
+                                ("phone parse", "phone"),
+                                ("dorks", "dorks"),
+                                ("breach audit", "breach"),
+                                ("harvest posts", "harvest"),
+                            ],
+                            value="domain",
+                            allow_blank=False,
+                            id="tool-select",
+                        )
+                        yield Input(
+                            placeholder="domain / IP / phone / handle / email",
+                            id="tool-target",
+                        )
+                        yield Input(placeholder="source (harvest)", id="tool-source")
+                        yield Button("Run tool", id="tool-run", variant="primary")
+                    yield Static("", id="tool-output", markup=False)
+            with TabPane("Cases", id="tab-cases"):
+                with Vertical():
+                    with Horizontal():
+                        yield Input(placeholder="new case name", id="case-name")
+                        yield Button("Create case", id="case-create", variant="primary")
+                    yield DataTable(id="cases-table")
+                    yield DataTable(id="annotations-table")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -138,12 +193,20 @@ class LarpharvesterTUI(App):
         search_table = self.query_one("#search-results", DataTable)
         search_table.cursor_type = "row"
         search_table.add_columns("When", "Source", "Username", "Text")
+        cases_table = self.query_one("#cases-table", DataTable)
+        cases_table.cursor_type = "row"
+        cases_table.add_columns("ID", "Name", "Runs", "Created")
+        annotations_table = self.query_one("#annotations-table", DataTable)
+        annotations_table.cursor_type = "row"
+        annotations_table.add_columns("Kind", "Target", "Value", "When")
         self.refresh_data()
+        self.refresh_cases()
 
     # -- actions ------------------------------------------------------------
 
     def action_refresh(self) -> None:
         self.refresh_data()
+        self.refresh_cases()
         self.notify("refreshed")
 
     def refresh_data(self) -> None:
@@ -183,6 +246,27 @@ class LarpharvesterTUI(App):
                 str(run["id"]), run["kind"], run["target"], run["status"], key=str(run["id"])
             )
 
+    def refresh_cases(self) -> None:
+        with Store(self.settings.db_path) as store:
+            cases = store.cases()
+            tags = store.tags()
+            notes = store.notes()
+        cases_table = self.query_one("#cases-table", DataTable)
+        cases_table.clear()
+        for case in cases:
+            cases_table.add_row(
+                str(case["id"]),
+                case["name"],
+                str(case["runs"]),
+                (case["created_at"] or "")[:19],
+            )
+        annotations = self.query_one("#annotations-table", DataTable)
+        annotations.clear()
+        for tag in tags:
+            annotations.add_row("tag", tag["target"], tag["tag"], "")
+        for note in notes:
+            annotations.add_row("note", note["target"], note["note"], note["created_at"][:19])
+
     # -- pivot --------------------------------------------------------------
 
     def on_select_changed(self, event: Select.Changed) -> None:
@@ -194,12 +278,20 @@ class LarpharvesterTUI(App):
             self.start_pivot()
         elif event.input.id == "search-q":
             self.run_search(event.value)
+        elif event.input.id == "tool-target":
+            self.start_tool()
+        elif event.input.id == "case-name":
+            self.create_case()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "run-pivot":
             self.start_pivot()
         elif event.button.id == "search-btn":
             self.run_search(self.query_one("#search-q", Input).value)
+        elif event.button.id == "tool-run":
+            self.start_tool()
+        elif event.button.id == "case-create":
+            self.create_case()
 
     def start_pivot(self) -> None:
         target = self.query_one("#target", Input).value.strip()
@@ -221,7 +313,22 @@ class LarpharvesterTUI(App):
         status = self.query_one("#pivot-status", Static)
         status.update(f"[yellow]probing {target}…[/yellow]")
         self.query_one("#pivot-results", DataTable).clear()
+        self._live_checked = 0
+        self._live_found = 0
         self.run_pivot_worker(target, names, include_web, expand, variants, avatar)
+
+    def _pivot_row(self, result: Any) -> None:
+        table = self.query_one("#pivot-results", DataTable)
+        handle = result.profile.username if result.profile else ""
+        url = result.profile.url if result.profile else ""
+        table.add_row(result.source, result.status, result.target, handle, url)
+        self._live_checked += 1
+        if result.status == "found":
+            self._live_found += 1
+        self.query_one("#pivot-status", Static).update(
+            f"[yellow]running…[/yellow] [green]{self._live_found} found[/green]"
+            f" / {self._live_checked} checked"
+        )
 
     @work(thread=True, exclusive=True, group="pivot")
     def run_pivot_worker(
@@ -233,6 +340,10 @@ class LarpharvesterTUI(App):
         variants: bool,
         avatar: bool,
     ) -> None:
+        def on_result(result: Any) -> None:
+            with contextlib.suppress(Exception):
+                self.call_from_thread(self._pivot_row, result)
+
         try:
             store = Store(self.settings.db_path)
             try:
@@ -246,6 +357,7 @@ class LarpharvesterTUI(App):
                         include_web=include_web,
                         avatar_hash=avatar,
                         store=store,
+                        on_result=on_result,
                     )
                 )
                 run_id = persist_pivot(store, report)
@@ -260,12 +372,15 @@ class LarpharvesterTUI(App):
         if error:
             status.update(f"[red]pivot failed: {error}[/red]")
             return
+        # Streaming normally populated the table already; reconcile from the
+        # report so the final view is complete even if a callback was missed.
         table = self.query_one("#pivot-results", DataTable)
-        table.clear()
-        for result in report.results:
-            handle = result.profile.username if result.profile else ""
-            url = result.profile.url if result.profile else ""
-            table.add_row(result.source, result.status, result.target, handle, url)
+        if table.row_count != len(report.results):
+            table.clear()
+            for result in report.results:
+                handle = result.profile.username if result.profile else ""
+                url = result.profile.url if result.profile else ""
+                table.add_row(result.source, result.status, result.target, handle, url)
         found = report.coverage.get("found", 0)
         status.update(
             f"[green]{found} found[/green] of {len(report.results)} checks  ·  "
@@ -323,6 +438,108 @@ class LarpharvesterTUI(App):
                 " ".join((row["text"] or "").split())[:120],
             )
         self.notify(f"{len(rows)} results for {query!r}")
+
+    # -- tools --------------------------------------------------------------
+
+    def start_tool(self) -> None:
+        tool = str(self.query_one("#tool-select", Select).value)
+        target = self.query_one("#tool-target", Input).value.strip()
+        source = self.query_one("#tool-source", Input).value.strip() or "github"
+        if not target:
+            self.notify("enter a tool target first", severity="warning")
+            return
+        self.query_one("#tool-output", Static).update(f"running {tool}…")
+        self.run_tool_worker(tool, target, source)
+
+    @work(thread=True, exclusive=True, group="tool")
+    def run_tool_worker(self, tool: str, target: str, source: str) -> None:
+        try:
+            result: Any
+            if tool == "domain":
+
+                async def _run():
+                    async with Fetcher(self.settings) as fetcher:
+                        return await lookup_domain(fetcher, target, deep=True)
+
+                result = asyncio.run(_run())
+            elif tool == "ip":
+
+                async def _run():
+                    async with Fetcher(self.settings) as fetcher:
+                        return {
+                            "address": target,
+                            "ptr": await ptr(fetcher, target),
+                            "hostnames": await reverse_ip(
+                                fetcher, target, self.settings.shodan_api_key
+                            ),
+                            "asn": await asn_lookup(fetcher, target),
+                            "rdap": await rdap_ip(fetcher, target),
+                        }
+
+                result = asyncio.run(_run())
+            elif tool == "phone":
+                result = phone_lookup(target) or {"error": "invalid number"}
+            elif tool == "dorks":
+                result = build_dorks(target)
+            elif tool == "breach":
+
+                async def _run():
+                    async with Fetcher(self.settings) as fetcher:
+                        return await full_breach_audit(fetcher, target)
+
+                result = asyncio.run(_run())
+            elif tool == "harvest":
+                store = Store(self.settings.db_path)
+                try:
+                    check, posts = asyncio.run(
+                        run_harvest(source, target, settings=self.settings, limit=25, store=store)
+                    )
+                    run_id = store.start_run("harvest", f"{source}:{target}")
+                    store.save_checks(run_id, [check])
+                    if check.profile:
+                        store.save_profiles(run_id, [check.profile])
+                        store.record_profile_history(run_id, [check.profile])
+                    store.save_posts(run_id, posts)
+                    store.finish_run(run_id)
+                finally:
+                    store.close()
+                result = {
+                    "run_id": run_id,
+                    "status": check.status,
+                    "profile": check.profile.username if check.profile else None,
+                    "posts": len(posts),
+                }
+            else:
+                result = {"error": f"unknown tool {tool}"}
+            self.call_from_thread(self._tool_finished, tool, result, None)
+        except Exception as exc:
+            self.call_from_thread(self._tool_finished, tool, None, f"{type(exc).__name__}: {exc}")
+
+    def _tool_finished(self, tool: str, result: Any, error: str | None) -> None:
+        output = self.query_one("#tool-output", Static)
+        if error:
+            output.update(f"{tool} failed: {error}")
+            return
+        text = json.dumps(result, indent=2, ensure_ascii=False, default=str)
+        output.update(f"{tool}\n{text}")
+        self.refresh_data()
+
+    # -- cases --------------------------------------------------------------
+
+    def create_case(self) -> None:
+        name = self.query_one("#case-name", Input).value.strip()
+        if not name:
+            self.notify("enter a case name", severity="warning")
+            return
+        with Store(self.settings.db_path) as store:
+            try:
+                case_id = store.create_case(name)
+            except Exception as exc:
+                self.notify(f"could not create case: {exc}", severity="error")
+                return
+        self.query_one("#case-name", Input).value = ""
+        self.refresh_cases()
+        self.notify(f"created case #{case_id} {name}")
 
 
 def run_tui(settings: Settings) -> None:

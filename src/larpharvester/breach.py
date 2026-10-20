@@ -13,6 +13,7 @@ credentials. It answers "was this exposed?" — never "what is it?".
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 from typing import Any
 from urllib.parse import quote
@@ -20,6 +21,8 @@ from urllib.parse import quote
 from .http import Fetcher, FetchError
 
 HIBP_BREACH_URL = "https://haveibeenpwned.com/api/v3/breachedaccount/{email}"
+HUDSONROCK_URL = "https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-email"
+LEAKCHECK_URL = "https://leakcheck.io/api/public"
 PWNED_RANGE_URL = "https://api.pwnedpasswords.com/range/{prefix}"
 
 
@@ -84,6 +87,82 @@ async def hibp_breaches(fetcher: Fetcher, email: str) -> dict[str, Any]:
             "breaches": [],
         }
     return {"status": "error", "detail": f"HTTP {status}", "breaches": []}
+
+
+async def hudsonrock_exposure(fetcher: Fetcher, email: str) -> dict[str, Any]:
+    """Query HudsonRock Cavalier public telemetry for infostealer exposure metadata."""
+    status, data = await _safe_json(
+        fetcher,
+        HUDSONROCK_URL,
+        params={"email": email.strip()},
+    )
+    if status is None:
+        return {"status": "error", "detail": data, "stealers": []}
+    if status == 200 and isinstance(data, dict):
+        stealers = data.get("stealers") or []
+        return {
+            "status": "found" if stealers else "none",
+            "detail": (
+                f"{len(stealers)} infostealer record(s)"
+                if stealers
+                else "not found in infostealer telemetry"
+            ),
+            "stealers": stealers[:25],
+        }
+    if status == 404:
+        return {"status": "none", "detail": "not found", "stealers": []}
+    if status in (401, 403, 429):
+        return {"status": "blocked", "detail": f"HTTP {status}: rate limited", "stealers": []}
+    return {"status": "error", "detail": f"HTTP {status}", "stealers": []}
+
+
+async def leakcheck_public(fetcher: Fetcher, email: str) -> dict[str, Any]:
+    """Query LeakCheck's unauthenticated public API for breach source names & fields."""
+    status, data = await _safe_json(
+        fetcher,
+        LEAKCHECK_URL,
+        params={"check": email.strip()},
+    )
+    if status is None:
+        return {"status": "error", "detail": data, "sources": [], "fields": []}
+    if status == 200 and isinstance(data, dict):
+        found = int(data.get("found") or 0)
+        if not data.get("success") or found <= 0:
+            return {"status": "none", "detail": "not found", "sources": [], "fields": []}
+        return {
+            "status": "found",
+            "detail": f"appears in {found} record(s)",
+            "found": found,
+            "fields": data.get("fields") or [],
+            "sources": data.get("sources") or [],
+        }
+    if status == 404:
+        return {"status": "none", "detail": "not found", "sources": [], "fields": []}
+    if status in (401, 403, 429):
+        return {
+            "status": "blocked",
+            "detail": f"HTTP {status}: rate limited",
+            "sources": [],
+            "fields": [],
+        }
+    return {"status": "error", "detail": f"HTTP {status}", "sources": [], "fields": []}
+
+
+async def full_breach_audit(fetcher: Fetcher, email: str) -> dict[str, Any]:
+    """Run HIBP + HudsonRock + LeakCheck concurrently for an email address."""
+    hibp, hr, lc = await asyncio.gather(
+        hibp_breaches(fetcher, email),
+        hudsonrock_exposure(fetcher, email),
+        leakcheck_public(fetcher, email),
+    )
+    any_found = any(r.get("status") == "found" for r in (hibp, hr, lc))
+    return {
+        "email": email,
+        "status": "found" if any_found else hibp.get("status", "none"),
+        "hibp": hibp,
+        "hudsonrock": hr,
+        "leakcheck": lc,
+    }
 
 
 def sha1_prefix(password: str) -> tuple[str, str]:

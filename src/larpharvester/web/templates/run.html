@@ -25,6 +25,17 @@
   </p>
 </section>
 
+{% if profiles or links or entities or edges %}
+<section class="panel">
+  <h2>Interactive identity graph</h2>
+  <p class="muted">Drag nodes to rearrange · scroll to zoom · click a node to inspect.</p>
+  <div class="graph-wrap">
+    <canvas id="identity-graph" data-run-id="{{ run.id }}" width="1100" height="440"></canvas>
+    <div id="graph-inspector" class="graph-info muted">Click any node in the graph to inspect profile/entity details.</div>
+  </div>
+</section>
+{% endif %}
+
 {% if clusters %}
 <section class="panel">
   <h2>Inferred identities ({{ clusters | length }})</h2>

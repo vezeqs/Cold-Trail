@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}OSINT Workbench · larpharvester{% endblock %}
+{% block content %}
+<h1>OSINT Workbench</h1>
+<p class="muted">Run domain, IP, phone, dorks, Wayback archive, breach exposure, post harvest, follow graph, or cross-run re-clustering directly.</p>
+
+<section class="panel">
+  <form method="post" action="/tools/run" class="stack">
+    <label>Tool
+      <select name="tool" id="tool-select">
+        <option value="domain" {{ 'selected' if tool == 'domain' }}>Domain intel (RDAP, DNS, crt.sh, SPF/DMARC, favicon MMH3, takeovers)</option>
+        <option value="ip" {{ 'selected' if tool == 'ip' }}>IP intel (PTR, reverse IP, RIPE ASN, RDAP, Shodan)</option>
+        <option value="phone" {{ 'selected' if tool == 'phone' }}>Phone number parser (E.164, carrier, region, timezones)</option>
+        <option value="dorks" {{ 'selected' if tool == 'dorks' }}>Search dorks &amp; reverse-image URLs</option>
+        <option value="archive" {{ 'selected' if tool == 'archive' }}>Wayback Machine CDX captures</option>
+        <option value="breach" {{ 'selected' if tool == 'breach' }}>Breach exposure audit (HIBP + HudsonRock + LeakCheck)</option>
+        <option value="pwned" {{ 'selected' if tool == 'pwned' }}>Pwned Passwords k-anonymity check (5-char SHA-1 prefix only)</option>
+        <option value="harvest" {{ 'selected' if tool == 'harvest' }}>Harvest profile &amp; recent posts from a source</option>
+        <option value="graph" {{ 'selected' if tool == 'graph' }}>Collect public follow graph from a source</option>
+        <option value="recluster" {{ 'selected' if tool == 'recluster' }}>Cross-run identity re-clustering</option>
+      </select>
+    </label>
+
+    <label>Target (domain, IP, phone, handle, email, URL, or password for pwned)
+      <input type="text" name="target" value="{{ target or '' }}" placeholder="example.com / 8.8.8.8 / +14155552671 / alice">
+    </label>
+
+    <div class="inline-form">
+      <label>Source (for harvest/graph)
+        <select name="source">
+          {% for s in post_sources %}
+          <option value="{{ s }}">{{ s }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Limit
+        <input type="text" name="limit" value="25">
+      </label>
+      <label class="check">
+        <input type="checkbox" name="deep" value="true" checked> Deep recon (DMARC / security.txt / favicon / takeover)
+      </label>
+    </div>
+
+    <button type="submit">Execute</button>
+  </form>
+</section>
+
+{% if result is not none %}
+<section class="panel">
+  <h2>Result · <span class="mono">{{ tool }}</span>
+    {% if run_id %}<a class="chip" href="/runs/{{ run_id }}">Saved as run #{{ run_id }} →</a>{% endif %}
+  </h2>
+  <pre class="code-box">{{ result_json }}</pre>
+</section>
+{% endif %}
+{% endblock %}

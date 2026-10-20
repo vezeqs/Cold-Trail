@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import os
+import uuid
 from typing import Any
 from xml.sax.saxutils import escape
 
@@ -200,6 +201,235 @@ def to_dot(payload: dict[str, Any]) -> str:
         )
     out.append("}")
     return "\n".join(out)
+
+
+def to_markdown(payload: dict[str, Any], redacted: bool = False) -> str:
+    run = payload.get("run") or {}
+    target = run.get("target") or payload.get("target") or "unknown"
+    profiles = payload.get("profiles") or []
+    links = payload.get("links") or []
+    clusters = payload.get("clusters") or []
+    entities = payload.get("entities") or []
+    posts = payload.get("posts") or []
+    checks = payload.get("checks") or []
+
+    counts: dict[str, int] = {}
+    for check in checks:
+        counts[check.get("status", "?")] = counts.get(check.get("status", "?"), 0) + 1
+    cov_str = ", ".join(f"{k}: {v}" for k, v in sorted(counts.items()))
+
+    lines = [
+        f"# OSINT Dossier: `{target}`",
+        "",
+        f"- **Run ID:** {run.get('id', 'n/a')}",
+        f"- **Kind:** {run.get('kind', 'pivot')}",
+        f"- **Started:** {run.get('started_at', '')}",
+        f"- **Coverage:** {cov_str or 'n/a'}",
+        f"- **Redacted:** {'yes' if redacted else 'no'}",
+        "",
+    ]
+    if clusters:
+        lines.extend(["## Inferred Identity Clusters", ""])
+        lines.append("| Cluster | Size | Confidence | Members | Reasons |")
+        lines.append("| --- | --- | --- | --- | --- |")
+        for cluster in clusters:
+            members = ", ".join(
+                f"`{m['source']}:{m['username']}`" for m in cluster.get("members", [])
+            )
+            reasons = ", ".join(cluster.get("reasons") or [])
+            lines.append(
+                f"| `{cluster.get('cluster_key', '')}` | {cluster.get('size', 0)} "
+                f"| {float(cluster.get('score') or 0):.2f} | {members} | {reasons} |"
+            )
+        lines.append("")
+
+    if profiles:
+        lines.extend(["## Profiles", ""])
+        lines.append("| Source | Username | Display Name | Followers | URL |")
+        lines.append("| --- | --- | --- | --- | --- |")
+        for p in profiles:
+            followers = p.get("followers") if p.get("followers") is not None else ""
+            lines.append(
+                f"| {p.get('source', '')} | `{p.get('username', '')}` "
+                f"| {p.get('display_name') or ''} | {followers} | {p.get('url') or ''} |"
+            )
+        lines.append("")
+
+    if links:
+        lines.extend(["## Correlated Pairs", ""])
+        lines.append("| Account A | Account B | Score | Reasons |")
+        lines.append("| --- | --- | --- | --- |")
+        for row in links:
+            lines.append(
+                f"| `{row.get('source_a')}:{row.get('username_a')}` "
+                f"| `{row.get('source_b')}:{row.get('username_b')}` "
+                f"| {float(row.get('score') or 0):.2f} "
+                f"| {', '.join(row.get('reasons') or [])} |"
+            )
+        lines.append("")
+
+    if entities:
+        lines.extend(["## Extracted Entities", ""])
+        lines.append("| Kind | Value | Observed On |")
+        lines.append("| --- | --- | --- |")
+        for e in entities:
+            lines.append(
+                f"| {e.get('kind', '')} | `{e.get('value', '')}` "
+                f"| `{e.get('source')}:{e.get('username')}` |"
+            )
+        lines.append("")
+
+    if posts:
+        lines.extend(["## Recent Posts", ""])
+        for p in sorted(posts, key=lambda item: item.get("created_at") or "")[:50]:
+            when = str(p.get("created_at") or "")[:19]
+            txt = " ".join(str(p.get("text") or "").split())[:200]
+            lines.append(f"- **{when}** `{p.get('source')}:{p.get('username')}` — {txt}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def _stix_id(kind: str, seed: str) -> str:
+    ns = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+    return f"{kind}--{uuid.uuid5(ns, f'larpharvester:{kind}:{seed}')}"
+
+
+def to_stix(payload: dict[str, Any]) -> str:
+    """Export a run as a STIX 2.1 JSON bundle (user-account, identity, relationship)."""
+    run = payload.get("run") or {}
+    started = run.get("started_at") or "2025-01-01T00:00:00Z"
+    if not started.endswith("Z") and "+" not in started:
+        started = started + "Z"
+
+    objects: list[dict[str, Any]] = []
+    acct_ids: dict[str, str] = {}
+
+    for profile in payload.get("profiles") or []:
+        node = _node_id(profile)
+        oid = _stix_id("user-account", node)
+        acct_ids[node] = oid
+        objects.append(
+            {
+                "type": "user-account",
+                "spec_version": "2.1",
+                "id": oid,
+                "user_id": profile.get("username"),
+                "account_login": profile.get("username"),
+                "account_type": profile.get("source"),
+                "display_name": profile.get("display_name") or profile.get("username"),
+                "extensions": {
+                    "x-larpharvester": {
+                        "url": profile.get("url"),
+                        "bio": profile.get("bio"),
+                        "avatar_hash": profile.get("avatar_hash"),
+                        "followers": profile.get("followers"),
+                    }
+                },
+            }
+        )
+
+    for cluster in payload.get("clusters") or []:
+        ckey = str(cluster.get("cluster_key") or "cluster")
+        ident_id = _stix_id("identity", ckey)
+        objects.append(
+            {
+                "type": "identity",
+                "spec_version": "2.1",
+                "id": ident_id,
+                "created": started,
+                "modified": started,
+                "name": f"cluster:{ckey}",
+                "identity_class": "individual",
+                "confidence": int(round(float(cluster.get("score") or 0) * 100)),
+                "description": ", ".join(cluster.get("reasons") or []),
+            }
+        )
+        for member in cluster.get("members") or []:
+            mkey = f"{member['source']}:{member['username']}"
+            if mkey in acct_ids:
+                rel_id = _stix_id("relationship", f"{ident_id}->{acct_ids[mkey]}")
+                objects.append(
+                    {
+                        "type": "relationship",
+                        "spec_version": "2.1",
+                        "id": rel_id,
+                        "created": started,
+                        "modified": started,
+                        "relationship_type": "attributed-to",
+                        "source_ref": acct_ids[mkey],
+                        "target_ref": ident_id,
+                    }
+                )
+
+    for link in payload.get("links") or []:
+        sa = f"{link['source_a']}:{link['username_a']}"
+        sb = f"{link['source_b']}:{link['username_b']}"
+        if sa in acct_ids and sb in acct_ids:
+            rel_id = _stix_id("relationship", f"{sa}<->{sb}")
+            objects.append(
+                {
+                    "type": "relationship",
+                    "spec_version": "2.1",
+                    "id": rel_id,
+                    "created": started,
+                    "modified": started,
+                    "relationship_type": "related-to",
+                    "description": ", ".join(link.get("reasons") or []),
+                    "confidence": int(round(float(link.get("score") or 0) * 100)),
+                    "source_ref": acct_ids[sa],
+                    "target_ref": acct_ids[sb],
+                }
+            )
+
+    bundle = {
+        "type": "bundle",
+        "id": _stix_id("bundle", str(run.get("id") or "0")),
+        "objects": objects,
+    }
+    return json.dumps(bundle, indent=2, ensure_ascii=False, default=str)
+
+
+def to_maltego_csv(payload: dict[str, Any]) -> str:
+    """Export links and entity observations as a Maltego-importable edge table."""
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    header = ["SourceType", "SourceValue", "Relation", "TargetType", "TargetValue", "Weight"]
+    writer.writerow(header)
+    for link in payload.get("links") or []:
+        writer.writerow(
+            [
+                "maltego.Alias",
+                f"{link['source_a']}:{link['username_a']}",
+                ", ".join(link.get("reasons") or []) or "correlated",
+                "maltego.Alias",
+                f"{link['source_b']}:{link['username_b']}",
+                link.get("score", 0.5),
+            ]
+        )
+    for ent in payload.get("entities") or []:
+        writer.writerow(
+            [
+                "maltego.Alias",
+                f"{ent.get('source')}:{ent.get('username')}",
+                f"mentions:{ent.get('kind')}",
+                f"maltego.{ent.get('kind')}",
+                ent.get("value"),
+                0.8,
+            ]
+        )
+    for edge in payload.get("edges") or []:
+        writer.writerow(
+            [
+                "maltego.Alias",
+                f"{edge.get('platform')}:{edge.get('actor')}",
+                edge.get("direction", "follows"),
+                "maltego.Alias",
+                f"{edge.get('platform')}:{edge.get('target')}",
+                0.5,
+            ]
+        )
+    return buffer.getvalue()
 
 
 def to_html(payload: dict[str, Any], redacted: bool = False) -> str:

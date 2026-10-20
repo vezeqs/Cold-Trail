@@ -34,6 +34,20 @@ HARD_MARKERS = (
     "ddos-guard",
     "verify you are human",
     "are you a robot",
+    "access denied",
+    "perimeterx",
+    "px-captcha",
+    "datadome",
+    "incapsula incident",
+    "_incapsula_resource",
+    "akamai reference",
+    "sucuri website firewall",
+)
+
+WAF_HEADER_MARKERS = (
+    ("cf-mitigated", "challenge"),
+    ("x-datadome", "protected"),
+    ("x-sucuri-block", ""),
 )
 
 
@@ -82,7 +96,10 @@ class Fetcher:
                 max_connections=max(8, settings.concurrency * 2),
                 max_keepalive_connections=max(4, settings.concurrency),
             ),
-            headers={"User-Agent": settings.user_agent},
+            headers={
+                "User-Agent": settings.user_agent,
+                "Accept-Language": "en-US,en;q=0.9",
+            },
         )
         self._sem = asyncio.Semaphore(max(1, settings.concurrency))
         self._hosts: dict[str, dict[str, Any]] = {}
@@ -416,7 +433,11 @@ def _cache_key(url: str, params: dict[str, Any] | None) -> str:
 def _looks_blocked(response: Fetched) -> bool:
     if response.status == 304:
         return False
-    content_type = response.headers.get("content-type", "").lower()
+    low_headers = {k.lower(): v.lower() for k, v in response.headers.items()}
+    for header, expected in WAF_HEADER_MARKERS:
+        if header in low_headers and (not expected or expected in low_headers[header]):
+            return True
+    content_type = low_headers.get("content-type", "")
     low = response.text[:5000].lower()
     if response.status in (401, 403, 407, 429, 503):
         return "html" in content_type or any(marker in low for marker in HARD_MARKERS)

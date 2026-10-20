@@ -6,11 +6,12 @@ the result as JSON, CSV, GraphML, GEXF, DOT, or a self-contained HTML dossier.
 
 Three interfaces over one database:
 
-- **CLI** — 38 commands, scriptable, JSON/JSONL output
-- **TUI** — full-screen terminal console (dashboard, pivot, browse, search)
-- **Web UI** — local FastAPI app with a JSON API, pivot job queue, and export downloads
+- **CLI** — 40 commands, scriptable, JSON/JSONL output
+- **TUI** — six-tab terminal console (dashboard, pivot, browse, search, tools, cases)
+- **Web UI** — local FastAPI app with a JSON API, live SSE pivot streaming, an interactive
+  identity graph, an OSINT workbench, case management, and export downloads
 
-488 sources out of the box: 28 hand-written API sources plus 460 declarative definitions generated
+493 sources out of the box: 40 hand-written API sources plus 453 declarative definitions generated
 from the [Sherlock](https://github.com/sherlock-project/sherlock) dataset (MIT). No API keys needed
 for most of it; optional keys unlock GitHub rate limits, HIBP, and EmailRep.
 
@@ -32,9 +33,12 @@ uv run larpharvester serve
 uv run larpharvester serve --port 9000 --open
 ```
 
-The web UI runs pivots as background jobs (one at a time, queued), shows live status, and exposes
-every stored run with export links. The TUI runs pivots in a worker thread so the UI stays
-responsive. Both respect the same `--db` / config as the CLI.
+The web UI runs pivots as background jobs with **live Server-Sent Events streaming** (each source
+appears the moment it finishes), renders an **interactive force-directed identity graph** per run
+(drag, zoom, click to inspect), and ships an **OSINT workbench** for domain/IP/phone/dorks/archive/
+breach/harvest/follow-graph/re-clustering. Case, tag, and note management is available in both the
+web UI and TUI. The TUI streams pivot rows live into its results table. Both respect the same
+`--db` / config as the CLI.
 
 ## Quickstart
 
@@ -50,6 +54,17 @@ uv run larpharvester pivot alice --variants
 
 # Email pivot, then follow linked handles from Gravatar/Keybase/EmailRep
 uv run larpharvester pivot alice@example.com --expand
+
+# Multi-hop expansion: email -> username -> email -> ...
+uv run larpharvester pivot alice@example.com --expand --depth 2
+
+# Batch pivots from arguments or a newline-delimited file
+uv run larpharvester batch alice bob carol -s social
+uv run larpharvester batch -f targets.txt --json
+
+# Re-correlate stored profiles with the current engine (single run or cross-run)
+uv run larpharvester recluster --run 3
+uv run larpharvester recluster --threshold 0.6
 
 # Harvest posts (paginated), then only new ones next time
 uv run larpharvester harvest alice -s reddit -n 200
@@ -79,6 +94,9 @@ uv run larpharvester analyze --run 3                  # timezone + writing-style
 
 uv run larpharvester export 3 --format graphml -o graph.graphml
 uv run larpharvester export 3 --format html -o dossier.html
+uv run larpharvester export 3 --format md -o dossier.md          # Markdown report
+uv run larpharvester export 3 --format stix -o bundle.json       # STIX 2.1 bundle
+uv run larpharvester export 3 --format maltego -o edges.csv      # Maltego import
 uv run larpharvester report 3 -o dossier.html
 uv run larpharvester export 3 --redact -o safe.json
 uv run larpharvester export 3 --encrypt -o run3.bin   # passphrase in LARPHARVESTER_PASSPHRASE
@@ -91,8 +109,10 @@ uv run larpharvester decrypt run3.bin run3.json
 uv run larpharvester dorks alice                     # 52 search-engine dork URLs
 uv run larpharvester dorks alice --image https://cdn.example/a.png
 uv run larpharvester domain example.com              # RDAP + DNS + crt.sh subdomains
+uv run larpharvester domain example.com --deep       # + DMARC, security.txt, favicon MMH3, takeovers
 uv run larpharvester phone "+351 912 345 678"        # carrier, region, timezone
 uv run larpharvester ip 8.8.8.8                       # PTR, reverse IP, Shodan (optional key)
+uv run larpharvester ip 8.8.8.8 --asn                 # + RIPE ASN/prefix and IP RDAP
 uv run larpharvester archive https://example.com/    # Wayback CDX captures
 uv run larpharvester archive https://example.com/ --snapshot 20200101000000
 ```
@@ -101,10 +121,10 @@ uv run larpharvester archive https://example.com/ --snapshot 20200101000000
 
 | Group | Sources |
 | --- | --- |
-| `social` | reddit, hackernews, mastodon, bluesky, telegram, youtube, twitch, steam, chesscom, lichess, roblox, duolingo |
-| `dev` | github, gitlab, codeberg, stackoverflow, kaggle, huggingface, npm, pypi, devto, hackerone |
-| `email` | gravatar, keybase, pgp (keyserver.ubuntu.com), github-commits, hibp, emailrep |
-| `web` | 460 declarative sites (Sherlock corpus), selectable with `--web` or `-g web` |
+| `social` | reddit, hackernews, mastodon, bluesky, telegram, youtube, twitch, steam, chesscom, lichess, roblox, duolingo, tiktok, medium, substack, linktree, matrix |
+| `dev` | github, gitlab, codeberg, stackoverflow, kaggle, huggingface, npm, pypi, devto, hackerone, crates, dockerhub, rubygems, packagist |
+| `email` | gravatar, keybase, pgp, github-commits, hibp, emailrep, hudsonrock, leakcheck, libravatar |
+| `web` | 453 declarative sites (Sherlock corpus), selectable with `--web` or `-g web` |
 
 ```bash
 uv run larpharvester sources                 # curated only
@@ -130,7 +150,9 @@ into **clusters** (inferred identities, confidence = weakest edge):
 | Same website (generic roots ignored) | 0.6 |
 | ≥70% distinctive-token bio overlap | 0.5 |
 | Handle mentioned in the other bio | 0.5 |
-| Shared extracted entity (email, crypto, phone, chat handle) | 0.8 |
+| Shared extracted entity (email, crypto, phone, chat handle, onion, PGP/SSH key, Matrix ID) | 0.8 |
+| Handle differs only by separators (`alice_sec` ~ `alicesec`) | 0.2 |
+| Handle Jaro-Winkler similarity ≥ 0.92 | 0.15 |
 | Same display name | 0.3 |
 | Accounts created within 7 days | 0.1 |
 | Same inferred timezone | 0.1 |
@@ -166,6 +188,9 @@ exposed?", never "what is it?":
 uv run larpharvester breach alice@example.com
 uv run larpharvester breach alice@example.com --json
 
+# Multi-provider exposure audit: HIBP + HudsonRock Cavalier + LeakCheck public
+uv run larpharvester breach alice@example.com --all
+
 # Is a password in the Pwned Passwords corpus? (no key needed)
 uv run larpharvester pwned                          # hidden prompt
 uv run larpharvester pwned --password-env MY_PW     # scripting
@@ -197,15 +222,19 @@ machine. Exit code is `1` when exposed, `0` when clean — safe for CI/scripts.
 | `GET /healthz`, `/api/health` | Liveness + DB check (503 when the DB is unusable) |
 | `GET /api/stats` | Table counts, DB info, source health |
 | `GET /api/runs`, `/api/runs/{id}` | Run listing and full run export |
+| `GET /api/runs/{id}/graph` | Nodes + edges for the interactive identity graph |
 | `GET /api/search?q=` | FTS5 post search |
 | `GET /api/sources` | Source registry |
-| `POST /api/pivot` | Queue a pivot (`{"target": "...", "include_web": false, ...}`) → `202 {job_id}` |
-| `GET /api/jobs/{id}` | Job status: `queued` / `running` / `done` / `error` |
+| `POST /api/pivot` | Queue a pivot (`{"target": "...", "include_web": false, "depth": 1, ...}`) → `202 {job_id}` |
+| `GET /api/jobs/{id}` | Job status, counts, and the full event list |
+| `GET /api/jobs/{id}/stream` | Server-Sent Events: `check` per source, then `done` |
 
-Run exports are downloadable at `/runs/{id}/export?format=json|jsonl|csv|graphml|gexf|dot|html`
+Run exports are downloadable at `/runs/{id}/export?format=json|jsonl|csv|graphml|gexf|dot|html|md|stix|maltego`
 with optional `&redact=true` and `&table=` for CSV. Responses carry a strict CSP
 (`script-src 'self'`), `X-Frame-Options: DENY`, and harvested URLs are scheme-checked before
-becoming links.
+becoming links. The web workbench at `/tools` runs domain, IP, phone, dorks, archive, breach,
+Pwned Passwords, harvest, follow-graph, and re-clustering jobs; `/cases` supports creating cases,
+attaching runs, and adding tags/notes.
 
 ## Configuration
 
@@ -234,7 +263,7 @@ becoming links.
 ## Development
 
 ```bash
-uv run pytest                # 252 tests, no network required
+uv run pytest                # 315 tests, no network required
 uv run ruff check .
 uv run ruff format --check .
 ```

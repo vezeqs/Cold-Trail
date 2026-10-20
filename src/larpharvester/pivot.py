@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import re
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlsplit
@@ -70,17 +72,26 @@ def select_sources(names: list[str] | None, kind: Kind, include_web: bool = Fals
     return sorted(pool, key=lambda source: source.name)
 
 
-async def _check(source: Source, fetcher: Fetcher, target: str) -> CheckResult:
+async def _check(
+    source: Source,
+    fetcher: Fetcher,
+    target: str,
+    on_result: Callable[[CheckResult], None] | None = None,
+) -> CheckResult:
     try:
-        return await source.check(fetcher, target)
+        res = await source.check(fetcher, target)
     except BlockedError as exc:
-        return source.blocked(target, str(exc))
+        res = source.blocked(target, str(exc))
     except BudgetExceeded as exc:
-        return source.failed(target, str(exc))
+        res = source.failed(target, str(exc))
     except FetchError as exc:
-        return source.failed(target, str(exc))
+        res = source.failed(target, str(exc))
     except Exception as exc:  # a broken source must not sink the whole pivot
-        return source.failed(target, f"{type(exc).__name__}: {exc}")
+        res = source.failed(target, f"{type(exc).__name__}: {exc}")
+    if on_result is not None:
+        with contextlib.suppress(Exception):
+            on_result(res)
+    return res
 
 
 def _cache_fresh(row: dict[str, Any], ttl: int) -> bool:
@@ -111,11 +122,13 @@ async def pivot(
     sources: list[str] | None = None,
     expand: bool = False,
     max_expand: int = MAX_EXPAND,
+    depth: int = 1,
     use_variants: bool = False,
     include_web: bool = False,
     avatar_hash: bool = True,
     use_cache: bool = True,
     store=None,
+    on_result: Callable[[CheckResult], None] | None = None,
 ) -> PivotReport:
     target = target.strip().lstrip("@")
     kind: Kind = "email" if "@" in target else "username"
@@ -132,15 +145,19 @@ async def pivot(
         for source in selected:
             cached = store.probe_get(source.name, probe) if store is not None and ttl else None
             if cached is not None and _cache_fresh(cached, ttl) and cached["status"] != "found":
-                results.append(
-                    CheckResult(source.name, probe, cached["status"], detail=cached["detail"])
+                cached_res = CheckResult(
+                    source.name, probe, cached["status"], detail=cached["detail"]
                 )
+                results.append(cached_res)
+                if on_result is not None:
+                    with contextlib.suppress(Exception):
+                        on_result(cached_res)
             else:
                 pending.append((source, probe))
 
     async with Fetcher(settings, store=store) as fetcher:
         fetched = await asyncio.gather(
-            *(_check(source, fetcher, probe) for source, probe in pending)
+            *(_check(source, fetcher, probe, on_result) for source, probe in pending)
         )
         results.extend(fetched)
         if store is not None and ttl:
@@ -151,13 +168,21 @@ async def pivot(
 
         expanded: list[str] = []
         if expand:
-            candidates = (
-                discovered_usernames(results, limit=max_expand)
-                if kind == "email"
-                else discovered_emails(results, limit=max_expand)
-            )
-            if candidates:
-                probe_kind: Kind = "username" if kind == "email" else "email"
+            visited: set[str] = {t.casefold() for t in targets}
+            current_kind: Kind = kind
+            frontier_results = list(results)
+            hops = max(1, depth)
+            for _hop in range(hops):
+                raw_candidates = (
+                    discovered_usernames(frontier_results, limit=max_expand)
+                    if current_kind == "email"
+                    else discovered_emails(frontier_results, limit=max_expand)
+                )
+                candidates = [c for c in raw_candidates if c.casefold() not in visited]
+                if not candidates:
+                    break
+                visited.update(c.casefold() for c in candidates)
+                probe_kind: Kind = "username" if current_kind == "email" else "email"
                 try:
                     extra_sources = select_sources(sources, probe_kind, include_web=include_web)
                 except ValueError:
@@ -165,15 +190,17 @@ async def pivot(
                 extra_results = list(
                     await asyncio.gather(
                         *(
-                            _check(source, fetcher, candidate)
+                            _check(source, fetcher, candidate, on_result)
                             for candidate in candidates
                             for source in extra_sources
                         )
                     )
                 )
-                expanded = candidates
+                expanded.extend(candidates)
                 results.extend(extra_results)
                 await _enrich(extra_results, fetcher, avatar_hash, store)
+                frontier_results = extra_results
+                current_kind = probe_kind
 
     profiles = [result.profile for result in results if result.profile is not None]
     links = correlate(profiles)

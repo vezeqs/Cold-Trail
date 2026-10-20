@@ -309,12 +309,90 @@ def score_pair(a: Profile, b: Profile) -> tuple[float, list[str]]:
     score += _timezone_signal(a, b, reasons)
     score += _language_signal(a, b, reasons)
     score += _extracted_entity_signal(a, b, reasons)
+    score += _handle_similarity_signal(a, b, reasons)
 
     return max(0.0, score), reasons
 
 
 # Kinds that are strong identity evidence when two profiles share them.
-STRONG_ENTITY_KINDS = {"email", "btc", "eth", "discord", "telegram", "phone"}
+STRONG_ENTITY_KINDS = {
+    "email",
+    "btc",
+    "eth",
+    "xmr",
+    "onion",
+    "pgp_fingerprint",
+    "ssh_key",
+    "matrix",
+    "discord",
+    "telegram",
+    "phone",
+}
+
+
+def jaro_winkler(left: str, right: str) -> float:
+    """Jaro-Winkler similarity in [0.0, 1.0]."""
+    s1, s2 = left.casefold(), right.casefold()
+    if s1 == s2:
+        return 1.0 if s1 else 0.0
+    len1, len2 = len(s1), len(s2)
+    if not len1 or not len2:
+        return 0.0
+    match_distance = max(len1, len2) // 2 - 1
+    if match_distance < 0:
+        match_distance = 0
+    s1_matches = [False] * len1
+    s2_matches = [False] * len2
+    matches = 0
+    transpositions = 0
+    for i in range(len1):
+        start = max(0, i - match_distance)
+        end = min(i + match_distance + 1, len2)
+        for j in range(start, end):
+            if s2_matches[j] or s1[i] != s2[j]:
+                continue
+            s1_matches[i] = True
+            s2_matches[j] = True
+            matches += 1
+            break
+    if not matches:
+        return 0.0
+    k = 0
+    for i in range(len1):
+        if not s1_matches[i]:
+            continue
+        while not s2_matches[k]:
+            k += 1
+        if s1[i] != s2[k]:
+            transpositions += 1
+        k += 1
+    jaro = (matches / len1 + matches / len2 + (matches - transpositions / 2) / matches) / 3.0
+    prefix = 0
+    for c1, c2 in zip(s1[:4], s2[:4], strict=False):
+        if c1 == c2:
+            prefix += 1
+        else:
+            break
+    return jaro + prefix * 0.1 * (1.0 - jaro)
+
+
+def _handle_similarity_signal(a: Profile, b: Profile, reasons: list[str]) -> float:
+    if "@" in a.username or "@" in b.username:
+        return 0.0
+    ua = a.username.strip().lstrip("@").casefold()
+    ub = b.username.strip().lstrip("@").casefold()
+    if not ua or not ub or ua == ub or min(len(ua), len(ub)) < 5:
+        return 0.0
+    stripped_a = re.sub(r"[._-]+", "", ua)
+    stripped_b = re.sub(r"[._-]+", "", ub)
+    if stripped_a == stripped_b and len(stripped_a) >= 5:
+        reasons.append(f"normalized handle match ({a.username} ~ {b.username})")
+        return 0.2
+    sim = jaro_winkler(ua, ub)
+    if sim >= 0.92:
+        reasons.append(f"similar handles ({sim:.2f})")
+        return 0.15
+    return 0.0
 
 
 def _extracted_entity_signal(a: Profile, b: Profile, reasons: list[str]) -> float:
@@ -444,3 +522,34 @@ def creation_spread(profiles: list[Profile]) -> float | None:
     if len(valid) < 2:
         return None
     return (max(valid) - min(valid)).total_seconds() / 86_400
+
+
+def recluster_rows(
+    rows: list[dict], threshold: float = THRESHOLD
+) -> tuple[list[Link], list[Cluster]]:
+    """Convert stored profile dicts into Profile models (deduped by source:username)
+    and run correlation + clustering across them."""
+    seen: dict[tuple[str, str], Profile] = {}
+    for row in rows:
+        key = (str(row["source"]), str(row["username"]).casefold())
+        if key in seen:
+            continue
+        seen[key] = Profile(
+            source=row["source"],
+            username=row["username"],
+            url=row["url"],
+            display_name=row.get("display_name"),
+            bio=row.get("bio"),
+            avatar=row.get("avatar"),
+            avatar_hash=row.get("avatar_hash"),
+            website=row.get("website"),
+            created_at=row.get("created_at"),
+            followers=row.get("followers"),
+            lang=row.get("lang"),
+            timezone=row.get("timezone"),
+            extra=row.get("extra") or {},
+        )
+    profiles = list(seen.values())
+    links = correlate(profiles, threshold=threshold)
+    clusters = build_clusters(profiles, links, threshold=threshold)
+    return links, clusters

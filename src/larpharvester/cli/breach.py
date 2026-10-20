@@ -15,7 +15,7 @@ from typing import Annotated
 import typer
 from rich.table import Table
 
-from ..breach import hibp_breaches, pwned_password
+from ..breach import full_breach_audit, hibp_breaches, pwned_password
 from ..http import Fetcher, FetchError
 from ._app import _print_json, _settings, app, console
 
@@ -24,13 +24,19 @@ from ._app import _print_json, _settings, app, console
 def breach(
     ctx: typer.Context,
     email: Annotated[str, typer.Argument(help="Email address to audit")],
+    all_providers: Annotated[
+        bool,
+        typer.Option("--all", help="Query HIBP + HudsonRock Cavalier + LeakCheck public"),
+    ] = False,
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    """List breaches an email address appears in (HIBP; needs HIBP_API_KEY)."""
+    """List breaches an email address appears in (HIBP, or --all for multi-provider)."""
     settings = _settings(ctx)
 
     async def run():
         async with Fetcher(settings) as fetcher:
+            if all_providers:
+                return await full_breach_audit(fetcher, email)
             return await hibp_breaches(fetcher, email)
 
     try:
@@ -38,6 +44,17 @@ def breach(
     except FetchError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
+
+    if all_providers:
+        if json_out:
+            _print_json(result)
+            return
+        console.print(f"[bold]{email}[/bold] — overall: {result['status']}")
+        for provider in ("hibp", "hudsonrock", "leakcheck"):
+            sub = result.get(provider) or {}
+            status = sub.get("status")
+            console.print(f"  [cyan]{provider}[/cyan]: {status} — {sub.get('detail', '')}")
+        return
 
     if json_out:
         _print_json(result)

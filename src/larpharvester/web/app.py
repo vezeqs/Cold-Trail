@@ -6,18 +6,19 @@ Design notes:
 - Reads open a short-lived SQLite connection per request (WAL mode makes
   concurrent readers cheap).
 - Pivots are long-running, so POST /pivot creates a background job and
-  redirects to a polling page instead of blocking the request. One pivot
-  runs at a time (asyncio lock); further jobs queue.
+  redirects to a live streaming page (/jobs/{id}) backed by Server-Sent
+  Events (/api/jobs/{id}/stream) and polling fallback (/api/jobs/{id}).
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -27,14 +28,26 @@ from fastapi.responses import (
     JSONResponse,
     RedirectResponse,
     Response,
+    StreamingResponse,
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
 from .. import __version__
+from ..analysis import entities_from_posts
+from ..breach import full_breach_audit, pwned_password
 from ..config import Settings
-from ..pivot import persist_pivot
+from ..correlate import recluster_rows
+from ..domain import asn_lookup, lookup_domain, ptr, rdap_ip, reverse_ip, shodan_host
+from ..dorks import dorks as build_dorks
+from ..dorks import reverse_image_links
+from ..harvest import collect_follows
+from ..harvest import harvest as run_harvest
+from ..http import Fetcher
+from ..models import CheckResult
+from ..phone import lookup as phone_lookup
+from ..pivot import entities_for_profiles, persist_pivot
 from ..pivot import pivot as run_pivot
 from ..report import (
     redact_payload,
@@ -45,9 +58,13 @@ from ..report import (
     to_html,
     to_json,
     to_jsonl,
+    to_maltego_csv,
+    to_markdown,
+    to_stix,
 )
 from ..sources import GROUPS, SOURCES
 from ..store import Store
+from ..wayback import cdx
 
 log = logging.getLogger("larpharvester.web")
 
@@ -63,6 +80,9 @@ EXPORTERS = {
     "gexf": ("application/gexf+xml", to_gexf),
     "dot": ("text/vnd.graphviz", to_dot),
     "html": ("text/html", None),
+    "md": ("text/markdown", None),
+    "stix": ("application/stix+json", to_stix),
+    "maltego": ("text/csv", to_maltego_csv),
 }
 
 MAX_JOBS = 200
@@ -79,8 +99,10 @@ class Job:
     finished_at: float | None = None
     run_id: int | None = None
     result_count: int = 0
+    found_count: int = 0
     error: str | None = None
     params: dict[str, Any] = field(default_factory=dict)
+    events: list[dict[str, Any]] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -92,7 +114,9 @@ class Job:
             "finished_at": self.finished_at,
             "run_id": self.run_id,
             "result_count": self.result_count,
+            "found_count": self.found_count,
             "error": self.error,
+            "events": self.events[-100:],
         }
 
 
@@ -101,6 +125,7 @@ class PivotRequest(BaseModel):
     sources: list[str] | None = None
     include_web: bool = False
     expand: bool = False
+    depth: int = Field(default=1, ge=1, le=5)
     variants: bool = False
     avatar_hash: bool = True
 
@@ -136,6 +161,116 @@ CSV_TABLES = {
 
 def _split_names(raw: str) -> list[str]:
     return [part for part in re.split(r"[,\s]+", raw.strip()) if part]
+
+
+def _build_graph_payload(
+    profiles: list[dict[str, Any]],
+    links: list[dict[str, Any]],
+    clusters: list[dict[str, Any]],
+    entities: list[dict[str, Any]],
+    edges: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Build a JSON graph structure (nodes + edges) for the interactive canvas."""
+    cluster_of: dict[str, str] = {}
+    for cluster in clusters:
+        ckey = str(cluster.get("cluster_key") or "")
+        for member in cluster.get("members") or []:
+            cluster_of[f"{member['source']}:{member['username']}"] = ckey
+
+    nodes: list[dict[str, Any]] = []
+    seen_nodes: set[str] = set()
+    for p in profiles:
+        nid = f"{p['source']}:{p['username']}"
+        if nid in seen_nodes:
+            continue
+        seen_nodes.add(nid)
+        nodes.append(
+            {
+                "id": nid,
+                "label": p.get("display_name") or p["username"],
+                "username": p["username"],
+                "source": p["source"],
+                "kind": "profile",
+                "cluster": cluster_of.get(nid, ""),
+                "url": _safe_url(p.get("url")),
+                "bio": (p.get("bio") or "")[:160],
+                "followers": p.get("followers"),
+            }
+        )
+
+    graph_edges: list[dict[str, Any]] = []
+    for link in links:
+        sa = f"{link['source_a']}:{link['username_a']}"
+        sb = f"{link['source_b']}:{link['username_b']}"
+        graph_edges.append(
+            {
+                "source": sa,
+                "target": sb,
+                "kind": "correlation",
+                "score": float(link.get("score") or 0.5),
+                "label": ", ".join(link.get("reasons") or []),
+            }
+        )
+
+    for ent in entities[:80]:
+        eid = f"entity:{ent['kind']}:{ent['value']}"
+        owner = f"{ent['source']}:{ent['username']}"
+        if eid not in seen_nodes:
+            seen_nodes.add(eid)
+            nodes.append(
+                {
+                    "id": eid,
+                    "label": f"{ent['kind']}: {ent['value']}",
+                    "username": ent["value"],
+                    "source": ent["kind"],
+                    "kind": "entity",
+                    "cluster": "",
+                    "url": "#",
+                    "bio": ent.get("context") or "",
+                    "followers": None,
+                }
+            )
+        if owner in seen_nodes:
+            graph_edges.append(
+                {
+                    "source": owner,
+                    "target": eid,
+                    "kind": "entity",
+                    "score": 0.8,
+                    "label": ent["kind"],
+                }
+            )
+
+    for edge in edges[:120]:
+        actor_id = f"{edge['platform']}:{edge['actor']}"
+        target_id = f"{edge['platform']}:{edge['target']}"
+        for nid, uname in ((actor_id, edge["actor"]), (target_id, edge["target"])):
+            if nid not in seen_nodes:
+                seen_nodes.add(nid)
+                nodes.append(
+                    {
+                        "id": nid,
+                        "label": uname,
+                        "username": uname,
+                        "source": edge["platform"],
+                        "kind": "follow",
+                        "cluster": "",
+                        "url": "#",
+                        "bio": "",
+                        "followers": None,
+                    }
+                )
+        graph_edges.append(
+            {
+                "source": actor_id,
+                "target": target_id,
+                "kind": "follow",
+                "score": 0.4,
+                "label": edge.get("direction", "follows"),
+            }
+        )
+
+    return {"nodes": nodes, "edges": graph_edges}
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -184,7 +319,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers.setdefault(
             "Content-Security-Policy",
             "default-src 'self'; img-src 'self' data: https:; style-src 'self'; "
-            "script-src 'self'; frame-ancestors 'none'",
+            "script-src 'self'; connect-src 'self'; frame-ancestors 'none'",
         )
         elapsed = (time.perf_counter() - started) * 1000
         log.info("%s %s %s %.1fms", request.method, request.url.path, response.status_code, elapsed)
@@ -273,6 +408,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "entities": store.entities(run_id, limit=10_000),
                 "edges": store.edges(run_id, limit=10_000),
                 "history": store.history(run_id, limit=10_000),
+                "cases": store.cases(),
             }
         coverage: dict[str, int] = {}
         for check in context["checks"]:
@@ -280,10 +416,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         context.update({"coverage": coverage, "active": "runs", "formats": sorted(EXPORTERS)})
         return _render(request, "run.html", context)
 
+    @app.get("/api/runs/{run_id}/graph")
+    def api_run_graph(run_id: int):
+        with _open() as store:
+            run = store.run(run_id)
+            if run is None:
+                raise HTTPException(status_code=404, detail=f"run {run_id} not found")
+            return _build_graph_payload(
+                store.profiles(run_id, limit=None),
+                store.links(run_id, limit=10_000),
+                store.clusters(run_id, limit=10_000),
+                store.entities(run_id, limit=10_000),
+                store.edges(run_id, limit=10_000),
+            )
+
     @app.get("/runs/{run_id}/export")
     def run_export(
         run_id: int,
-        format: Annotated[str, Query(pattern="^(json|jsonl|csv|graphml|gexf|dot|html)$")] = "json",
+        format: Annotated[
+            str, Query(pattern="^(json|jsonl|csv|graphml|gexf|dot|html|md|stix|maltego)$")
+        ] = "json",
         table: Annotated[
             str,
             Query(pattern="^(run|checks|profiles|posts|links|clusters|entities|edges|history)$"),
@@ -302,6 +454,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             body = to_csv(payload, table)
         elif format == "html":
             body = to_html(payload, redacted=redact)
+        elif format == "md":
+            body = to_markdown(payload, redacted=redact)
         else:
             body = renderer(payload)
         filename = f"larpharvester-run{run_id}.{format}"
@@ -342,23 +496,198 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             {"items": items, "group": group, "active": "sources"},
         )
 
+    # -- cases, tags, notes CRUD --------------------------------------------
+
     @app.get("/cases", response_class=HTMLResponse)
     def cases_page(request: Request):
         with _open() as store:
             cases = store.cases()
             tags = store.tags()
             notes = store.notes()
+            runs = store.runs(limit=100)
         return _render(
             request,
             "cases.html",
-            {"cases": cases, "tags": tags, "notes": notes, "active": "cases"},
+            {"cases": cases, "tags": tags, "notes": notes, "runs": runs, "active": "cases"},
+        )
+
+    @app.post("/cases/new")
+    async def cases_new(
+        name: Annotated[str, Form(min_length=1, max_length=120)],
+        notes: Annotated[str, Form()] = "",
+    ):
+        with _open() as store:
+            try:
+                store.create_case(name.strip(), notes.strip() or None)
+            except Exception as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return RedirectResponse("/cases", status_code=303)
+
+    @app.post("/cases/add-run")
+    async def cases_add_run(
+        case_name: Annotated[str, Form(min_length=1)],
+        run_id: Annotated[int, Form(ge=1)],
+    ):
+        with _open() as store:
+            case = store.case(case_name.strip())
+            if case is None:
+                raise HTTPException(status_code=404, detail=f"no such case: {case_name}")
+            store.add_to_case(case["id"], run_id)
+        return RedirectResponse("/cases", status_code=303)
+
+    @app.post("/tags/new")
+    async def tags_new(
+        target_type: Annotated[str, Form(pattern="^(profile|post|run|entity|case)$")],
+        target: Annotated[str, Form(min_length=1, max_length=200)],
+        tag: Annotated[str, Form(min_length=1, max_length=80)],
+    ):
+        with _open() as store:
+            store.add_tag(target_type, target.strip(), tag.strip())
+        return RedirectResponse("/cases", status_code=303)
+
+    @app.post("/notes/new")
+    async def notes_new(
+        target_type: Annotated[str, Form(pattern="^(profile|post|run|entity|case)$")],
+        target: Annotated[str, Form(min_length=1, max_length=200)],
+        note: Annotated[str, Form(min_length=1, max_length=2000)],
+    ):
+        with _open() as store:
+            store.add_note(target_type, target.strip(), note.strip())
+        return RedirectResponse("/cases", status_code=303)
+
+    # -- OSINT tools workbench ----------------------------------------------
+
+    @app.get("/tools", response_class=HTMLResponse)
+    def tools_page(request: Request):
+        post_sources = sorted(
+            name for name, src in SOURCES.items() if src.kind == "username" and src.supports_posts
+        )
+        return _render(
+            request,
+            "tools.html",
+            {"post_sources": post_sources, "result": None, "tool": None, "active": "tools"},
+        )
+
+    @app.post("/tools/run", response_class=HTMLResponse)
+    async def tools_run(
+        request: Request,
+        tool: Annotated[
+            str,
+            Form(pattern="^(domain|ip|phone|dorks|archive|breach|pwned|harvest|graph|recluster)$"),
+        ],
+        target: Annotated[str, Form()] = "",
+        source: Annotated[str, Form()] = "github",
+        limit: Annotated[int, Form(ge=1, le=500)] = 25,
+        deep: Annotated[bool, Form()] = False,
+    ):
+        post_sources = sorted(
+            name for name, src in SOURCES.items() if src.kind == "username" and src.supports_posts
+        )
+        cleaned = target.strip()
+        result: Any = None
+        run_id: int | None = None
+
+        if tool == "domain":
+            async with Fetcher(settings) as fetcher:
+                result = await lookup_domain(fetcher, cleaned, deep=deep)
+        elif tool == "ip":
+            async with Fetcher(settings) as fetcher:
+                result = {
+                    "address": cleaned,
+                    "ptr": await ptr(fetcher, cleaned),
+                    "hostnames": await reverse_ip(fetcher, cleaned, settings.shodan_api_key),
+                    "asn": await asn_lookup(fetcher, cleaned),
+                    "rdap": await rdap_ip(fetcher, cleaned),
+                    "shodan": await shodan_host(fetcher, cleaned, settings.shodan_api_key),
+                }
+        elif tool == "phone":
+            result = phone_lookup(cleaned) or {"error": "invalid or unparseable phone number"}
+        elif tool == "dorks":
+            rows = build_dorks(cleaned)
+            if cleaned.startswith(("http://", "https://")):
+                rows.extend(reverse_image_links(cleaned))
+            result = rows
+        elif tool == "archive":
+            async with Fetcher(settings) as fetcher:
+                result = await cdx(fetcher, cleaned, limit=limit)
+        elif tool == "breach":
+            async with Fetcher(settings) as fetcher:
+                result = await full_breach_audit(fetcher, cleaned)
+        elif tool == "pwned":
+            async with Fetcher(settings) as fetcher:
+                result = await pwned_password(fetcher, target)
+        elif tool == "harvest":
+            if source not in SOURCES or SOURCES[source].kind != "username":
+                raise HTTPException(status_code=400, detail=f"invalid source {source!r}")
+            with _open() as store:
+                check, posts = await run_harvest(
+                    source, cleaned, settings=settings, limit=limit, store=store
+                )
+                run_id = store.start_run("harvest", f"{source}:{cleaned}")
+                store.save_checks(run_id, [check])
+                if check.profile:
+                    store.save_profiles(run_id, [check.profile])
+                    store.record_profile_history(run_id, [check.profile])
+                    store.save_entities(run_id, entities_for_profiles([check.profile]))
+                store.save_posts(run_id, posts)
+                store.save_entities(run_id, entities_from_posts(posts))
+                store.finish_run(run_id)
+                result = {
+                    "run_id": run_id,
+                    "check": asdict(check),
+                    "post_count": len(posts),
+                    "posts": [asdict(p) for p in posts[:50]],
+                }
+        elif tool == "graph":
+            if source not in SOURCES or SOURCES[source].kind != "username":
+                raise HTTPException(status_code=400, detail=f"invalid source {source!r}")
+            with _open() as store:
+                check, edges = await collect_follows(
+                    source, cleaned, settings=settings, limit=limit, store=store
+                )
+                run_id = store.start_run("graph", f"{source}:{cleaned}")
+                store.save_checks(run_id, [check])
+                if check.profile:
+                    store.save_profiles(run_id, [check.profile])
+                store.save_edges(run_id, edges)
+                store.finish_run(run_id)
+                result = {
+                    "run_id": run_id,
+                    "check": asdict(check),
+                    "edge_count": len(edges),
+                    "edges": [asdict(e) for e in edges[:100]],
+                }
+        elif tool == "recluster":
+            with _open() as store:
+                rows = store.profiles(limit=None)
+            links, clusters = recluster_rows(rows)
+            result = {
+                "profiles": len(rows),
+                "link_count": len(links),
+                "cluster_count": len(clusters),
+                "clusters": [asdict(c) for c in clusters],
+                "links": [asdict(link) for link in links[:100]],
+            }
+
+        return _render(
+            request,
+            "tools.html",
+            {
+                "post_sources": post_sources,
+                "tool": tool,
+                "target": cleaned if tool != "pwned" else "",
+                "result": result,
+                "result_json": json.dumps(result, indent=2, ensure_ascii=False, default=str),
+                "run_id": run_id,
+                "active": "tools",
+            },
         )
 
     @app.get("/pivot", response_class=HTMLResponse)
     def pivot_page(request: Request):
         return _render(request, "pivot.html", {"active": "pivot"})
 
-    # -- pivot jobs ----------------------------------------------------------
+    # -- pivot jobs & SSE streaming -----------------------------------------
 
     def _prune_jobs() -> None:
         now = time.time()
@@ -383,6 +712,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         sources: list[str] | None,
         include_web: bool,
         expand: bool,
+        depth: int = 1,
         variants: bool,
         avatar_hash: bool,
     ) -> Job:
@@ -394,11 +724,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "sources": sources,
                 "include_web": include_web,
                 "expand": expand,
+                "depth": depth,
                 "variants": variants,
                 "avatar_hash": avatar_hash,
             },
         )
         app.state.jobs[job.id] = job
+
+        def _on_result(res: CheckResult) -> None:
+            job.result_count += 1
+            if res.status == "found":
+                job.found_count += 1
+            job.events.append(
+                {
+                    "source": res.source,
+                    "target": res.target,
+                    "status": res.status,
+                    "username": res.profile.username if res.profile else "",
+                    "url": _safe_url(res.profile.url) if res.profile else "",
+                    "detail": res.detail or "",
+                }
+            )
 
         async def _execute() -> None:
             async with app.state.pivot_lock:
@@ -411,12 +757,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                         settings=settings,
                         sources=sources,
                         expand=expand,
+                        depth=depth,
                         use_variants=variants,
                         include_web=include_web,
                         avatar_hash=avatar_hash,
                         store=store,
+                        on_result=_on_result,
                     )
                     job.result_count = len(report.results)
+                    job.found_count = report.coverage.get("found", 0)
                     job.run_id = persist_pivot(store, report)
                     job.status = "done"
                 except Exception as exc:
@@ -438,6 +787,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         scope: Annotated[str, Form(pattern="^(curated|web|custom)$")] = "curated",
         sources: Annotated[str, Form()] = "",
         expand: Annotated[bool, Form()] = False,
+        depth: Annotated[int, Form(ge=1, le=5)] = 1,
         variants: Annotated[bool, Form()] = False,
         avatar_hash: Annotated[bool, Form()] = True,
     ):
@@ -452,6 +802,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             sources=names,
             include_web=include_web,
             expand=expand,
+            depth=depth,
             variants=variants,
             avatar_hash=avatar_hash,
         )
@@ -471,6 +822,33 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="job not found")
         return job.as_dict()
 
+    @app.get("/api/jobs/{job_id}/stream")
+    async def api_job_stream(job_id: str):
+        job = app.state.jobs.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="job not found")
+
+        async def _event_gen():
+            cursor = 0
+            while True:
+                while cursor < len(job.events):
+                    ev = job.events[cursor]
+                    cursor += 1
+                    yield f"event: check\ndata: {json.dumps(ev)}\n\n"
+                if job.status in ("done", "error"):
+                    summary = {
+                        "status": job.status,
+                        "run_id": job.run_id,
+                        "result_count": job.result_count,
+                        "found_count": job.found_count,
+                        "error": job.error,
+                    }
+                    yield f"event: done\ndata: {json.dumps(summary)}\n\n"
+                    break
+                await asyncio.sleep(0.15)
+
+        return StreamingResponse(_event_gen(), media_type="text/event-stream")
+
     @app.post("/api/pivot", status_code=202)
     async def api_pivot(payload: PivotRequest):
         job = _start_job(
@@ -478,6 +856,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             sources=payload.sources,
             include_web=payload.include_web,
             expand=payload.expand,
+            depth=payload.depth,
             variants=payload.variants,
             avatar_hash=payload.avatar_hash,
         )

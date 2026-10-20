@@ -197,6 +197,38 @@ button:hover, .button:hover { filter: brightness(1.1); text-decoration: none; }
 /* pager */
 .pager { display: flex; gap: 16px; align-items: center; margin: 18px 0; }
 
+/* grid & workbench */
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 16px;
+}
+.code-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  font-family: var(--mono);
+  font-size: 13px;
+  overflow-x: auto;
+  max-height: 540px;
+}
+.graph-wrap { display: flex; flex-direction: column; gap: 10px; }
+#identity-graph {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: grab;
+}
+.graph-info {
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 8px 12px;
+  background: var(--panel-2);
+  border-radius: 6px;
+}
+
 /* misc */
 pre.error {
   background: var(--panel-2);

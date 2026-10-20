@@ -11,6 +11,13 @@ PATTERNS: dict[str, re.Pattern[str]] = {
     "email": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
     "btc": re.compile(r"\b(?:bc1[a-zA-HJ-NP-Z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b"),
     "eth": re.compile(r"\b0x[a-fA-F0-9]{40}\b"),
+    "xmr": re.compile(r"\b[48][0-9AB][1-9A-HJ-NP-Za-km-z]{93}\b"),
+    "onion": re.compile(r"\b[a-z2-7]{56}\.onion\b", re.IGNORECASE),
+    "pgp_fingerprint": re.compile(
+        r"\b(?:0x)?(?:[0-9A-Fa-f]{4}\s+){9}[0-9A-Fa-f]{4}\b|\b0x[0-9A-Fa-f]{16,40}\b"
+    ),
+    "ssh_key": re.compile(r"\bSHA256:[A-Za-z0-9+/]{43}=?\b"),
+    "matrix": re.compile(r"(?<![\w.])@[A-Za-z0-9._=-]{2,64}:[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
     "ipv4": re.compile(r"\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b"),
     "coords": re.compile(r"\b-?\d{1,3}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}\b"),
     "discord": re.compile(r"\b[A-Za-z0-9_.]{2,32}#\d{4}\b"),
@@ -124,6 +131,10 @@ def extract_entities(text: str | None, source: str, username: str) -> list[Entit
                 value = f"+{digits}" if stripped.startswith("+") else digits
             if kind == "telegram" and value.casefold() in {"gmail", "yahoo", "hotmail"}:
                 continue
+            if kind == "pgp_fingerprint":
+                value = re.sub(r"\s+", "", value).upper()
+            if kind == "onion":
+                value = value.casefold()
             key = (kind, value.casefold())
             if key in seen:
                 continue
