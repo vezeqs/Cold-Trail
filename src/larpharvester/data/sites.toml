@@ -1,0 +1,2722 @@
+# Declarative site definitions generated from the Sherlock project dataset.
+# Sherlock is MIT licensed: https://github.com/sherlock-project/sherlock
+# Source: git ref v0.16.2 (https://raw.githubusercontent.com/sherlock-project/sherlock/v0.16.2/sherlock_project/resources/data.json) (sha256:3fdfc6694c5cd997)
+# 481 entries in source; POST-only entries are skipped.
+# Regenerate with: python scripts/build_sites.py --fetch
+
+[sites."1337x"]
+url = "https://www.1337x.to/user/{username}/"
+main = "https://www.1337x.to/"
+error_type = "message"
+error_msg = ["<title>Error something went wrong.</title>", "<head><title>404 Not Found</title></head>"]
+regex = "^[A-Za-z0-9]{4,12}$"
+
+[sites."2Dimensions"]
+url = "https://2Dimensions.com/a/{username}"
+main = "https://2Dimensions.com/"
+error_type = "status_code"
+
+[sites."7Cups"]
+url = "https://www.7cups.com/@{username}"
+main = "https://www.7cups.com/"
+error_type = "status_code"
+
+[sites."9GAG"]
+url = "https://www.9gag.com/u/{username}"
+main = "https://www.9gag.com/"
+error_type = "status_code"
+
+[sites."About.me"]
+url = "https://about.me/{username}"
+main = "https://about.me/"
+error_type = "status_code"
+
+[sites."Academia.edu"]
+url = "https://independent.academia.edu/{username}"
+main = "https://www.academia.edu/"
+error_type = "status_code"
+regex = "^[^.]*$"
+
+[sites."addons.wago.io"]
+url = "https://addons.wago.io/user/{username}"
+main = "https://addons.wago.io/"
+error_type = "status_code"
+error_code = 404
+
+[sites."AdmireMe.Vip"]
+url = "https://admireme.vip/{username}"
+main = "https://admireme.vip/"
+error_type = "message"
+error_msg = ["Page Not Found"]
+nsfw = true
+
+[sites."Airbit"]
+url = "https://airbit.com/{username}"
+main = "https://airbit.com/"
+error_type = "status_code"
+
+[sites."Airliners"]
+url = "https://www.airliners.net/user/{username}/profile/photos"
+main = "https://www.airliners.net/"
+error_type = "status_code"
+
+[sites."akniga"]
+url = "https://akniga.org/profile/{username}"
+main = "https://akniga.org/"
+error_type = "status_code"
+error_code = 404
+
+[sites."All Things Worn"]
+url = "https://www.allthingsworn.com/profile/{username}"
+main = "https://www.allthingsworn.com"
+error_type = "message"
+error_msg = ["Sell Used Panties"]
+nsfw = true
+
+[sites."AllMyLinks"]
+url = "https://allmylinks.com/{username}"
+main = "https://allmylinks.com/"
+error_type = "message"
+error_msg = ["Page not found"]
+regex = "^[a-z0-9][a-z0-9-]{2,32}$"
+
+[sites."AniWorld"]
+url = "https://aniworld.to/user/profil/{username}"
+main = "https://aniworld.to/"
+error_type = "message"
+error_msg = ["Dieses Profil ist nicht verfügbar"]
+
+[sites."Aparat"]
+url = "https://www.aparat.com/api/fa/v1/user/user/information/username/{username}"
+main = "https://www.aparat.com/"
+error_type = "status_code"
+url_probe = "https://www.aparat.com/api/fa/v1/user/user/information/username/{username}"
+
+[sites."APClips"]
+url = "https://apclips.com/{username}"
+main = "https://apclips.com/"
+error_type = "message"
+error_msg = ["Amateur Porn Content Creators"]
+nsfw = true
+
+[sites."Apple Developer"]
+url = "https://developer.apple.com/forums/profile/{username}"
+main = "https://developer.apple.com"
+error_type = "status_code"
+
+[sites."Apple Discussions"]
+url = "https://discussions.apple.com/profile/{username}"
+main = "https://discussions.apple.com"
+error_type = "message"
+error_msg = ["Looking for something in Apple Support Communities?"]
+
+[sites."Archive of Our Own"]
+url = "https://archiveofourown.org/users/{username}"
+main = "https://archiveofourown.org/"
+error_type = "status_code"
+regex = "^[^.]*?$"
+
+[sites."Archive.org"]
+url = "https://archive.org/details/@{username}?noscript=true"
+main = "https://archive.org"
+error_type = "message"
+error_msg = ["could not fetch an account with user item identifier", "The resource could not be found", "Internet Archive services are temporarily offline"]
+url_probe = "https://archive.org/details/@{username}?noscript=true"
+
+[sites."Arduino Forum"]
+url = "https://forum.arduino.cc/u/{username}/summary"
+main = "https://forum.arduino.cc/"
+error_type = "status_code"
+
+[sites."ArtStation"]
+url = "https://www.artstation.com/users/{username}.json"
+main = "https://www.artstation.com/"
+error_type = "status_code"
+url_probe = "https://www.artstation.com/users/{username}.json"
+
+[sites."Asciinema"]
+url = "https://asciinema.org/~{username}"
+main = "https://asciinema.org"
+error_type = "status_code"
+
+[sites."Ask Fedora"]
+url = "https://ask.fedoraproject.org/u/{username}"
+main = "https://ask.fedoraproject.org/"
+error_type = "status_code"
+
+[sites."Atcoder"]
+url = "https://atcoder.jp/users/{username}"
+main = "https://atcoder.jp/"
+error_type = "status_code"
+
+[sites."Audiojungle"]
+url = "https://audiojungle.net/user/{username}"
+main = "https://audiojungle.net/"
+error_type = "status_code"
+regex = "^[a-zA-Z0-9_]+$"
+
+[sites."authorSTREAM"]
+url = "http://www.authorstream.com/{username}/"
+main = "http://www.authorstream.com/"
+error_type = "status_code"
+
+[sites."Autofrage"]
+url = "https://www.autofrage.net/nutzer/{username}"
+main = "https://www.autofrage.net/"
+error_type = "status_code"
+
+[sites."Avizo"]
+url = "https://www.avizo.cz/{username}/"
+main = "https://www.avizo.cz/"
+error_type = "response_url"
+error_url = "https://www.avizo.cz/"
+
+[sites."AWS Skills Profile"]
+url = "https://skillsprofile.skillbuilder.aws/user/{username}/"
+main = "https://skillsprofile.skillbuilder.aws"
+error_type = "message"
+error_msg = ["shareProfileAccepted\":false"]
+
+[sites."babyblogRU"]
+url = "https://www.babyblog.ru/user/{username}"
+main = "https://www.babyblog.ru/"
+error_type = "response_url"
+error_url = "https://www.babyblog.ru/"
+
+[sites."BabyRu"]
+url = "https://www.baby.ru/u/{username}"
+main = "https://www.baby.ru/"
+error_type = "message"
+error_msg = ["Страница, которую вы искали, не найдена", "Доступ с вашего IP-адреса временно ограничен"]
+
+[sites."Bandcamp"]
+url = "https://www.bandcamp.com/{username}"
+main = "https://www.bandcamp.com/"
+error_type = "status_code"
+
+[sites."Bazar.cz"]
+url = "https://www.bazar.cz/{username}/"
+main = "https://www.bazar.cz/"
+error_type = "response_url"
+error_url = "https://www.bazar.cz/error404.aspx"
+
+[sites."Behance"]
+url = "https://www.behance.net/{username}"
+main = "https://www.behance.net/"
+error_type = "status_code"
+
+[sites."Bezuzyteczna"]
+url = "https://bezuzyteczna.pl/uzytkownicy/{username}"
+main = "https://bezuzyteczna.pl"
+error_type = "status_code"
+
+[sites."BiggerPockets"]
+url = "https://www.biggerpockets.com/users/{username}"
+main = "https://www.biggerpockets.com/"
+error_type = "status_code"
+
+[sites."BioHacking"]
+url = "https://forum.dangerousthings.com/u/{username}"
+main = "https://forum.dangerousthings.com/"
+error_type = "status_code"
+
+[sites."BitBucket"]
+url = "https://bitbucket.org/{username}/"
+main = "https://bitbucket.org/"
+error_type = "status_code"
+regex = "^[a-zA-Z0-9-_]{1,30}$"
+
+[sites."Bitwarden Forum"]
+url = "https://community.bitwarden.com/u/{username}/summary"
+main = "https://bitwarden.com/"
+error_type = "status_code"
+regex = "^(?![.-])[a-zA-Z0-9_.-]{3,20}$"
+
+[sites."Blipfoto"]
+url = "https://www.blipfoto.com/{username}"
+main = "https://www.blipfoto.com/"
+error_type = "status_code"
+
+[sites."Blitz Tactics"]
+url = "https://blitztactics.com/{username}"
+main = "https://blitztactics.com/"
+error_type = "message"
+error_msg = ["That page doesn't exist"]
+
+[sites."Blogger"]
+url = "https://{username}.blogspot.com"
+main = "https://www.blogger.com/"
+error_type = "status_code"
+regex = "^[a-zA-Z][a-zA-Z0-9_-]*$"
+
+[sites."Bluesky"]
+url = "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={username}.bsky.social"
+main = "https://bsky.app/"
+error_type = "status_code"
+url_probe = "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={username}.bsky.social"
+
+[sites."BoardGameGeek"]
+url = "https://api.geekdo.com/api/accounts/validate/username?username={username}"
+main = "https://boardgamegeek.com/"
+error_type = "message"
+error_msg = ["\"isValid\":true"]
+url_probe = "https://api.geekdo.com/api/accounts/validate/username?username={username}"
+
+[sites."BongaCams"]
+url = "https://pt.bongacams.com/profile/{username}"
+main = "https://pt.bongacams.com"
+error_type = "status_code"
+nsfw = true
+
+[sites."Bookcrossing"]
+url = "https://www.bookcrossing.com/mybookshelf/{username}/"
+main = "https://www.bookcrossing.com/"
+error_type = "status_code"
+
+[sites."BOOTH"]
+url = "https://{username}.booth.pm/"
+main = "https://booth.pm/"
+error_type = "response_url"
+error_url = "https://booth.pm/"
+regex = "^[\\w@-]+?$"
+
+[sites."BraveCommunity"]
+url = "https://community.brave.com/u/{username}/"
+main = "https://community.brave.com/"
+error_type = "status_code"
+
+[sites."BreachSta.rs Forum"]
+url = "https://breachsta.rs/profile/{username}"
+main = "https://breachsta.rs/"
+error_type = "message"
+error_msg = ["<title>Error - BreachStars</title>"]
+
+[sites."BugCrowd"]
+url = "https://bugcrowd.com/{username}"
+main = "https://bugcrowd.com/"
+error_type = "status_code"
+
+[sites."BuyMeACoffee"]
+url = "https://www.buymeacoffee.com/{username}"
+main = "https://www.buymeacoffee.com/"
+error_type = "status_code"
+regex = "[a-zA-Z0-9]{3,15}"
+url_probe = "https://www.buymeacoffee.com/{username}"
+
+[sites."BuzzFeed"]
+url = "https://buzzfeed.com/{username}"
+main = "https://buzzfeed.com/"
+error_type = "status_code"
+
+[sites."Caddy Community"]
+url = "https://caddy.community/u/{username}/summary"
+main = "https://caddy.community/"
+error_type = "status_code"
+
+[sites."Car Talk Community"]
+url = "https://community.cartalk.com/u/{username}/summary"
+main = "https://community.cartalk.com/"
+error_type = "status_code"
+
+[sites."Carbonmade"]
+url = "https://{username}.carbonmade.com"
+main = "https://carbonmade.com/"
+error_type = "response_url"
+error_url = "https://carbonmade.com/fourohfour?domain={}.carbonmade.com"
+regex = "^[\\w@-]+?$"
+
+[sites."Career.habr"]
+url = "https://career.habr.com/{username}"
+main = "https://career.habr.com/"
+error_type = "message"
+error_msg = ["<h1>Ошибка 404</h1>"]
+
+[sites."Carrd"]
+url = "https://{username}.carrd.co/"
+main = "https://carrd.co/"
+error_type = "status_code"
+regex = "^[a-zA-Z0-9_-]{3,50}$"
+
+[sites."CashApp"]
+url = "https://cash.app/${username}"
+main = "https://cash.app"
+error_type = "status_code"
+
+[sites."Cfx.re Forum"]
+url = "https://forum.cfx.re/u/{username}/summary"
+main = "https://forum.cfx.re"
+error_type = "status_code"
+
+[sites."CGTrader"]
+url = "https://www.cgtrader.com/{username}"
+main = "https://www.cgtrader.com"
+error_type = "status_code"
+regex = "^[^.]*?$"
+
+[sites."Championat"]
+url = "https://www.championat.com/user/{username}"
+main = "https://www.championat.com/"
+error_type = "status_code"
+
+[sites."Chaos"]
+url = "https://chaos.social/@{username}"
+main = "https://chaos.social/"
+error_type = "status_code"
+
+[sites."chaos.social"]
+url = "https://chaos.social/@{username}"
+main = "https://chaos.social/"
+error_type = "status_code"
+
+[sites."Chatujme.cz"]
+url = "https://profil.chatujme.cz/{username}"
+main = "https://chatujme.cz/"
+error_type = "message"
+error_msg = ["Neexistujicí profil"]
+regex = "^[a-zA-Z][a-zA-Z1-9_-]*$"
+
+[sites."ChaturBate"]
+url = "https://chaturbate.com/{username}"
+main = "https://chaturbate.com"
+error_type = "status_code"
+nsfw = true
+
+[sites."Chess"]
+url = "https://www.chess.com/callback/user/valid?username={username}"
+main = "https://www.chess.com/"
+error_type = "message"
+error_msg = ["Username is valid"]
+regex = "^[a-zA-Z0-9_]{3,25}$"
+url_probe = "https://www.chess.com/callback/user/valid?username={username}"
+
+[sites."Choice Community"]
+url = "https://choice.community/u/{username}/summary"
+main = "https://choice.community/"
+error_type = "status_code"
+
+[sites."Chollometro"]
+url = "https://www.chollometro.com/profile/{username}"
+main = "https://www.chollometro.com/"
+error_type = "status_code"
+
+[sites."Clapper"]
+url = "https://clapperapp.com/{username}"
+main = "https://clapperapp.com/"
+error_type = "status_code"
+
+[sites."CloudflareCommunity"]
+url = "https://community.cloudflare.com/u/{username}"
+main = "https://community.cloudflare.com/"
+error_type = "status_code"
+
+[sites."Clozemaster"]
+url = "https://www.clozemaster.com/players/{username}"
+main = "https://www.clozemaster.com"
+error_type = "message"
+error_msg = ["Oh no! Player not found."]
+
+[sites."Clubhouse"]
+url = "https://www.clubhouse.com/@{username}"
+main = "https://www.clubhouse.com"
+error_type = "status_code"
+
+[sites."CNET"]
+url = "https://www.cnet.com/profiles/{username}/"
+main = "https://www.cnet.com/"
+error_type = "status_code"
+regex = "^[a-z].*$"
+
+[sites."Code Snippet Wiki"]
+url = "https://codesnippets.fandom.com/wiki/User:{username}"
+main = "https://codesnippets.fandom.com"
+error_type = "message"
+error_msg = ["This user has not filled out their profile page yet"]
+
+[sites."Codeberg"]
+url = "https://codeberg.org/{username}"
+main = "https://codeberg.org/"
+error_type = "status_code"
+
+[sites."Codecademy"]
+url = "https://www.codecademy.com/profiles/{username}"
+main = "https://www.codecademy.com/"
+error_type = "message"
+error_msg = ["This profile could not be found"]
+
+[sites."Codechef"]
+url = "https://www.codechef.com/users/{username}"
+main = "https://www.codechef.com/"
+error_type = "response_url"
+error_url = "https://www.codechef.com/"
+
+[sites."Codeforces"]
+url = "https://codeforces.com/api/user.info?handles={username}"
+main = "https://codeforces.com/"
+error_type = "status_code"
+url_probe = "https://codeforces.com/api/user.info?handles={username}"
+
+[sites."Codepen"]
+url = "https://codepen.io/{username}"
+main = "https://codepen.io/"
+error_type = "status_code"
+
+[sites."Coders Rank"]
+url = "https://profile.codersrank.io/user/{username}/"
+main = "https://codersrank.io/"
+error_type = "message"
+error_msg = ["not a registered member"]
+regex = "^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$"
+
+[sites."Coderwall"]
+url = "https://coderwall.com/{username}"
+main = "https://coderwall.com"
+error_type = "status_code"
+
+[sites."CodeSandbox"]
+url = "https://codesandbox.io/api/v1/users/{username}"
+main = "https://codesandbox.io"
+error_type = "message"
+error_msg = ["Could not find user with username"]
+regex = "^[a-zA-Z0-9_-]{3,30}$"
+url_probe = "https://codesandbox.io/api/v1/users/{username}"
+
+[sites."Codewars"]
+url = "https://www.codewars.com/users/{username}"
+main = "https://www.codewars.com"
+error_type = "status_code"
+
+[sites."Codolio"]
+url = "https://codolio.com/profile/{username}"
+main = "https://codolio.com/"
+error_type = "message"
+error_msg = ["<title>Page Not Found | Codolio</title>"]
+regex = "^[a-zA-Z0-9_-]{3,30}$"
+
+[sites."Coinvote"]
+url = "https://coinvote.cc/profile/{username}"
+main = "https://coinvote.cc/"
+error_type = "status_code"
+
+[sites."ColourLovers"]
+url = "https://www.colourlovers.com/lover/{username}"
+main = "https://www.colourlovers.com/"
+error_type = "status_code"
+
+[sites."Contently"]
+url = "https://{username}.contently.com/"
+main = "https://contently.com/"
+error_type = "response_url"
+error_url = "https://contently.com"
+regex = "^[a-zA-Z][a-zA-Z0-9_-]*$"
+
+[sites."Coroflot"]
+url = "https://www.coroflot.com/{username}"
+main = "https://coroflot.com/"
+error_type = "status_code"
+
+[sites."couchsurfing"]
+url = "https://www.couchsurfing.com/people/{username}"
+main = "https://www.couchsurfing.com/"
+error_type = "status_code"
+
+[sites."Cplusplus"]
+url = "https://cplusplus.com/user/{username}"
+main = "https://cplusplus.com"
+error_type = "message"
+error_msg = ["<title>404 Page Not Found</title>"]
+
+[sites."Cracked"]
+url = "https://www.cracked.com/members/{username}/"
+main = "https://www.cracked.com/"
+error_type = "response_url"
+error_url = "https://www.cracked.com/"
+
+[sites."Cracked Forum"]
+url = "https://cracked.ax/{username}"
+main = "https://cracked.ax/"
+error_type = "status_code"
+
+[sites."Credly"]
+url = "https://www.credly.com/users/{username}"
+main = "https://www.credly.com/"
+error_type = "status_code"
+
+[sites."Crevado"]
+url = "https://{username}.crevado.com"
+main = "https://crevado.com/"
+error_type = "status_code"
+regex = "^[\\w@-]+?$"
+
+[sites."Crowdin"]
+url = "https://crowdin.com/profile/{username}"
+main = "https://crowdin.com/"
+error_type = "status_code"
+regex = "^[a-zA-Z0-9._-]{2,255}$"
+
+[sites."CryptoHack"]
+url = "https://cryptohack.org/user/{username}/"
+main = "https://cryptohack.org/"
+error_type = "response_url"
+error_url = "https://cryptohack.org/"
+
+[sites."Cryptomator Forum"]
+url = "https://community.cryptomator.org/u/{username}"
+main = "https://community.cryptomator.org/"
+error_type = "status_code"
+
+[sites."CSSBattle"]
+url = "https://cssbattle.dev/player/{username}"
+main = "https://cssbattle.dev"
+error_type = "status_code"
+
+[sites."CTAN"]
+url = "https://ctan.org/author/{username}"
+main = "https://ctan.org/"
+error_type = "status_code"
+
+[sites."Cults3D"]
+url = "https://cults3d.com/en/users/{username}/creations"
+main = "https://cults3d.com/en"
+error_type = "message"
+error_msg = ["Oh dear, this page is not working!"]
+
+[sites."CurseForge"]
+url = "https://www.curseforge.com/members/{username}/projects"
+main = "https://www.curseforge.com."
+error_type = "status_code"
+error_code = 404
+
+[sites."CyberDefenders"]
+url = "https://cyberdefenders.org/p/{username}"
+main = "https://cyberdefenders.org/"
+error_type = "status_code"
+regex = "^[^\\/:*?\"<>|@]{3,50}$"
+
+[sites."d3RU"]
+url = "https://d3.ru/user/{username}/posts"
+main = "https://d3.ru/"
+error_type = "status_code"
+
+[sites."dailykos"]
+url = "https://www.dailykos.com/signup/check_nickname?nickname={username}"
+main = "https://www.dailykos.com"
+error_type = "message"
+error_msg = ["{\"result\":true,\"message\":null}"]
+url_probe = "https://www.dailykos.com/signup/check_nickname?nickname={username}"
+
+[sites."DailyMotion"]
+url = "https://www.dailymotion.com/{username}"
+main = "https://www.dailymotion.com/"
+error_type = "status_code"
+
+[sites."datingRU"]
+url = "http://dating.ru/{username}"
+main = "http://dating.ru"
+error_type = "status_code"
+
+[sites."dcinside"]
+url = "https://gallog.dcinside.com/{username}"
+main = "https://www.dcinside.com/"
+error_type = "status_code"
+
+[sites."Dealabs"]
+url = "https://www.dealabs.com/profile/{username}"
+main = "https://www.dealabs.com/"
+error_type = "message"
+error_msg = ["La page que vous essayez"]
+regex = "[a-z0-9]{4,16}"
+
+[sites."DEV Community"]
+url = "https://dev.to/{username}"
+main = "https://dev.to/"
+error_type = "status_code"
+regex = "^[a-zA-Z][a-zA-Z0-9_-]*$"
+
+[sites."DeviantArt"]
+url = "https://www.deviantart.com/{username}"
+main = "https://www.deviantart.com/"
+error_type = "message"
+error_msg = ["Llama Not Found"]
+regex = "^[a-zA-Z][a-zA-Z0-9_-]*$"
+
+[sites."devRant"]
+url = "https://devrant.com/users/{username}"
+main = "https://devrant.com/"
+error_type = "response_url"
+error_url = "https://devrant.com/"
+
+[sites."DigitalSpy"]
+url = "https://forums.digitalspy.com/profile/{username}"
+main = "https://forums.digitalspy.com/"
+error_type = "message"
+error_msg = ["The page you were looking for could not be found."]
+regex = "^\\w{3,20}$"
+
+[sites."Discogs"]
+url = "https://www.discogs.com/user/{username}"
+main = "https://www.discogs.com/"
+error_type = "status_code"
+
+[sites."Discord.bio"]
+url = "https://discords.com/api-v2/bio/details/{username}"
+main = "https://discord.bio/"
+error_type = "message"
+error_msg = ["<title>Server Error (500)</title>"]
+
+[sites."Discuss.Elastic.co"]
+url = "https://discuss.elastic.co/u/{username}"
+main = "https://discuss.elastic.co/"
+error_type = "status_code"
+
+[sites."Diskusjon.no"]
+url = "https://www.diskusjon.no/?app=core&module=system&controller=ajax&do=usernameExists&input={username}"
+main = "https://www.diskusjon.no"
+error_type = "message"
+error_msg = ["{\"result\":\"ok\"}"]
+regex = "^[a-zA-Z0-9_.-]{3,40}$"
+url_probe = "https://www.diskusjon.no/?app=core&module=system&controller=ajax&do=usernameExists&input={username}"
+
+[sites."Disqus"]
+url = "https://disqus.com/{username}"
+main = "https://disqus.com/"
+error_type = "status_code"
+
+[sites."DMOJ"]
+url = "https://dmoj.ca/user/{username}"
+main = "https://dmoj.ca/"
+error_type = "message"
+error_msg = ["No such user"]
+
+[sites."Docker Hub"]
+url = "https://hub.docker.com/v2/users/{username}/"
+main = "https://hub.docker.com/"
+error_type = "status_code"
+url_probe = "https://hub.docker.com/v2/users/{username}/"
+
+[sites."Dribbble"]
+url = "https://dribbble.com/{username}"
+main = "https://dribbble.com/"
+error_type = "message"
+error_msg = ["Whoops, that page is gone."]
+regex = "^[a-zA-Z][a-zA-Z0-9_-]*$"
+
+[sites."drive2"]
+url = "https://www.drive2.ru/users/{username}"
+main = "https://www.drive2.ru/"
+error_type = "status_code"
+
+[sites."Duolingo"]
+url = "https://www.duolingo.com/2017-06-30/users?username={username}"
+main = "https://duolingo.com/"
+error_type = "message"
+error_msg = ["{\"users\":[]}"]
+url_probe = "https://www.duolingo.com/2017-06-30/users?username={username}"
+
+[sites."eGPU"]
+url = "https://egpu.io/forums/profile/{username}/"
+main = "https://egpu.io/"
+error_type = "status_code"
+
+[sites."eintracht"]
+url = "https://community.eintracht.de/fans/{username}"
+main = "https://eintracht.de"
+error_type = "status_code"
+regex = "^[^.]*?$"
+
+[sites."Eintracht Frankfurt Forum"]
+url = "https://community.eintracht.de/fans/{username}"
+main = "https://community.eintracht.de/"
+error_type = "status_code"
+regex = "^[^.]*?$"
+
+[sites."Empretienda AR"]
+url = "https://{username}.empretienda.com.ar"
+main = "https://empretienda.com"
+error_type = "status_code"
+
+[sites."Envato Forum"]
+url = "https://forums.envato.com/u/{username}"
+main = "https://forums.envato.com/"
+error_type = "status_code"
+
+[sites."Erome"]
+url = "https://www.erome.com/{username}"
+main = "https://www.erome.com/"
+error_type = "status_code"
+nsfw = true
+
+[sites."exophase"]
+url = "https://www.exophase.com/user/{username}/"
+main = "https://www.exophase.com/"
+error_type = "status_code"
+
+[sites."Exposure"]
+url = "https://{username}.exposure.co/"
+main = "https://exposure.co/"
+error_type = "status_code"
+regex = "^[a-zA-Z0-9-]{1,63}$"
+
+[sites."EyeEm"]
+url = "https://www.eyeem.com/u/{username}"
+main = "https://www.eyeem.com/"
+error_type = "status_code"
+
+[sites."F3.cool"]
+url = "https://f3.cool/{username}/"
+main = "https://f3.cool/"
+error_type = "status_code"
+
+[sites."Fameswap"]
+url = "https://fameswap.com/user/{username}"
+main = "https://fameswap.com/"
+error_type = "status_code"
+
+[sites."Fandom"]
+url = "https://www.fandom.com/u/{username}"
+main = "https://www.fandom.com/"
+error_type = "status_code"
+
+[sites."Fanpop"]
+url = "https://www.fanpop.com/fans/{username}"
+main = "https://www.fanpop.com/"
+error_type = "response_url"
+error_url = "https://www.fanpop.com/"
+
+[sites."Finanzfrage"]
+url = "https://www.finanzfrage.net/nutzer/{username}"
+main = "https://www.finanzfrage.net/"
+error_type = "status_code"
+
+[sites."fixya"]
+url = "https://www.fixya.com/users/{username}"
+main = "https://www.fixya.com"
+error_type = "status_code"
+
+[sites."fl"]
+url = "https://www.fl.ru/users/{username}"
+main = "https://www.fl.ru/"
+error_type = "status_code"
+
+[sites."Flickr"]
+url = "https://www.flickr.com/people/{username}"
+main = "https://www.flickr.com/"
+error_type = "status_code"
+
+[sites."Flightradar24"]
+url = "https://my.flightradar24.com/{username}"
+main = "https://www.flightradar24.com/"
+error_type = "status_code"
+regex = "^[a-zA-Z0-9_]{3,20}$"
+
+[sites."Flipboard"]
+url = "https://flipboard.com/@{username}"
+main = "https://flipboard.com/"
+error_type = "status_code"
+regex = "^([a-zA-Z0-9_]){1,15}$"
+
+[sites."Football"]
+url = "https://www.rusfootball.info/user/{username}/"
+main = "https://www.rusfootball.info/"
+error_type = "message"
+error_msg = ["Пользователь с таким именем не найден"]
+
+[sites."FortniteTracker"]
+url = "https://fortnitetracker.com/profile/all/{username}"
+main = "https://fortnitetracker.com/challenges"
+error_type = "status_code"
+
+[sites."Forum Ophilia"]
+url = "https://www.forumophilia.com/profile.php?mode=viewprofile&u={username}"
+main = "https://www.forumophilia.com/"
+error_type = "message"
+error_msg = ["that user does not exist"]
+nsfw = true
+
+[sites."forum_guns"]
+url = "https://forum.guns.ru/forummisc/blog/{username}"
+main = "https://forum.guns.ru/"
+error_type = "message"
+error_msg = ["action=https://forum.guns.ru/forummisc/blog/search"]
+
+[sites."Fosstodon"]
+url = "https://fosstodon.org/@{username}"
+main = "https://fosstodon.org/"
+error_type = "status_code"
+regex = "^[a-zA-Z0-9_]{1,30}$"
+
+[sites."Framapiaf"]
+url = "https://framapiaf.org/@{username}"
+main = "https://framapiaf.org"
+error_type = "status_code"
+regex = "^[a-zA-Z0-9_]{1,30}$"
+
+[sites."freecodecamp"]
+url = "https://api.freecodecamp.org/api/users/get-public-profile?username={username}"
+main = "https://www.freecodecamp.org/"
+error_type = "status_code"
+url_probe = "https://api.freecodecamp.org/api/users/get-public-profile?username={username}"
+
+[sites."Freelancer"]
+url = "https://www.freelancer.com/api/users/0.1/users?usernames%5B%5D={username}&compact=true"
+main = "https://www.freelancer.com/"
+error_type = "message"
+error_msg = ["\"users\":{}"]
+url_probe = "https://www.freelancer.com/api/users/0.1/users?usernames%5B%5D={username}&compact=true"
+
+[sites."Freesound"]
+url = "https://freesound.org/people/{username}/"
+main = "https://freesound.org/"
+error_type = "status_code"
+
+[sites."furaffinity"]
+url = "https://www.furaffinity.net/user/{username}"
+main = "https://www.furaffinity.net"
+error_type = "message"
+error_msg = ["This user cannot be found."]
+
+[sites."GaiaOnline"]
+url = "https://www.gaiaonline.com/profiles/{username}"
+main = "https://www.gaiaonline.com/"
+error_type = "message"
+error_msg = ["No user ID specified or user does not exist"]
+
+[sites."GameFAQs"]
+url = "https://gamefaqs.gamespot.com/community/{username}"
+main = "https://gamefaqs.gamespot.com"
+error_type = "status_code"
+
+[sites."Gamespot"]
+url = "https://www.gamespot.com/profile/{username}/"
+main = "https://www.gamespot.com/"
+error_type = "status_code"
+
+[sites."GeeksforGeeks"]
+url = "https://auth.geeksforgeeks.org/user/{username}"
+main = "https://www.geeksforgeeks.org/"
+error_type = "message"
+error_msg = ["false   | GeeksforGeeks Profile"]
+
+[sites."Genius (Artists)"]
+url = "https://genius.com/artists/{username}"
+main = "https://genius.com/"
+error_type = "status_code"
+regex = "^[a-zA-Z0-9]{5,50}$"
+
+[sites."Genius (Users)"]
+url = "https://genius.com/{username}"
+main = "https://genius.com/"
+error_type = "status_code"
+regex = "^[a-zA-Z0-9]*?$"
+
+[sites."geocaching"]
+url = "https://www.geocaching.com/p/default.aspx?u={username}"
+main = "https://www.geocaching.com/"
+error_type = "status_code"
+
+[sites."Gesundheitsfrage"]
+url = "https://www.gesundheitsfrage.net/nutzer/{username}"
+main = "https://www.gesundheitsfrage.net/"
+error_type = "status_code"
+
+[sites."GetMyUni"]
+url = "https://www.getmyuni.com/user/{username}"
+main = "https://getmyuni.com/"
+error_type = "status_code"
+
+[sites."Giant Bomb"]
+url = "https://www.giantbomb.com/profile/{username}/"
+main = "https://www.giantbomb.com/"
+error_type = "status_code"
+
+[sites."Giphy"]
+url = "https://giphy.com/{username}"
+main = "https://giphy.com/"
+error_type = "message"
+error_msg = ["<title> GIFs - Find &amp; Share on GIPHY</title>"]
+
+[sites."GitBook"]
+url = "https://{username}.gitbook.io/"
+main = "https://gitbook.com/"
+error_type = "status_code"
+regex = "^[\\w@-]+?$"
+
+[sites."Gitea"]
+url = "https://gitea.com/{username}"
+main = "https://gitea.com/"
+error_type = "status_code"
+
+[sites."Gitee"]
+url = "https://gitee.com/{username}"
+main = "https://gitee.com/"
+error_type = "status_code"
+
+[sites."GitHub"]
+url = "https://www.github.com/{username}"
+main = "https://www.github.com/"
+error_type = "status_code"
+regex = "^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$"
+
+[sites."GitLab"]
+url = "https://gitlab.com/api/v4/users?username={username}"
+main = "https://gitlab.com/"
+error_type = "message"
+error_msg = ["[]"]
+url_probe = "https://gitlab.com/api/v4/users?username={username}"
+
+[sites."GNOME VCS"]
+url = "https://gitlab.gnome.org/{username}"
+main = "https://gitlab.gnome.org/"
+error_type = "response_url"
+error_url = "https://gitlab.gnome.org/{}"
+regex = "^(?!-)[a-zA-Z0-9_.-]{2,255}(?<!\\.)$"
+
+[sites."GoodReads"]
+url = "https://www.goodreads.com/{username}"
+main = "https://www.goodreads.com/"
+error_type = "status_code"
+
+[sites."Google Play"]
+url = "https://play.google.com/store/apps/developer?id={username}"
+main = "https://play.google.com"
+error_type = "message"
+error_msg = ["the requested URL was not found on this server"]
+
+[sites."Gradle"]
+url = "https://plugins.gradle.org/u/{username}"
+main = "https://gradle.org/"
+error_type = "status_code"
+regex = "^(?!-)[a-zA-Z0-9-]{3,}(?<!-)$"
+
+[sites."Grailed"]
+url = "https://www.grailed.com/{username}"
+main = "https://www.grailed.com/"
+error_type = "response_url"
+error_url = "https://www.grailed.com/{}"
+
+[sites."Gravatar"]
+url = "http://en.gravatar.com/{username}"
+main = "http://en.gravatar.com/"
+error_type = "status_code"
+regex = "^((?!\\.).)*$"
+
+[sites."Gumroad"]
+url = "https://www.gumroad.com/{username}"
+main = "https://www.gumroad.com/"
+error_type = "message"
+error_msg = ["Page not found (404) - Gumroad"]
+regex = "^[^.]*?$"
+
+[sites."Gutefrage"]
+url = "https://www.gutefrage.net/nutzer/{username}"
+main = "https://www.gutefrage.net/"
+error_type = "status_code"
+
+[sites."habr"]
+url = "https://habr.com/ru/users/{username}"
+main = "https://habr.com/"
+error_type = "status_code"
+
+[sites."Hackaday"]
+url = "https://hackaday.io/{username}"
+main = "https://hackaday.io/"
+error_type = "status_code"
+
+[sites."HackenProof (Hackers)"]
+url = "https://hackenproof.com/hackers/{username}"
+main = "https://hackenproof.com/"
+error_type = "message"
+error_msg = ["Page not found"]
+regex = "^[\\w-]{,34}$"
+
+[sites."HackerEarth"]
+url = "https://hackerearth.com/@{username}"
+main = "https://hackerearth.com/"
+error_type = "status_code"
+
+[sites."HackerNews"]
+url = "https://news.ycombinator.com/user?id={username}"
+main = "https://news.ycombinator.com/"
+error_type = "message"
+error_msg = ["No such user.", "Sorry."]
+
+[sites."HackerOne"]
+url = "https://hackerone.com/{username}"
+main = "https://hackerone.com/"
+error_type = "message"
+error_msg = ["Page not found"]
+
+[sites."HackerRank"]
+url = "https://hackerrank.com/{username}"
+main = "https://hackerrank.com/"
+error_type = "message"
+error_msg = ["Something went wrong"]
+regex = "^[^.]*?$"
+
+[sites."HackerSploit"]
+url = "https://forum.hackersploit.org/u/{username}"
+main = "https://forum.hackersploit.org/"
+error_type = "status_code"
+
+[sites."HackMD"]
+url = "https://hackmd.io/@{username}"
+main = "https://hackmd.io/"
+error_type = "status_code"
+
+[sites."hackster"]
+url = "https://www.hackster.io/{username}"
+main = "https://www.hackster.io"
+error_type = "status_code"
+
+[sites."HackTheBox"]
+url = "https://forum.hackthebox.com/u/{username}"
+main = "https://forum.hackthebox.com/"
+error_type = "status_code"
+
+[sites."Harvard Scholar"]
+url = "https://scholar.harvard.edu/{username}"
+main = "https://scholar.harvard.edu/"
+error_type = "status_code"
+
+[sites."Hashnode"]
+url = "https://hashnode.com/@{username}"
+main = "https://hashnode.com"
+error_type = "status_code"
+
+[sites."Heavy-R"]
+url = "https://www.heavy-r.com/user/{username}"
+main = "https://www.heavy-r.com/"
+error_type = "message"
+error_msg = ["Channel not found"]
+nsfw = true
+
+[sites."Hive Blog"]
+url = "https://hive.blog/@{username}"
+main = "https://hive.blog/"
+error_type = "message"
+error_msg = ["<title>User Not Found - Hive</title>"]
+
+[sites."HotUKdeals"]
+url = "https://www.hotukdeals.com/profile/{username}"
+main = "https://www.hotukdeals.com/"
+error_type = "status_code"
+
+[sites."Houzz"]
+url = "https://houzz.com/user/{username}"
+main = "https://houzz.com/"
+error_type = "status_code"
+
+[sites."HubPages"]
+url = "https://hubpages.com/@{username}"
+main = "https://hubpages.com/"
+error_type = "status_code"
+
+[sites."Hubski"]
+url = "https://hubski.com/user/{username}"
+main = "https://hubski.com/"
+error_type = "message"
+error_msg = ["No such user"]
+
+[sites."HudsonRock"]
+url = "https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-username?username={username}"
+main = "https://hudsonrock.com"
+error_type = "message"
+error_msg = ["This username is not associated"]
+
+[sites."Hugging Face"]
+url = "https://huggingface.co/{username}"
+main = "https://huggingface.co/"
+error_type = "status_code"
+
+[sites."hunting"]
+url = "https://www.hunting.ru/forum/members/?username={username}"
+main = "https://www.hunting.ru/forum/"
+error_type = "message"
+error_msg = ["Указанный пользователь не найден. Пожалуйста, введите другое имя."]
+
+[sites."Icons8 Community"]
+url = "https://community.icons8.com/u/{username}/summary"
+main = "https://community.icons8.com/"
+error_type = "status_code"
+
+[sites."IFTTT"]
+url = "https://www.ifttt.com/p/{username}"
+main = "https://www.ifttt.com/"
+error_type = "status_code"
+regex = "^[A-Za-z0-9]{3,35}$"
+
+[sites."Ifunny"]
+url = "https://ifunny.co/user/{username}"
+main = "https://ifunny.co/"
+error_type = "status_code"
+
+[sites."igromania"]
+url = "http://forum.igromania.ru/member.php?username={username}"
+main = "http://forum.igromania.ru/"
+error_type = "message"
+error_msg = ["Пользователь не зарегистрирован и не имеет профиля для просмотра."]
+
+[sites."Image Fap"]
+url = "https://www.imagefap.com/profile/{username}"
+main = "https://www.imagefap.com/"
+error_type = "message"
+error_msg = ["Not found"]
+nsfw = true
+
+[sites."ImgUp.cz"]
+url = "https://imgup.cz/{username}"
+main = "https://imgup.cz/"
+error_type = "status_code"
+
+[sites."Imgur"]
+url = "https://api.imgur.com/account/v1/accounts/{username}?client_id=546c25a59c58ad7"
+main = "https://imgur.com/"
+error_type = "status_code"
+url_probe = "https://api.imgur.com/account/v1/accounts/{username}?client_id=546c25a59c58ad7"
+
+[sites."imood"]
+url = "https://www.imood.com/users/{username}"
+main = "https://www.imood.com/"
+error_type = "status_code"
+
+[sites."Instagram"]
+url = "https://imginn.com/{username}"
+main = "https://instagram.com/"
+error_type = "status_code"
+url_probe = "https://imginn.com/{username}"
+
+[sites."Instapaper"]
+url = "https://www.instapaper.com/p/{username}"
+main = "https://www.instapaper.com/"
+error_type = "status_code"
+
+[sites."Instructables"]
+url = "https://www.instructables.com/json-api/showAuthorExists?screenName={username}"
+main = "https://www.instructables.com/"
+error_type = "status_code"
+url_probe = "https://www.instructables.com/json-api/showAuthorExists?screenName={username}"
+
+[sites."interpals"]
+url = "https://www.interpals.net/{username}"
+main = "https://www.interpals.net/"
+error_type = "message"
+error_msg = ["The requested user does not exist or is inactive"]
+
+[sites."Intigriti"]
+url = "https://api.intigriti.com/user/public/profile/{username}"
+main = "https://app.intigriti.com"
+error_type = "status_code"
+regex = "[a-z0-9_]{1,25}"
+url_probe = "https://api.intigriti.com/user/public/profile/{username}"
+
+[sites."Ionic Forum"]
+url = "https://forum.ionicframework.com/u/{username}"
+main = "https://forum.ionicframework.com/"
+error_type = "status_code"
+
+[sites."IRC-Galleria"]
+url = "https://irc-galleria.net/user/{username}"
+main = "https://irc-galleria.net/"
+error_type = "response_url"
+error_url = "https://irc-galleria.net/users/search?username={}"
+
+[sites."irecommend"]
+url = "https://irecommend.ru/users/{username}"
+main = "https://irecommend.ru/"
+error_type = "status_code"
+
+[sites."Issuu"]
+url = "https://issuu.com/{username}"
+main = "https://issuu.com/"
+error_type = "status_code"
+
+[sites."Itch.io"]
+url = "https://{username}.itch.io/"
+main = "https://itch.io/"
+error_type = "status_code"
+regex = "^[\\w@-]+?$"
+
+[sites."Itemfix"]
+url = "https://www.itemfix.com/c/{username}"
+main = "https://www.itemfix.com/"
+error_type = "message"
+error_msg = ["<title>ItemFix - Channel: </title>"]
+
+[sites."jbzd.com.pl"]
+url = "https://jbzd.com.pl/uzytkownik/{username}"
+main = "https://jbzd.com.pl/"
+error_type = "status_code"
+
+[sites."Jellyfin Weblate"]
+url = "https://translate.jellyfin.org/user/{username}/"
+main = "https://translate.jellyfin.org/"
+error_type = "status_code"
+regex = "^[a-zA-Z0-9@._-]{1,150}$"
+
+[sites."jeuxvideo"]
+url = "https://www.jeuxvideo.com/profil/{username}?mode=infos"
+main = "https://www.jeuxvideo.com"
+error_type = "status_code"
+url_probe = "https://www.jeuxvideo.com/profil/{username}?mode=infos"
+
+[sites."Jimdo"]
+url = "https://{username}.jimdosite.com"
+main = "https://jimdosite.com/"
+error_type = "status_code"
+regex = "^[\\w@-]+?$"
+
+[sites."Joplin Forum"]
+url = "https://discourse.joplinapp.org/u/{username}"
+main = "https://discourse.joplinapp.org/"
+error_type = "status_code"
+
+[sites."Jupyter Community Forum"]
+url = "https://discourse.jupyter.org/u/{username}/summary"
+main = "https://discourse.jupyter.org"
+error_type = "message"
+error_msg = ["Oops! That page doesn’t exist or is private."]
+
+[sites."Kaggle"]
+url = "https://www.kaggle.com/{username}"
+main = "https://www.kaggle.com/"
+error_type = "status_code"
+
+[sites."kaskus"]
+url = "https://www.kaskus.co.id/api/users?username={username}"
+main = "https://www.kaskus.co.id"
+error_type = "status_code"
+url_probe = "https://www.kaskus.co.id/api/users?username={username}"
+
+[sites."Keybase"]
+url = "https://keybase.io/{username}"
+main = "https://keybase.io/"
+error_type = "status_code"
+
+[sites."Kick"]
+url = "https://kick.com/api/v2/channels/{username}"
+main = "https://kick.com/"
+error_type = "status_code"
+url_probe = "https://kick.com/api/v2/channels/{username}"
+
+[sites."Kik"]
+url = "https://ws2.kik.com/user/{username}"
+main = "http://kik.me/"
+error_type = "message"
+error_msg = ["The page you requested was not found"]
+url_probe = "https://ws2.kik.com/user/{username}"
+
+[sites."kofi"]
+url = "https://ko-fi.com/{username}"
+main = "https://ko-fi.com"
+error_type = "response_url"
+error_url = "https://ko-fi.com/art?=redirect"
+
+[sites."Kongregate"]
+url = "https://www.kongregate.com/accounts/{username}"
+main = "https://www.kongregate.com/"
+error_type = "status_code"
+regex = "^[a-zA-Z][a-zA-Z0-9_-]*$"
+headers = { "Accept" = "text/html" }
+
+[sites."Kvinneguiden"]
+url = "https://forum.kvinneguiden.no/?app=core&module=system&controller=ajax&do=usernameExists&input={username}"
+main = "https://forum.kvinneguiden.no"
+error_type = "message"
+error_msg = ["{\"result\":\"ok\"}"]
+regex = "^[a-zA-Z0-9_.-]{3,18}$"
+url_probe = "https://forum.kvinneguiden.no/?app=core&module=system&controller=ajax&do=usernameExists&input={username}"
+
+[sites."kwork"]
+url = "https://kwork.ru/user/{username}"
+main = "https://www.kwork.ru/"
+error_type = "status_code"
+
+[sites."Laracast"]
+url = "https://laracasts.com/@{username}"
+main = "https://laracasts.com/"
+error_type = "status_code"
+regex = "^[a-zA-Z0-9_-]{3,}$"
+
+[sites."last.fm"]
+url = "https://last.fm/user/{username}"
+main = "https://last.fm/"
+error_type = "status_code"
+
+[sites."Launchpad"]
+url = "https://launchpad.net/~{username}"
+main = "https://launchpad.net/"
+error_type = "status_code"
+
+[sites."leasehackr"]
+url = "https://forum.leasehackr.com/u/{username}/summary/"
+main = "https://forum.leasehackr.com/"
+error_type = "status_code"
+
+[sites."LeetCode"]
+url = "https://leetcode.com/{username}"
+main = "https://leetcode.com/"
+error_type = "status_code"
+
+[sites."LemmyWorld"]
+url = "https://lemmy.world/u/{username}"
+main = "https://lemmy.world"
+error_type = "message"
+error_msg = ["<h1>Error!</h1>"]
+
+[sites."LessWrong"]
+url = "https://www.lesswrong.com/users/{username}"
+main = "https://www.lesswrong.com/"
+error_type = "response_url"
+error_url = "https://www.lesswrong.com/"
+
+[sites."Letterboxd"]
+url = "https://letterboxd.com/{username}"
+main = "https://letterboxd.com/"
+error_type = "message"
+error_msg = ["Sorry, we can’t find the page you’ve requested."]
+
+[sites."LibraryThing"]
+url = "https://www.librarything.com/profile/{username}"
+main = "https://www.librarything.com/"
+error_type = "message"
+error_msg = ["<p>Error: This user doesn't exist</p>"]
+headers = { "Cookie" = "LTAnonSessionID=3159599315; LTUnifiedCookie=%7B%22areyouhuman%22%3A1%7D; " }
+
+[sites."Lichess"]
+url = "https://lichess.org/@/{username}"
+main = "https://lichess.org"
+error_type = "status_code"
+
+[sites."LinkedIn"]
+url = "https://linkedin.com/in/{username}"
+main = "https://linkedin.com"
+error_type = "status_code"
+regex = "^[a-zA-Z0-9]{3,100}$"
+headers = { "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", "Accept-Language" = "en-US,en;q=0.9", "Accept" = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8" }
+
+[sites."Linktree"]
+url = "https://linktr.ee/{username}"
+main = "https://linktr.ee/"
+error_type = "message"
+error_msg = ["\"statusCode\":404"]
+regex = "^[\\w\\.]{2,30}$"
+
+[sites."LinuxFR.org"]
+url = "https://linuxfr.org/users/{username}"
+main = "https://linuxfr.org/"
+error_type = "status_code"
+
+[sites."Listed"]
+url = "https://listed.to/@{username}"
+main = "https://listed.to/"
+error_type = "response_url"
+error_url = "https://listed.to/@{}"
+
+[sites."LiveJournal"]
+url = "https://{username}.livejournal.com"
+main = "https://www.livejournal.com/"
+error_type = "status_code"
+regex = "^[a-zA-Z][a-zA-Z0-9_-]*$"
+
+[sites."livelib"]
+url = "https://www.livelib.ru/reader/{username}"
+main = "https://www.livelib.ru/"
+error_type = "status_code"
+
+[sites."Lobsters"]
+url = "https://lobste.rs/u/{username}"
+main = "https://lobste.rs/"
+error_type = "status_code"
+regex = "[A-Za-z0-9][A-Za-z0-9_-]{0,24}"
+
+[sites."LOR"]
+url = "https://www.linux.org.ru/people/{username}/profile"
+main = "https://linux.org.ru/"
+error_type = "status_code"
+
+[sites."LottieFiles"]
+url = "https://lottiefiles.com/{username}"
+main = "https://lottiefiles.com/"
+error_type = "status_code"
+
+[sites."LushStories"]
+url = "https://www.lushstories.com/profile/{username}"
+main = "https://www.lushstories.com/"
+error_type = "response_url"
+error_url = "https://www.lushstories.com/login"
+nsfw = true
+
+[sites."Mamot"]
+url = "https://mamot.fr/@{username}"
+main = "https://mamot.fr/"
+error_type = "status_code"
+regex = "^[a-zA-Z0-9_]{1,30}$"
+
+[sites."mastodon.cloud"]
+url = "https://mastodon.cloud/@{username}"
+main = "https://mastodon.cloud/"
+error_type = "status_code"
+
+[sites."mastodon.social"]
+url = "https://mastodon.social/@{username}"
+main = "https://chaos.social/"
+error_type = "status_code"
+
+[sites."mastodon.xyz"]
+url = "https://mastodon.xyz/@{username}"
+main = "https://mastodon.xyz/"
+error_type = "status_code"
+
+[sites."Medium"]
+url = "https://medium.com/feed/@{username}"
+main = "https://medium.com/"
+error_type = "message"
+error_msg = ["<body"]
+url_probe = "https://medium.com/feed/@{username}"
+
+[sites."Memrise"]
+url = "https://www.memrise.com/user/{username}/"
+main = "https://www.memrise.com/"
+error_type = "status_code"
+
+[sites."mercadolivre"]
+url = "https://www.mercadolivre.com.br/perfil/{username}"
+main = "https://www.mercadolivre.com.br"
+error_type = "status_code"
+
+[sites."minds"]
+url = "https://www.minds.com/api/v3/register/validate?username={username}"
+main = "https://www.minds.com"
+error_type = "message"
+error_msg = ["\"valid\":true"]
+url_probe = "https://www.minds.com/api/v3/register/validate?username={username}"
+
+[sites."Minecraft"]
+url = "https://api.mojang.com/users/profiles/minecraft/{username}"
+main = "https://minecraft.net/"
+error_type = "message"
+error_msg = ["Couldn't find any profile with name"]
+regex = "^.{1,25}$"
+
+[sites."MixCloud"]
+url = "https://api.mixcloud.com/{username}/"
+main = "https://www.mixcloud.com/"
+error_type = "status_code"
+url_probe = "https://api.mixcloud.com/{username}/"
+
+[sites."MMORPG Forum"]
+url = "https://forums.mmorpg.com/profile/{username}"
+main = "https://forums.mmorpg.com/"
+error_type = "status_code"
+
+[sites."moikrug"]
+url = "https://moikrug.ru/{username}"
+main = "https://moikrug.ru/"
+error_type = "status_code"
+
+[sites."Monkeytype"]
+url = "https://api.monkeytype.com/users/{username}/profile"
+main = "https://monkeytype.com/"
+error_type = "status_code"
+url_probe = "https://api.monkeytype.com/users/{username}/profile"
+
+[sites."Motherless"]
+url = "https://motherless.com/m/{username}"
+main = "https://motherless.com/"
+error_type = "message"
+error_msg = ["no longer a member"]
+nsfw = true
+
+[sites."Motorradfrage"]
+url = "https://www.motorradfrage.net/nutzer/{username}"
+main = "https://www.motorradfrage.net/"
+error_type = "status_code"
+
+[sites."mstdn.io"]
+url = "https://mstdn.io/@{username}"
+main = "https://mstdn.io/"
+error_type = "status_code"
+
+[sites."mstdn.social"]
+url = "https://mstdn.social/@{username}"
+main = "https://mstdn.social/"
+error_type = "status_code"
+
+[sites."MuseScore"]
+url = "https://musescore.com/{username}"
+main = "https://musescore.com/"
+error_type = "status_code"
+
+[sites."MyAnimeList"]
+url = "https://myanimelist.net/profile/{username}"
+main = "https://myanimelist.net/"
+error_type = "status_code"
+
+[sites."Mydealz"]
+url = "https://www.mydealz.de/profile/{username}"
+main = "https://www.mydealz.de/"
+error_type = "status_code"
+
+[sites."Mydramalist"]
+url = "https://www.mydramalist.com/profile/{username}"
+main = "https://mydramalist.com"
+error_type = "message"
+error_msg = ["The requested page was not found"]
+
+[sites."MyMiniFactory"]
+url = "https://www.myminifactory.com/users/{username}"
+main = "https://www.myminifactory.com/"
+error_type = "status_code"
+
+[sites."Myspace"]
+url = "https://myspace.com/{username}"
+main = "https://myspace.com/"
+error_type = "status_code"
+
+[sites."n8n Community"]
+url = "https://community.n8n.io/u/{username}/summary"
+main = "https://community.n8n.io/"
+error_type = "status_code"
+
+[sites."nairaland.com"]
+url = "https://www.nairaland.com/{username}"
+main = "https://www.nairaland.com/"
+error_type = "status_code"
+
+[sites."namuwiki"]
+url = "https://namu.wiki/w/%EC%82%AC%EC%9A%A9%EC%9E%90:{username}"
+main = "https://namu.wiki/"
+error_type = "status_code"
+
+[sites."NationStates Nation"]
+url = "https://nationstates.net/nation={username}"
+main = "https://nationstates.net"
+error_type = "message"
+error_msg = ["Was this your nation? It may have ceased to exist due to inactivity, but can rise again!"]
+
+[sites."NationStates Region"]
+url = "https://nationstates.net/region={username}"
+main = "https://nationstates.net"
+error_type = "message"
+error_msg = ["does not exist."]
+
+[sites."Naver"]
+url = "https://blog.naver.com/{username}"
+main = "https://naver.com"
+error_type = "status_code"
+
+[sites."Needrom"]
+url = "https://www.needrom.com/author/{username}/"
+main = "https://www.needrom.com/"
+error_type = "status_code"
+
+[sites."Newgrounds"]
+url = "https://{username}.newgrounds.com"
+main = "https://newgrounds.com"
+error_type = "status_code"
+regex = "^[a-zA-Z][a-zA-Z0-9_-]*$"
+
+[sites."Nextcloud Forum"]
+url = "https://help.nextcloud.com/u/{username}/summary"
+main = "https://nextcloud.com/"
+error_type = "status_code"
+regex = "^(?![.-])[a-zA-Z0-9_.-]{3,20}$"
+
+[sites."NICommunityForum"]
+url = "https://community.native-instruments.com/profile/{username}"
+main = "https://www.native-instruments.com/forum/"
+error_type = "message"
+error_msg = ["The page you were looking for could not be found."]
+
+[sites."Nightbot"]
+url = "https://api.nightbot.tv/1/channels/t/{username}"
+main = "https://nightbot.tv/"
+error_type = "status_code"
+url_probe = "https://api.nightbot.tv/1/channels/t/{username}"
+
+[sites."Ninja Kiwi"]
+url = "https://ninjakiwi.com/profile/{username}"
+main = "https://ninjakiwi.com/"
+error_type = "response_url"
+error_url = "https://ninjakiwi.com/profile/{}"
+
+[sites."NintendoLife"]
+url = "https://www.nintendolife.com/users/{username}"
+main = "https://www.nintendolife.com/"
+error_type = "status_code"
+
+[sites."NitroType"]
+url = "https://www.nitrotype.com/racer/{username}"
+main = "https://www.nitrotype.com/"
+error_type = "message"
+error_msg = ["<title>Nitro Type | Competitive Typing Game | Race Your Friends</title>"]
+
+[sites."nnRU"]
+url = "https://{username}.www.nn.ru/"
+main = "https://www.nn.ru/"
+error_type = "status_code"
+regex = "^[\\w@-]+?$"
+
+[sites."NotABug.org"]
+url = "https://notabug.org/{username}/followers"
+main = "https://notabug.org/"
+error_type = "status_code"
+url_probe = "https://notabug.org/{username}/followers"
+
+[sites."note"]
+url = "https://note.com/{username}"
+main = "https://note.com/"
+error_type = "status_code"
+
+[sites."Nothing Community"]
+url = "https://nothing.community/u/{username}"
+main = "https://nothing.community/"
+error_type = "status_code"
+
+[sites."npm"]
+url = "https://www.npmjs.com/~{username}"
+main = "https://www.npmjs.com/"
+error_type = "status_code"
+
+[sites."Nyaa.si"]
+url = "https://nyaa.si/user/{username}"
+main = "https://nyaa.si/"
+error_type = "status_code"
+
+[sites."ObservableHQ"]
+url = "https://observablehq.com/@{username}"
+main = "https://observablehq.com/"
+error_type = "message"
+error_msg = ["Page not found"]
+
+[sites."Odysee"]
+url = "https://odysee.com/@{username}"
+main = "https://odysee.com/"
+error_type = "message"
+error_msg = ["<link rel=\"canonical\" content=\"odysee.com\"/>"]
+
+[sites."omg.lol"]
+url = "https://api.omg.lol/address/{username}/availability"
+main = "https://home.omg.lol"
+error_type = "message"
+error_msg = ["\"available\": true"]
+url_probe = "https://api.omg.lol/address/{username}/availability"
+
+[sites."Open Collective"]
+url = "https://opencollective.com/{username}"
+main = "https://opencollective.com/"
+error_type = "status_code"
+
+[sites."OpenGameArt"]
+url = "https://opengameart.org/users/{username}"
+main = "https://opengameart.org"
+error_type = "status_code"
+
+[sites."opennet"]
+url = "https://www.opennet.ru/~{username}"
+main = "https://www.opennet.ru/"
+error_type = "message"
+error_msg = ["Имя участника не найдено"]
+regex = "^[^-]*$"
+
+[sites."Opensource"]
+url = "https://opensource.com/users/{username}"
+main = "https://opensource.com/"
+error_type = "status_code"
+
+[sites."OpenStreetMap"]
+url = "https://www.openstreetmap.org/user/{username}"
+main = "https://www.openstreetmap.org/"
+error_type = "status_code"
+regex = "^[^.]*?$"
+
+[sites."osu!"]
+url = "https://osu.ppy.sh/users/{username}"
+main = "https://osu.ppy.sh/"
+error_type = "status_code"
+
+[sites."OurDJTalk"]
+url = "https://ourdjtalk.com/members?username={username}"
+main = "https://ourdjtalk.com/"
+error_type = "message"
+error_msg = ["The specified member cannot be found"]
+
+[sites."Outgress"]
+url = "https://outgress.com/agents/{username}"
+main = "https://outgress.com/"
+error_type = "message"
+error_msg = ["Outgress - Error"]
+
+[sites."Packagist"]
+url = "https://packagist.org/packages/{username}/"
+main = "https://packagist.org/"
+error_type = "response_url"
+error_url = "https://packagist.org/search/?q={}&reason=vendor_not_found"
+
+[sites."Pastebin"]
+url = "https://pastebin.com/u/{username}"
+main = "https://pastebin.com/"
+error_type = "message"
+error_msg = ["Not Found (#404)"]
+
+[sites."Patched"]
+url = "https://patched.sh/User/{username}"
+main = "https://patched.sh/"
+error_type = "message"
+error_msg = ["The member you specified is either invalid or doesn't exist."]
+
+[sites."Patreon"]
+url = "https://www.patreon.com/{username}"
+main = "https://www.patreon.com/"
+error_type = "status_code"
+
+[sites."PCGamer"]
+url = "https://forums.pcgamer.com/members/?username={username}"
+main = "https://pcgamer.com"
+error_type = "message"
+error_msg = ["The specified member cannot be found. Please enter a member's entire name."]
+
+[sites."PentesterLab"]
+url = "https://pentesterlab.com/profile/{username}"
+main = "https://pentesterlab.com/"
+error_type = "status_code"
+regex = "^[\\w]{4,30}$"
+
+[sites."Pepperdeals"]
+url = "https://www.pepperdeals.se/profile/{username}"
+main = "https://www.pepperdeals.se/"
+error_type = "status_code"
+
+[sites."PepperealsUS"]
+url = "https://www.pepperdeals.com/profile/{username}"
+main = "https://www.pepperdeals.com/"
+error_type = "status_code"
+
+[sites."PepperNL"]
+url = "https://nl.pepper.com/profile/{username}"
+main = "https://nl.pepper.com/"
+error_type = "status_code"
+
+[sites."PepperPL"]
+url = "https://www.pepper.pl/profile/{username}"
+main = "https://www.pepper.pl/"
+error_type = "status_code"
+
+[sites."Periscope"]
+url = "https://www.periscope.tv/{username}/"
+main = "https://www.periscope.tv/"
+error_type = "status_code"
+
+[sites."phpRU"]
+url = "https://php.ru/forum/members/?username={username}"
+main = "https://php.ru/forum/"
+error_type = "message"
+error_msg = ["Указанный пользователь не найден. Пожалуйста, введите другое имя."]
+
+[sites."pikabu"]
+url = "https://pikabu.ru/@{username}"
+main = "https://pikabu.ru/"
+error_type = "status_code"
+
+[sites."Pinkbike"]
+url = "https://www.pinkbike.com/u/{username}/"
+main = "https://www.pinkbike.com/"
+error_type = "status_code"
+regex = "^[^.]*?$"
+
+[sites."Pinterest"]
+url = "https://www.pinterest.com/oembed.json?url=https://www.pinterest.com/{username}/"
+main = "https://www.pinterest.com/"
+error_type = "status_code"
+error_url = "https://www.pinterest.com/"
+url_probe = "https://www.pinterest.com/oembed.json?url=https://www.pinterest.com/{username}/"
+
+[sites."pixelfed.social"]
+url = "https://pixelfed.social/{username}/"
+main = "https://pixelfed.social"
+error_type = "status_code"
+
+[sites."Platzi"]
+url = "https://platzi.com/p/{username}/"
+main = "https://platzi.com/"
+error_type = "status_code"
+error_code = 404
+
+[sites."PlayStore"]
+url = "https://play.google.com/store/apps/developer?id={username}"
+main = "https://play.google.com/store"
+error_type = "status_code"
+
+[sites."Playstrategy"]
+url = "https://playstrategy.org/@/{username}"
+main = "https://playstrategy.org"
+error_type = "status_code"
+
+[sites."Plurk"]
+url = "https://www.plurk.com/{username}"
+main = "https://www.plurk.com/"
+error_type = "message"
+error_msg = ["User Not Found!"]
+
+[sites."PocketStars"]
+url = "https://pocketstars.com/{username}"
+main = "https://pocketstars.com/"
+error_type = "message"
+error_msg = ["Join Your Favorite Adult Stars"]
+nsfw = true
+
+[sites."Pokemon Showdown"]
+url = "https://pokemonshowdown.com/users/{username}"
+main = "https://pokemonshowdown.com"
+error_type = "status_code"
+
+[sites."Polarsteps"]
+url = "https://api.polarsteps.com/users/byusername/{username}"
+main = "https://polarsteps.com/"
+error_type = "status_code"
+url_probe = "https://api.polarsteps.com/users/byusername/{username}"
+
+[sites."Polygon"]
+url = "https://www.polygon.com/users/{username}"
+main = "https://www.polygon.com/"
+error_type = "status_code"
+
+[sites."Polymart"]
+url = "https://polymart.org/user/{username}"
+main = "https://polymart.org/"
+error_type = "response_url"
+error_url = "https://polymart.org/user/-1"
+
+[sites."Pornhub"]
+url = "https://pornhub.com/users/{username}"
+main = "https://pornhub.com/"
+error_type = "status_code"
+nsfw = true
+
+[sites."pr0gramm"]
+url = "https://pr0gramm.com/api/profile/info?name={username}"
+main = "https://pr0gramm.com/"
+error_type = "status_code"
+url_probe = "https://pr0gramm.com/api/profile/info?name={username}"
+
+[sites."Preisjaeger"]
+url = "https://www.preisjaeger.at/profile/{username}"
+main = "https://www.preisjaeger.at/"
+error_type = "status_code"
+
+[sites."ProductHunt"]
+url = "https://www.producthunt.com/@{username}"
+main = "https://www.producthunt.com/"
+error_type = "status_code"
+
+[sites."prog.hu"]
+url = "https://prog.hu/azonosito/info/{username}"
+main = "https://prog.hu/"
+error_type = "response_url"
+error_url = "https://prog.hu/azonosito/info/{}"
+
+[sites."programming.dev"]
+url = "https://programming.dev/u/{username}"
+main = "https://programming.dev"
+error_type = "message"
+error_msg = ["Error!"]
+
+[sites."Promodescuentos"]
+url = "https://www.promodescuentos.com/profile/{username}"
+main = "https://www.promodescuentos.com/"
+error_type = "status_code"
+
+[sites."PromoDJ"]
+url = "http://promodj.com/{username}"
+main = "http://promodj.com/"
+error_type = "status_code"
+
+[sites."Pronouns.page"]
+url = "https://pronouns.page/@{username}"
+main = "https://pronouns.page/"
+error_type = "status_code"
+
+[sites."PSNProfiles.com"]
+url = "https://psnprofiles.com/{username}"
+main = "https://psnprofiles.com/"
+error_type = "response_url"
+error_url = "https://psnprofiles.com/?psnId={}"
+
+[sites."Pychess"]
+url = "https://www.pychess.org/@/{username}"
+main = "https://www.pychess.org"
+error_type = "message"
+error_msg = ["404"]
+
+[sites."PyPi"]
+url = "https://pypi.org/_includes/administer-user-include/{username}"
+main = "https://pypi.org"
+error_type = "status_code"
+url_probe = "https://pypi.org/_includes/administer-user-include/{username}"
+
+[sites."Python.org Discussions"]
+url = "https://discuss.python.org/u/{username}/summary"
+main = "https://discuss.python.org"
+error_type = "message"
+error_msg = ["Oops! That page doesn’t exist or is private."]
+
+[sites."Rajce.net"]
+url = "https://{username}.rajce.idnes.cz/"
+main = "https://www.rajce.idnes.cz/"
+error_type = "status_code"
+regex = "^[\\w@-]+?$"
+
+[sites."Rarible"]
+url = "https://rarible.com/marketplace/api/v4/urls/{username}"
+main = "https://rarible.com/"
+error_type = "status_code"
+
+[sites."Rate Your Music"]
+url = "https://rateyourmusic.com/~{username}"
+main = "https://rateyourmusic.com/"
+error_type = "status_code"
+
+[sites."Rclone Forum"]
+url = "https://forum.rclone.org/u/{username}"
+main = "https://forum.rclone.org/"
+error_type = "status_code"
+
+[sites."Realmeye"]
+url = "https://www.realmeye.com/player/{username}"
+main = "https://www.realmeye.com/"
+error_type = "message"
+error_msg = ["Sorry, but we either:"]
+
+[sites."Redbubble"]
+url = "https://www.redbubble.com/people/{username}"
+main = "https://www.redbubble.com/"
+error_type = "status_code"
+
+[sites."Reddit"]
+url = "https://www.reddit.com/user/{username}"
+main = "https://www.reddit.com/"
+error_type = "message"
+error_msg = ["Sorry, nobody on Reddit goes by that name."]
+headers = { "accept-language" = "en-US,en;q=0.9" }
+
+[sites."RedTube"]
+url = "https://www.redtube.com/users/{username}"
+main = "https://www.redtube.com/"
+error_type = "status_code"
+nsfw = true
+
+[sites."Reisefrage"]
+url = "https://www.reisefrage.net/nutzer/{username}"
+main = "https://www.reisefrage.net/"
+error_type = "status_code"
+
+[sites."Replit.com"]
+url = "https://replit.com/@{username}"
+main = "https://replit.com/"
+error_type = "status_code"
+
+[sites."ResearchGate"]
+url = "https://www.researchgate.net/profile/{username}"
+main = "https://www.researchgate.net/"
+error_type = "response_url"
+error_url = "https://www.researchgate.net/directory/profiles"
+regex = "\\w+_\\w+"
+
+[sites."ReverbNation"]
+url = "https://www.reverbnation.com/{username}"
+main = "https://www.reverbnation.com/"
+error_type = "message"
+error_msg = ["Sorry, we couldn't find that page"]
+
+[sites."Roblox"]
+url = "https://www.roblox.com/user.aspx?username={username}"
+main = "https://www.roblox.com/"
+error_type = "status_code"
+
+[sites."RocketTube"]
+url = "https://www.rockettube.com/{username}"
+main = "https://www.rockettube.com/"
+error_type = "message"
+error_msg = ["OOPS! Houston, we have a problem"]
+nsfw = true
+
+[sites."RoyalCams"]
+url = "https://royalcams.com/profile/{username}"
+main = "https://royalcams.com"
+error_type = "status_code"
+
+[sites."Ruby Forums"]
+url = "https://ruby-forum.com/u/{username}/summary"
+main = "https://ruby-forums.com"
+error_type = "message"
+error_msg = ["Oops! That page doesn’t exist or is private."]
+
+[sites."RubyGems"]
+url = "https://rubygems.org/profiles/{username}"
+main = "https://rubygems.org/"
+error_type = "status_code"
+regex = "^[a-zA-Z][a-zA-Z0-9_-]{1,40}"
+
+[sites."Rumble"]
+url = "https://rumble.com/user/{username}"
+main = "https://rumble.com/"
+error_type = "status_code"
+
+[sites."RuneScape"]
+url = "https://apps.runescape.com/runemetrics/profile/profile?user={username}"
+main = "https://www.runescape.com/"
+error_type = "message"
+error_msg = ["{\"error\":\"NO_PROFILE\",\"loggedIn\":\"false\"}"]
+regex = "^(?! )[\\w -]{1,12}(?<! )$"
+url_probe = "https://apps.runescape.com/runemetrics/profile/profile?user={username}"
+
+[sites."satsisRU"]
+url = "https://satsis.info/user/{username}"
+main = "https://satsis.info/"
+error_type = "status_code"
+
+[sites."Sbazar.cz"]
+url = "https://www.sbazar.cz/{username}"
+main = "https://www.sbazar.cz/"
+error_type = "status_code"
+
+[sites."Scratch"]
+url = "https://scratch.mit.edu/users/{username}"
+main = "https://scratch.mit.edu/"
+error_type = "status_code"
+
+[sites."Scribd"]
+url = "https://www.scribd.com/{username}"
+main = "https://www.scribd.com/"
+error_type = "message"
+error_msg = ["Page not found"]
+
+[sites."SEOForum"]
+url = "https://seoforum.com/@{username}"
+main = "https://www.seoforum.com/"
+error_type = "status_code"
+
+[sites."sessionize"]
+url = "https://sessionize.com/{username}"
+main = "https://sessionize.com/"
+error_type = "status_code"
+
+[sites."Shelf"]
+url = "https://www.shelf.im/{username}"
+main = "https://www.shelf.im/"
+error_type = "status_code"
+
+[sites."ShitpostBot5000"]
+url = "https://www.shitpostbot.com/user/{username}"
+main = "https://www.shitpostbot.com/"
+error_type = "status_code"
+
+[sites."Signal"]
+url = "https://community.signalusers.org/u/{username}"
+main = "https://community.signalusers.org"
+error_type = "message"
+error_msg = ["Oops! That page doesn’t exist or is private."]
+
+[sites."Sketchfab"]
+url = "https://sketchfab.com/{username}"
+main = "https://sketchfab.com/"
+error_type = "status_code"
+
+[sites."Slack"]
+url = "https://{username}.slack.com"
+main = "https://slack.com"
+error_type = "status_code"
+regex = "^[a-zA-Z][a-zA-Z0-9_-]*$"
+
+[sites."Slant"]
+url = "https://www.slant.co/users/{username}"
+main = "https://www.slant.co/"
+error_type = "status_code"
+regex = "^.{2,32}$"
+
+[sites."Slashdot"]
+url = "https://slashdot.org/~{username}"
+main = "https://slashdot.org"
+error_type = "message"
+error_msg = ["user you requested does not exist"]
+
+[sites."Slides"]
+url = "https://slides.com/{username}"
+main = "https://slides.com/"
+error_type = "status_code"
+error_code = 204
+
+[sites."SlideShare"]
+url = "https://slideshare.net/{username}"
+main = "https://slideshare.net/"
+error_type = "message"
+error_msg = ["<title>Page no longer exists</title>"]
+
+[sites."SmugMug"]
+url = "https://{username}.smugmug.com"
+main = "https://smugmug.com"
+error_type = "status_code"
+regex = "^[a-zA-Z]{1,35}$"
+
+[sites."Smule"]
+url = "https://www.smule.com/{username}"
+main = "https://www.smule.com/"
+error_type = "message"
+error_msg = ["Smule | Page Not Found (404)"]
+
+[sites."Snapchat"]
+url = "https://www.snapchat.com/add/{username}"
+main = "https://www.snapchat.com"
+error_type = "status_code"
+regex = "^[a-z][a-z-_.]{3,15}"
+
+[sites."social.tchncs.de"]
+url = "https://social.tchncs.de/@{username}"
+main = "https://social.tchncs.de/"
+error_type = "status_code"
+
+[sites."SOOP"]
+url = "https://api-channel.sooplive.co.kr/v1.1/channel/{username}/station"
+main = "https://www.sooplive.co.kr/"
+error_type = "status_code"
+url_probe = "https://api-channel.sooplive.co.kr/v1.1/channel/{username}/station"
+
+[sites."SoundCloud"]
+url = "https://soundcloud.com/{username}"
+main = "https://soundcloud.com/"
+error_type = "status_code"
+
+[sites."SourceForge"]
+url = "https://sourceforge.net/u/{username}"
+main = "https://sourceforge.net/"
+error_type = "status_code"
+
+[sites."SoylentNews"]
+url = "https://soylentnews.org/~{username}"
+main = "https://soylentnews.org"
+error_type = "message"
+error_msg = ["The user you requested does not exist, no matter how much you wish this might be the case."]
+
+[sites."SpaceHey"]
+url = "https://spacehey.com/{username}"
+main = "https://spacehey.com/"
+error_type = "message"
+error_msg = ["Not Found (Error 404) | SpaceHey"]
+
+[sites."SpeakerDeck"]
+url = "https://speakerdeck.com/{username}"
+main = "https://speakerdeck.com/"
+error_type = "status_code"
+
+[sites."Speedrun.com"]
+url = "https://speedrun.com/users/{username}"
+main = "https://speedrun.com/"
+error_type = "status_code"
+
+[sites."Spells8"]
+url = "https://forum.spells8.com/u/{username}"
+main = "https://spells8.com"
+error_type = "status_code"
+
+[sites."spletnik"]
+url = "https://spletnik.ru/user/{username}"
+main = "https://spletnik.ru/"
+error_type = "status_code"
+
+[sites."Splice"]
+url = "https://splice.com/{username}"
+main = "https://splice.com/"
+error_type = "status_code"
+
+[sites."Splits.io"]
+url = "https://splits.io/users/{username}"
+main = "https://splits.io"
+error_type = "status_code"
+regex = "^[^.]*?$"
+
+[sites."Sporcle"]
+url = "https://www.sporcle.com/user/{username}/people"
+main = "https://www.sporcle.com/"
+error_type = "status_code"
+
+[sites."Sportlerfrage"]
+url = "https://www.sportlerfrage.net/nutzer/{username}"
+main = "https://www.sportlerfrage.net/"
+error_type = "status_code"
+
+[sites."SportsRU"]
+url = "https://www.sports.ru/profile/{username}/"
+main = "https://www.sports.ru/"
+error_type = "status_code"
+
+[sites."Spotify"]
+url = "https://open.spotify.com/user/{username}"
+main = "https://open.spotify.com/"
+error_type = "status_code"
+
+[sites."Star Citizen"]
+url = "https://robertsspaceindustries.com/citizens/{username}"
+main = "https://robertsspaceindustries.com/"
+error_type = "message"
+error_msg = ["404"]
+
+[sites."Status Cafe"]
+url = "https://status.cafe/users/{username}"
+main = "https://status.cafe/"
+error_type = "message"
+error_msg = ["Page Not Found"]
+
+[sites."Steam Community (Group)"]
+url = "https://steamcommunity.com/groups/{username}"
+main = "https://steamcommunity.com/"
+error_type = "message"
+error_msg = ["No group could be retrieved for the given URL"]
+
+[sites."Steam Community (User)"]
+url = "https://steamcommunity.com/id/{username}/"
+main = "https://steamcommunity.com/"
+error_type = "message"
+error_msg = ["The specified profile could not be found"]
+
+[sites."Strava"]
+url = "https://www.strava.com/athletes/{username}"
+main = "https://www.strava.com/"
+error_type = "status_code"
+regex = "^[^.]*?$"
+
+[sites."SublimeForum"]
+url = "https://forum.sublimetext.com/u/{username}"
+main = "https://forum.sublimetext.com/"
+error_type = "status_code"
+
+[sites."Substack"]
+url = "https://{username}.substack.com/"
+main = "https://substack.com/"
+error_type = "status_code"
+regex = "^[a-zA-Z0-9][a-zA-Z0-9_-]{1,60}$"
+
+[sites."svidbook"]
+url = "https://www.svidbook.ru/user/{username}"
+main = "https://www.svidbook.ru/"
+error_type = "status_code"
+
+[sites."SWAPD"]
+url = "https://swapd.co/u/{username}"
+main = "https://swapd.co/"
+error_type = "status_code"
+
+[sites."Telegram"]
+url = "https://t.me/{username}"
+main = "https://t.me/"
+error_type = "message"
+error_msg = ["<title>Telegram Messenger</title>", "If you have <strong>Telegram</strong>, you can contact <a class=\"tgme_username_link\" href=\"tg://resolve?domain="]
+regex = "^[a-zA-Z0-9_]{3,32}[^_]$"
+
+[sites."Tellonym.me"]
+url = "https://tellonym.me/{username}"
+main = "https://tellonym.me/"
+error_type = "status_code"
+
+[sites."Tenor"]
+url = "https://tenor.com/users/{username}"
+main = "https://tenor.com/"
+error_type = "status_code"
+regex = "^[A-Za-z0-9_]{2,32}$"
+
+[sites."Terraria Forums"]
+url = "https://forums.terraria.org/index.php?search/42798315/&c[users]={username}&o=relevance"
+main = "https://forums.terraria.org/index.php"
+error_type = "message"
+error_msg = ["The following members could not be found"]
+
+[sites."TETR.IO"]
+url = "https://ch.tetr.io/api/users/{username}"
+main = "https://tetr.io"
+error_type = "message"
+error_msg = ["No such user!"]
+url_probe = "https://ch.tetr.io/api/users/{username}"
+
+[sites."ThemeForest"]
+url = "https://themeforest.net/user/{username}"
+main = "https://themeforest.net/"
+error_type = "status_code"
+
+[sites."TheMovieDB"]
+url = "https://www.themoviedb.org/u/{username}"
+main = "https://www.themoviedb.org/"
+error_type = "status_code"
+
+[sites."threads"]
+url = "https://www.threads.net/@{username}"
+main = "https://www.threads.net/"
+error_type = "message"
+error_msg = ["<title>Threads • Log in</title>"]
+headers = { "Sec-Fetch-Mode" = "navigate" }
+
+[sites."Tiendanube"]
+url = "https://{username}.mitiendanube.com/"
+main = "https://www.tiendanube.com/"
+error_type = "status_code"
+
+[sites."TikTok"]
+url = "https://www.tiktok.com/@{username}"
+main = "https://www.tiktok.com"
+error_type = "message"
+error_msg = ["\"statusCode\":10221", "Govt. of India decided to block 59 apps"]
+
+[sites."tistory"]
+url = "https://{username}.tistory.com/"
+main = "https://www.tistory.com/"
+error_type = "status_code"
+
+[sites."TnAFlix"]
+url = "https://www.tnaflix.com/profile/{username}"
+main = "https://www.tnaflix.com/"
+error_type = "status_code"
+nsfw = true
+
+[sites."Topcoder"]
+url = "https://api.topcoder.com/v5/members/{username}"
+main = "https://topcoder.com/"
+error_type = "status_code"
+regex = "^[a-zA-Z0-9_.]+$"
+url_probe = "https://api.topcoder.com/v5/members/{username}"
+
+[sites."Topmate"]
+url = "https://topmate.io/{username}"
+main = "https://topmate.io/"
+error_type = "status_code"
+
+[sites."toster"]
+url = "https://www.toster.ru/user/{username}/answers"
+main = "https://www.toster.ru/"
+error_type = "status_code"
+
+[sites."TradingView"]
+url = "https://www.tradingview.com/u/{username}/"
+main = "https://www.tradingview.com/"
+error_type = "status_code"
+
+[sites."Trakt"]
+url = "https://www.trakt.tv/users/{username}"
+main = "https://www.trakt.tv/"
+error_type = "status_code"
+regex = "^[^.]*$"
+
+[sites."TRAKTRAIN"]
+url = "https://traktrain.com/{username}"
+main = "https://traktrain.com/"
+error_type = "status_code"
+
+[sites."TrashboxRU"]
+url = "https://trashbox.ru/users/{username}"
+main = "https://trashbox.ru/"
+error_type = "status_code"
+regex = "^[A-Za-z0-9_-]{3,16}$"
+
+[sites."Trawelling"]
+url = "https://traewelling.de/@{username}"
+main = "https://traewelling.de/"
+error_type = "status_code"
+
+[sites."Trello"]
+url = "https://trello.com/1/Members/{username}"
+main = "https://trello.com/"
+error_type = "message"
+error_msg = ["model not found"]
+url_probe = "https://trello.com/1/Members/{username}"
+
+[sites."Trovo"]
+url = "https://trovo.live/s/{username}/"
+main = "https://trovo.live"
+error_type = "message"
+error_msg = ["Uh Ohhh..."]
+
+[sites."TryHackMe"]
+url = "https://tryhackme.com/api/user/exist/{username}"
+main = "https://tryhackme.com/"
+error_type = "message"
+error_msg = ["{\"success\":false}"]
+regex = "^[a-zA-Z0-9.]{1,16}$"
+url_probe = "https://tryhackme.com/api/user/exist/{username}"
+
+[sites."tumblr"]
+url = "https://{username}.tumblr.com/"
+main = "https://www.tumblr.com/"
+error_type = "status_code"
+
+[sites."Tuna"]
+url = "https://tuna.voicemod.net/user/{username}"
+main = "https://tuna.voicemod.net/"
+error_type = "status_code"
+regex = "^[a-z0-9]{4,40}$"
+
+[sites."Tweakers"]
+url = "https://tweakers.net/gallery/{username}"
+main = "https://tweakers.net"
+error_type = "status_code"
+
+[sites."Twitch"]
+url = "https://www.twitch.tv/{username}"
+main = "https://www.twitch.tv"
+error_type = "message"
+error_msg = ["content='Twitch is the world&#39;s leading video platform and community for gamers.'"]
+
+[sites."Twitter"]
+url = "https://nitter.privacydev.net/{username}"
+main = "https://x.com/"
+error_type = "message"
+error_msg = ["<div class=\"error-panel\"><span>User ", "<title>429 Too Many Requests</title>"]
+regex = "^[a-zA-Z0-9_]{1,15}$"
+url_probe = "https://nitter.privacydev.net/{username}"
+
+[sites."Typeracer"]
+url = "https://data.typeracer.com/pit/profile?user={username}"
+main = "https://typeracer.com"
+error_type = "message"
+error_msg = ["Profile Not Found"]
+
+[sites."uid"]
+url = "http://uid.me/{username}"
+main = "https://uid.me/"
+error_type = "status_code"
+
+[sites."Ultimate-Guitar"]
+url = "https://ultimate-guitar.com/u/{username}"
+main = "https://ultimate-guitar.com/"
+error_type = "status_code"
+
+[sites."Unsplash"]
+url = "https://unsplash.com/@{username}"
+main = "https://unsplash.com/"
+error_type = "status_code"
+regex = "^[a-z0-9_]{1,60}$"
+
+[sites."Untappd"]
+url = "https://untappd.com/user/{username}"
+main = "https://untappd.com/"
+error_type = "status_code"
+
+[sites."Valorant Forums"]
+url = "https://valorantforums.com/u/{username}"
+main = "https://valorantforums.com"
+error_type = "message"
+error_msg = ["The page you requested could not be found."]
+
+[sites."Velog"]
+url = "https://velog.io/@{username}/posts"
+main = "https://velog.io/"
+error_type = "status_code"
+
+[sites."Velomania"]
+url = "https://forum.velomania.ru/member.php?username={username}"
+main = "https://forum.velomania.ru/"
+error_type = "message"
+error_msg = ["Пользователь не зарегистрирован и не имеет профиля для просмотра."]
+
+[sites."Venmo"]
+url = "https://test1.venmo.com/u/{username}"
+main = "https://venmo.com/"
+error_type = "message"
+error_msg = ["Venmo | Page Not Found"]
+url_probe = "https://test1.venmo.com/u/{username}"
+headers = { "Host" = "account.venmo.com" }
+
+[sites."Vero"]
+url = "https://vero.co/{username}"
+main = "https://vero.co/"
+error_type = "message"
+error_msg = ["Not Found"]
+
+[sites."Vimeo"]
+url = "https://vimeo.com/{username}"
+main = "https://vimeo.com/"
+error_type = "status_code"
+
+[sites."VirusTotal"]
+url = "https://www.virustotal.com/ui/users/{username}/avatar"
+main = "https://www.virustotal.com/"
+error_type = "status_code"
+url_probe = "https://www.virustotal.com/ui/users/{username}/avatar"
+
+[sites."Vjudge"]
+url = "https://VJudge.net/user/{username}"
+main = "https://VJudge.net/"
+error_type = "status_code"
+
+[sites."VK"]
+url = "https://vk.com/{username}"
+main = "https://vk.com/"
+error_type = "response_url"
+error_url = "https://www.quora.com/profile/{}"
+
+[sites."VLR"]
+url = "https://www.vlr.gg/user/{username}"
+main = "https://www.vlr.gg"
+error_type = "status_code"
+
+[sites."VSCO"]
+url = "https://vsco.co/{username}"
+main = "https://vsco.co/"
+error_type = "status_code"
+
+[sites."Wakatime"]
+url = "https://wakatime.com/@{username}"
+main = "https://wakatime.com/"
+error_type = "status_code"
+
+[sites."Warframe Market"]
+url = "https://api.warframe.market/v2/user/{username}"
+main = "https://warframe.market/"
+error_type = "status_code"
+url_probe = "https://api.warframe.market/v2/user/{username}"
+
+[sites."Warrior Forum"]
+url = "https://www.warriorforum.com/members/{username}.html"
+main = "https://www.warriorforum.com/"
+error_type = "status_code"
+
+[sites."Wattpad"]
+url = "https://www.wattpad.com/api/v3/users/{username}/"
+main = "https://www.wattpad.com/"
+error_type = "status_code"
+url_probe = "https://www.wattpad.com/api/v3/users/{username}/"
+
+[sites."Weblate"]
+url = "https://hosted.weblate.org/user/{username}/"
+main = "https://hosted.weblate.org/"
+error_type = "status_code"
+regex = "^[a-zA-Z0-9@._-]{1,150}$"
+
+[sites."WebNode"]
+url = "https://{username}.webnode.cz/"
+main = "https://www.webnode.cz/"
+error_type = "status_code"
+regex = "^[\\w@-]+?$"
+
+[sites."Weebly"]
+url = "https://{username}.weebly.com/"
+main = "https://weebly.com/"
+error_type = "status_code"
+regex = "^[a-zA-Z0-9-]{1,63}$"
+
+[sites."WICG Forum"]
+url = "https://discourse.wicg.io/u/{username}/summary"
+main = "https://discourse.wicg.io/"
+error_type = "status_code"
+regex = "^(?![.-])[a-zA-Z0-9_.-]{3,20}$"
+
+[sites."Wikidot"]
+url = "http://www.wikidot.com/user:info/{username}"
+main = "http://www.wikidot.com/"
+error_type = "message"
+error_msg = ["User does not exist."]
+
+[sites."Wikipedia"]
+url = "https://en.wikipedia.org/wiki/Special:CentralAuth/{username}?uselang=qqx"
+main = "https://www.wikipedia.org/"
+error_type = "message"
+error_msg = ["centralauth-admin-nonexistent:"]
+
+[sites."Windy"]
+url = "https://community.windy.com/user/{username}"
+main = "https://windy.com/"
+error_type = "status_code"
+
+[sites."Wix"]
+url = "https://{username}.wix.com"
+main = "https://wix.com/"
+error_type = "status_code"
+regex = "^[\\w@-]+?$"
+
+[sites."WolframalphaForum"]
+url = "https://community.wolfram.com/web/{username}/home"
+main = "https://community.wolfram.com/"
+error_type = "status_code"
+
+[sites."Wordnik"]
+url = "https://www.wordnik.com/users/{username}"
+main = "https://www.wordnik.com/"
+error_type = "message"
+error_msg = ["Page Not Found"]
+regex = "^[a-zA-Z0-9_.+-]{1,40}$"
+
+[sites."WordPress"]
+url = "https://{username}.wordpress.com/"
+main = "https://wordpress.com"
+error_type = "response_url"
+error_url = "wordpress.com/typo/?subdomain="
+regex = "^[a-zA-Z][a-zA-Z0-9_-]*$"
+
+[sites."WordPressOrg"]
+url = "https://profiles.wordpress.org/{username}/"
+main = "https://wordpress.org/"
+error_type = "response_url"
+error_url = "https://wordpress.org"
+
+[sites."Wowhead"]
+url = "https://wowhead.com/user={username}"
+main = "https://wowhead.com/"
+error_type = "status_code"
+error_code = 404
+
+[sites."write.as"]
+url = "https://write.as/{username}"
+main = "https://write.as"
+error_type = "status_code"
+
+[sites."Wykop"]
+url = "https://www.wykop.pl/ludzie/{username}"
+main = "https://www.wykop.pl"
+error_type = "status_code"
+
+[sites."Xbox Gamertag"]
+url = "https://xboxgamertag.com/search/{username}"
+main = "https://xboxgamertag.com/"
+error_type = "status_code"
+
+[sites."xHamster"]
+url = "https://xhamster.com/users/{username}?old_browser=true"
+main = "https://xhamster.com"
+error_type = "status_code"
+url_probe = "https://xhamster.com/users/{username}?old_browser=true"
+nsfw = true
+
+[sites."Xvideos"]
+url = "https://xvideos.com/profiles/{username}"
+main = "https://xvideos.com/"
+error_type = "status_code"
+nsfw = true
+
+[sites."YandexMusic"]
+url = "https://music.yandex/users/{username}/playlists"
+main = "https://music.yandex"
+error_type = "message"
+error_msg = ["Ошибка 404", "<meta name=\"description\" content=\"Открывайте новую музыку каждый день.", "<input type=\"submit\" class=\"CheckboxCaptcha-Button\""]
+
+[sites."YouNow"]
+url = "https://api.younow.com/php/api/broadcast/info/user={username}/"
+main = "https://www.younow.com/"
+error_type = "message"
+error_msg = ["No users found"]
+url_probe = "https://api.younow.com/php/api/broadcast/info/user={username}/"
+
+[sites."YouPic"]
+url = "https://youpic.com/photographer/{username}/"
+main = "https://youpic.com/"
+error_type = "status_code"
+
+[sites."YouPorn"]
+url = "https://youporn.com/uservids/{username}"
+main = "https://youporn.com"
+error_type = "status_code"
+nsfw = true
+
+[sites."YouTube"]
+url = "https://www.youtube.com/@{username}"
+main = "https://www.youtube.com/"
+error_type = "status_code"
+
+[sites."znanylekarz.pl"]
+url = "https://www.znanylekarz.pl/{username}"
+main = "https://znanylekarz.pl"
+error_type = "status_code"
