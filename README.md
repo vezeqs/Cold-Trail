@@ -4,6 +4,12 @@ OSINT CLI for **pivoting** usernames and emails across public sources, **harvest
 posts into a local SQLite database, **correlating** them into inferred identities, and **reporting**
 the result as JSON, CSV, GraphML, GEXF, DOT, or a self-contained HTML dossier.
 
+Three interfaces over one database:
+
+- **CLI** — 36 commands, scriptable, JSON/JSONL output
+- **TUI** — full-screen terminal console (dashboard, pivot, browse, search)
+- **Web UI** — local FastAPI app with a JSON API, pivot job queue, and export downloads
+
 488 sources out of the box: 28 hand-written API sources plus 460 declarative definitions generated
 from the [Sherlock](https://github.com/sherlock-project/sherlock) dataset (MIT). No API keys needed
 for most of it; optional keys unlock GitHub rate limits, HIBP, and EmailRep.
@@ -14,6 +20,21 @@ for most of it; optional keys unlock GitHub rate limits, HIBP, and EmailRep.
 uv sync
 uv run larpharvester --help
 ```
+
+## Interfaces
+
+```bash
+# Terminal UI: dashboard, pivot runner, browse stored runs, full-text search
+uv run larpharvester tui
+
+# Local web UI on http://127.0.0.1:8765 (JSON API + docs at /api/docs)
+uv run larpharvester serve
+uv run larpharvester serve --port 9000 --open
+```
+
+The web UI runs pivots as background jobs (one at a time, queued), shows live status, and exposes
+every stored run with export links. The TUI runs pivots in a worker thread so the UI stays
+responsive. Both respect the same `--db` / config as the CLI.
 
 ## Quickstart
 
@@ -147,6 +168,26 @@ uv run larpharvester audit
 - **Retention:** `retention_days` prunes automatically at startup; `prune` does it manually.
 - **Plugins:** third-party sources via the `larpharvester.sources` entry-point group.
 
+## Web API
+
+`larpharvester serve` exposes a JSON API alongside the HTML pages (interactive docs at
+`/api/docs`):
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /healthz`, `/api/health` | Liveness + DB check (503 when the DB is unusable) |
+| `GET /api/stats` | Table counts, DB info, source health |
+| `GET /api/runs`, `/api/runs/{id}` | Run listing and full run export |
+| `GET /api/search?q=` | FTS5 post search |
+| `GET /api/sources` | Source registry |
+| `POST /api/pivot` | Queue a pivot (`{"target": "...", "include_web": false, ...}`) → `202 {job_id}` |
+| `GET /api/jobs/{id}` | Job status: `queued` / `running` / `done` / `error` |
+
+Run exports are downloadable at `/runs/{id}/export?format=json|jsonl|csv|graphml|gexf|dot|html`
+with optional `&redact=true` and `&table=` for CSV. Responses carry a strict CSP
+(`script-src 'self'`), `X-Frame-Options: DENY`, and harvested URLs are scheme-checked before
+becoming links.
+
 ## Configuration
 
 `~/.config/larpharvester/config.toml` (or `--config`), with env overrides:
@@ -174,7 +215,7 @@ uv run larpharvester audit
 ## Development
 
 ```bash
-uv run pytest                # 209 tests, no network required
+uv run pytest                # 240 tests, no network required
 uv run ruff check .
 uv run ruff format --check .
 ```

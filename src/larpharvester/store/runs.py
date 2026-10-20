@@ -23,9 +23,14 @@ class RunsMixin:
                 (now_iso(), status, run_id),
             )
 
-    def runs(self, limit: int = 25) -> list[dict[str, Any]]:
-        rows = self.conn.execute("SELECT * FROM runs ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+    def runs(self, limit: int = 25, offset: int = 0) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM runs ORDER BY id DESC LIMIT ? OFFSET ?", (limit, offset)
+        ).fetchall()
         return [dict(row) for row in rows]
+
+    def count_runs(self) -> int:
+        return int(self.conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0])
 
     def run(self, run_id: int) -> dict[str, Any] | None:
         row = self.conn.execute("SELECT * FROM runs WHERE id = ?", (run_id,)).fetchone()

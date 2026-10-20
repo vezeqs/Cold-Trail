@@ -349,6 +349,24 @@ IGNORE_URL_PARTS = {
 }
 
 
+def persist_pivot(store: Any, report: PivotReport) -> int:
+    """Save a pivot report as a run. Shared by the CLI, TUI, and web app."""
+    run_id = store.start_run("pivot", report.target)
+    try:
+        store.save_checks(run_id, report.results)
+        store.save_profiles(run_id, report.profiles)
+        store.save_links(run_id, report.links)
+        store.save_clusters(run_id, report.clusters)
+        store.save_entities(run_id, entities_for_profiles(report.profiles))
+        store.record_profile_history(run_id, report.profiles)
+    except Exception:
+        store.finish_run(run_id, "error")
+        raise
+    store.finish_run(run_id)
+    report.run_id = run_id
+    return run_id
+
+
 def entities_for_profiles(profiles: list[Profile]) -> list:
     entities = []
     for profile in profiles:

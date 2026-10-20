@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Job {{ job.id }} · larpharvester{% endblock %}
+{% block head %}
+{% if job.status in ("queued", "running") %}<meta http-equiv="refresh" content="2">{% endif %}
+{% endblock %}
+{% block content %}
+<h1>Pivot job <span class="mono">{{ job.id }}</span></h1>
+<p class="muted">Target <span class="mono">{{ job.target }}</span></p>
+
+{% if job.status in ("queued", "running") %}
+<section class="panel">
+  <p><span class="spinner"></span>
+    {% if job.status == "queued" %}Queued — waiting for the current pivot to finish…{% else %}Running pivot across sources…{% endif %}
+  </p>
+  <p class="muted">This page refreshes every 2 seconds.</p>
+</section>
+{% elif job.status == "done" %}
+<section class="panel">
+  <p><span class="badge status-found">done</span>
+    {{ job.result_count }} checks completed in
+    {{ "%.1f" | format((job.finished_at or 0) - (job.started_at or 0)) }}s.</p>
+  <p><a class="button" href="/runs/{{ job.run_id }}">Open run #{{ job.run_id }} →</a></p>
+</section>
+{% else %}
+<section class="panel">
+  <p><span class="badge status-error">error</span></p>
+  <pre class="error">{{ job.error }}</pre>
+  <p><a href="/pivot">← try another pivot</a></p>
+</section>
+{% endif %}
+{% endblock %}

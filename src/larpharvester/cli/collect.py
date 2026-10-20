@@ -13,7 +13,7 @@ from ..config import Settings
 from ..harvest import collect_follows
 from ..harvest import harvest as run_harvest
 from ..models import PivotReport
-from ..pivot import entities_for_profiles
+from ..pivot import entities_for_profiles, persist_pivot
 from ..pivot import pivot as run_pivot
 from ..sources import SOURCES
 from ..store import Store
@@ -128,19 +128,7 @@ def _pivot_jsonl(report: PivotReport) -> None:
 
 def _save_pivot(settings: Settings, report: PivotReport) -> None:
     with Store(settings.db_path) as store:
-        run_id = store.start_run("pivot", report.target)
-        try:
-            store.save_checks(run_id, report.results)
-            store.save_profiles(run_id, report.profiles)
-            store.save_links(run_id, report.links)
-            store.save_clusters(run_id, report.clusters)
-            store.save_entities(run_id, entities_for_profiles(report.profiles))
-            store.record_profile_history(run_id, report.profiles)
-        except Exception:
-            store.finish_run(run_id, "error")
-            raise
-        store.finish_run(run_id)
-        report.run_id = run_id
+        persist_pivot(store, report)
 
 
 # -- harvest ----------------------------------------------------------------

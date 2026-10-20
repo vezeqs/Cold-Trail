@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Search · larpharvester{% endblock %}
+{% block content %}
+<h1>Search</h1>
+<p class="muted">Full-text search over harvested post text (FTS5).</p>
+
+<form method="get" action="/search" class="inline-form">
+  <input type="text" name="q" value="{{ q }}" placeholder="search terms" autofocus>
+  <select name="limit">
+    {% for option in [50, 100, 250, 500] %}
+    <option value="{{ option }}" {{ 'selected' if limit == option }}>{{ option }} results</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Search</button>
+</form>
+
+{% if error %}
+<p class="badge status-error">{{ error }}</p>
+{% endif %}
+
+{% if q %}
+<h2>{{ rows | length }} result{{ '' if rows | length == 1 else 's' }} for “{{ q }}”</h2>
+{% if rows %}
+<table>
+  <thead><tr><th>When</th><th>Source</th><th>Username</th><th>Text</th><th>URL</th></tr></thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <td>{{ row.created_at | ts }}</td>
+      <td>{{ row.source }}</td>
+      <td class="mono">{{ row.username }}</td>
+      <td>{{ row.text | short(160) }}</td>
+      <td class="mono"><a href="{{ row.url | url }}" target="_blank" rel="noopener">link</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No matches. Search terms are ANDed; try fewer words.</p>
+{% endif %}
+{% endif %}
+{% endblock %}
