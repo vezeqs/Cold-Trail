@@ -37,7 +37,7 @@ def _instances(value: str | tuple[str, ...] | list[str] | None) -> tuple[str, ..
 class Settings:
     db_path: Path = field(default_factory=_default_db)
     timeout: float = 10.0
-    concurrency: int = 8
+    concurrency: int = 24
     requests_per_second: float = 5.0
     jitter: float = 0.1
     user_agent: str = DEFAULT_UA

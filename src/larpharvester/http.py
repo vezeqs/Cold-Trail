@@ -24,6 +24,10 @@ BACKOFF = 1.0
 CIRCUIT_THRESHOLD = 5
 CIRCUIT_SECONDS = 60.0
 MAX_BODY = 2_000_000
+MAX_TEXT = 2_000_000
+# Declarative checks only need the document head; caching whole multi-MB pages
+# wastes disk and makes warm-cache runs decode gigabytes of HTML.
+CACHE_HTML_MAX = 262_144
 
 HARD_MARKERS = (
     "just a moment",
@@ -131,8 +135,12 @@ class Fetcher:
         *,
         params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        timeout: float | None = None,
+        retries: int | None = None,
     ) -> Fetched:
-        return await self._request("GET", url, params=params, headers=headers)
+        return await self._request(
+            "GET", url, params=params, headers=headers, timeout=timeout, retries=retries
+        )
 
     async def post(
         self,
@@ -150,11 +158,15 @@ class Fetcher:
         *,
         params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        timeout: float | None = None,
+        retries: int | None = None,
     ) -> tuple[int, Any]:
         response = await self.get(
             url,
             params=params,
             headers={"Accept": "application/json", **(headers or {})},
+            timeout=timeout,
+            retries=retries,
         )
         if response.json is not None:
             return response.status, response.json
@@ -170,6 +182,8 @@ class Fetcher:
         *,
         params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        timeout: float | None = None,
+        retries: int | None = None,
     ) -> tuple[int, str]:
         response = await self.get(
             url,
@@ -178,6 +192,8 @@ class Fetcher:
                 "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
                 **(headers or {}),
             },
+            timeout=timeout,
+            retries=retries,
         )
         return response.status, response.text
 
@@ -208,6 +224,8 @@ class Fetcher:
         headers: dict[str, str] | None = None,
         data: dict[str, Any] | None = None,
         json: Any = None,
+        timeout: float | None = None,
+        retries: int | None = None,
     ) -> Fetched:
         key = _cache_key(url, params)
         host = urlsplit(key).netloc
@@ -226,8 +244,10 @@ class Fetcher:
         state = self._host_state(host)
         delay = BACKOFF
         last_error: Exception | None = None
+        attempts = (RETRIES if retries is None else max(0, retries)) + 1
+        request_timeout = timeout if timeout is not None else self.settings.timeout
 
-        for attempt in range(RETRIES + 1):
+        for attempt in range(attempts):
             if time.monotonic() < state["open_until"]:
                 raise FetchError(f"circuit open for {host} after repeated failures")
             async with self._req_lock:
@@ -244,12 +264,31 @@ class Fetcher:
             try:
                 async with self._sem:
                     response = await self._client.request(
-                        method, url, params=params, headers=request_headers, data=data, json=json
+                        method,
+                        url,
+                        params=params,
+                        headers=request_headers,
+                        data=data,
+                        json=json,
+                        timeout=request_timeout,
                     )
+            except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+                # DNS/connection failures are usually permanent for a probe;
+                # retrying them just stalls the whole pivot.
+                self._record_failure(state)
+                raise FetchError(f"{type(exc).__name__}: {exc}") from exc
+            except httpx.TimeoutException as exc:
+                last_error = exc
+                self._record_failure(state)
+                if attempt < attempts - 1:
+                    await asyncio.sleep(delay)
+                    delay *= 2
+                    continue
+                raise FetchError(f"{type(exc).__name__}: {exc}") from exc
             except httpx.HTTPError as exc:
                 last_error = exc
                 self._record_failure(state)
-                if attempt < RETRIES:
+                if attempt < attempts - 1:
                     await asyncio.sleep(delay)
                     delay *= 2
                     continue
@@ -259,7 +298,7 @@ class Fetcher:
                 return self._from_cache(stale, key)
 
             if response.status_code == 429 or response.status_code >= 500:
-                if attempt < RETRIES:
+                if attempt < attempts - 1:
                     retry_after = response.headers.get("Retry-After", "")
                     wait = float(retry_after) if retry_after.isdigit() else delay
                     await asyncio.sleep(wait)
@@ -267,7 +306,7 @@ class Fetcher:
                     continue
                 self._record_failure(state)
                 raise BlockedError(
-                    f"HTTP {response.status_code} from {host} after {RETRIES + 1} attempts"
+                    f"HTTP {response.status_code} from {host} after {attempts} attempts"
                 )
 
             state["fails"] = 0
@@ -285,18 +324,25 @@ class Fetcher:
     def _build(self, response: httpx.Response, key: str) -> Fetched:
         content_type = response.headers.get("content-type", "")
         payload: Any = None
-        if response.content and ("json" in content_type or response.text[:1] in ("{", "[")):
+        first = response.content[:1]
+        if response.content and ("json" in content_type or first in (b"{", b"[")):
             try:
                 payload = response.json()
             except ValueError:
                 payload = None
+        raw = response.content
+        text_bytes = raw[:MAX_TEXT]
+        try:
+            text = text_bytes.decode(response.encoding or "utf-8", "replace")
+        except LookupError:
+            text = text_bytes.decode("utf-8", "replace")
         return Fetched(
             status=response.status_code,
-            text=response.text[:MAX_BODY],
+            text=text,
             url=str(response.url) if response.url else key,
             headers=dict(response.headers),
             json=payload,
-            content=response.content,
+            content=raw,
         )
 
     def _host_state(self, host: str) -> dict[str, Any]:
@@ -383,7 +429,8 @@ class Fetcher:
     @staticmethod
     def _from_cache(row: dict[str, Any], key: str) -> Fetched:
         body = row["body"]
-        text = body.decode("utf-8", "replace")
+        text_bytes = body[:MAX_TEXT]
+        text = text_bytes.decode("utf-8", "replace")
         try:
             payload = json.loads(text)
         except ValueError:
@@ -403,11 +450,15 @@ class Fetcher:
     def _cache_put(self, key: str, response: httpx.Response) -> None:
         if not self.settings.cache_ttl or self.store is None:
             return
+        content_type = response.headers.get("content-type", "")
+        body = response.content
+        if "html" in content_type.lower():
+            body = body[:CACHE_HTML_MAX]
         self.store.cache_put(
             key,
             response.status_code,
-            response.content,
-            response.headers.get("content-type", ""),
+            body,
+            content_type,
             response.headers.get("etag", ""),
             response.headers.get("last-modified", ""),
             now_iso(),
@@ -420,12 +471,13 @@ class Fetcher:
         row = self.store.raw_get(key)
         if row is None:
             raise FetchError(f"no recording for {key}")
-        text = row["body"].decode("utf-8", "replace")
+        body = row["body"]
+        text = body[:MAX_TEXT].decode("utf-8", "replace")
         try:
             payload = json.loads(text)
         except ValueError:
             payload = None
-        return Fetched(status=row["status"], text=text, url=key, json=payload, content=row["body"])
+        return Fetched(status=row["status"], text=text, url=key, json=payload, content=body)
 
 
 def _cache_key(url: str, params: dict[str, Any] | None) -> str:

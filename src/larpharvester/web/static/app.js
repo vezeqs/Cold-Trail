@@ -12,6 +12,18 @@
     syncScope();
   }
 
+  // 1b. Client-side source filter on /sources
+  var sourceFilter = document.getElementById("source-filter");
+  if (sourceFilter) {
+    sourceFilter.addEventListener("input", function () {
+      var needle = this.value.toLowerCase();
+      var rows = document.querySelectorAll("#sources-table tbody tr");
+      for (var i = 0; i < rows.length; i++) {
+        rows[i].style.display = rows[i].textContent.toLowerCase().indexOf(needle) >= 0 ? "" : "none";
+      }
+    });
+  }
+
   // 2. Real-time SSE streaming on /jobs/{id}
   var jobPanel = document.getElementById("job-live");
   if (jobPanel && typeof EventSource !== "undefined") {

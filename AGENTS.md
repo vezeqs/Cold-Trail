@@ -245,3 +245,16 @@ Export formats: `json`, `jsonl`, `csv` (`&table=`), `graphml`, `gexf`, `dot`,
   never reuse the profile serializer for links.
 - **`ct` uses `crtsh_identities(..., strict=True)`** so a 502/503 from crt.sh is a
   clear error (exit 2), not an empty result table.
+- **Speed invariants (0.5.2):**
+  - `Fetcher` never retries `ConnectError`/`ConnectTimeout` (DNS/refused failures are
+    permanent for probes); `TimeoutException` honours the per-call `retries` argument.
+  - Declarative checks call `fetcher.get(..., timeout=min(settings.timeout, 8), retries=0)`
+    so one dead host cannot stall a 470-site pivot for 30s.
+  - `Fetcher._build` sniffs JSON from raw bytes (`content[:1]`), never `response.text`;
+    text decoding is capped at `MAX_TEXT`, and HTML cache bodies at `CACHE_HTML_MAX`
+    (256 KB). Do not reintroduce full-body `response.text` access.
+  - Default `concurrency` is 24 (per-host pacing still 5 rps). Benchmarks: 471-check web
+    pivot ~22s cold / ~15s warm; curated ~4s cold / ~2s warm.
+  - `web.*` avatars are never downloaded/hashed (site logos, excluded from correlation).
+  - `pivot` renders found-only by default; `--all-checks` shows every check. JSON/JSONL
+    paths are unaffected and must remain complete.

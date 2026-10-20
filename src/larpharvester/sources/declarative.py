@@ -127,9 +127,19 @@ class DeclarativeSource(Source):
             "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
             **site.headers,
         }
-        response = await fetcher.get(probe, headers=headers)
+        response = await fetcher.get(
+            probe,
+            headers=headers,
+            timeout=min(fetcher.settings.timeout, 8.0),
+            retries=0,
+        )
         if response.status == 410 and "://www." in probe:
-            response = await fetcher.get(probe.replace("://www.", "://"), headers=headers)
+            response = await fetcher.get(
+                probe.replace("://www.", "://"),
+                headers=headers,
+                timeout=min(fetcher.settings.timeout, 8.0),
+                retries=0,
+            )
         if not _found(site, response):
             return self.missing(target, f"HTTP {response.status}")
         meta = parse_meta(response.text)

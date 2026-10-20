@@ -117,8 +117,18 @@ def extract_image_metadata(image_bytes: bytes) -> dict[str, Any]:
 
 
 async def hash_avatars(fetcher, profiles: list[Profile]) -> int:
-    """Download avatars, attach perceptual hashes and metadata. Returns hashes set."""
-    targets = [profile for profile in profiles if profile.avatar and not profile.avatar_hash]
+    """Download avatars, attach perceptual hashes and metadata. Returns hashes set.
+
+    Declarative web.* avatars are og:image site logos/templates, not user
+    avatars, and are excluded from correlation — skip them entirely.
+    """
+    targets = [
+        profile
+        for profile in profiles
+        if profile.avatar
+        and not profile.avatar_hash
+        and not profile.source.startswith("web.")
+    ]
     if not targets:
         return 0
     urls = list(dict.fromkeys(profile.avatar for profile in targets))

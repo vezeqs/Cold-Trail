@@ -134,3 +134,49 @@ async def test_security_verification_page_is_blocked(settings):
     async with Fetcher(settings) as fetcher:
         with pytest.raises(BlockedError):
             await fetcher.get("https://example.test/challenge")
+
+
+@respx.mock
+async def test_connect_errors_are_not_retried(settings):
+    route = respx.get("https://dead.example/x").mock(
+        side_effect=httpx.ConnectError("name resolution failed")
+    )
+    async with Fetcher(settings) as fetcher:
+        with pytest.raises(FetchError):
+            await fetcher.get("https://dead.example/x")
+    assert route.call_count == 1
+
+
+@respx.mock
+async def test_retries_parameter_controls_attempts(settings):
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr("larpharvester.http.BACKOFF", 0)
+    route = respx.get("https://flaky.example/x")
+    route.side_effect = [httpx.Response(500), httpx.Response(200, text="ok")]
+    async with Fetcher(settings) as fetcher:
+        with pytest.raises(BlockedError):
+            await fetcher.get("https://flaky.example/x", retries=0)
+    assert route.call_count == 1
+    route.side_effect = [httpx.Response(500), httpx.Response(200, text="ok")]
+    async with Fetcher(settings) as fetcher:
+        response = await fetcher.get("https://flaky.example/x", retries=1)
+    assert response.status == 200
+    monkeypatch.undo()
+
+
+@respx.mock
+async def test_declarative_probe_times_out_once(settings):
+    from larpharvester.sites import SiteDef
+    from larpharvester.sources.declarative import DeclarativeSource
+
+    site = SiteDef(name="Slow", url="https://slow.example/{username}")
+    route = respx.get("https://slow.example/alice")
+    route.side_effect = [
+        httpx.ReadTimeout("slow"),
+        httpx.Response(200, text="<title>alice</title>"),
+    ]
+    source = DeclarativeSource(site)
+    async with Fetcher(settings) as fetcher:
+        with pytest.raises(FetchError):
+            await source.check(fetcher, "alice")
+    assert route.call_count == 1

@@ -18,6 +18,11 @@ app = typer.Typer(
     add_completion=True,
     no_args_is_help=False,
     help="OSINT pivoting, harvesting, correlation and reporting.",
+    epilog=(
+        "Global options (--db, --config, --timeout, --concurrency, --proxy, --tor, "
+        "--cache, --max-requests, ...) must be placed before the command, e.g. "
+        "`larpharvester --db case.db pivot alice`."
+    ),
 )
 case_app = typer.Typer(help="Case management.")
 source_app = typer.Typer(help="Source inspection.")
@@ -136,28 +141,37 @@ class _null:
 # -- rendering --------------------------------------------------------------
 
 
-def _render_pivot(report: PivotReport) -> None:
+def _render_pivot(report: PivotReport, show_all: bool = False) -> None:
     found = report.coverage.get("found", 0)
     coverage = ", ".join(f"{status}: {count}" for status, count in sorted(report.coverage.items()))
     console.print(
         f"[bold]Pivot[/bold] {report.target} ([cyan]{report.kind}[/cyan]) — "
         f"{found}/{len(report.results)} checks matched ({coverage})"
     )
-    table = Table()
-    for column in ("Source", "Status", "Target", "Handle", "Name", "URL", "Detail"):
-        table.add_column(column, overflow="fold")
-    for result in report.results:
-        profile = result.profile
-        table.add_row(
-            result.source,
-            f"[{STATUS_STYLE[result.status]}]{result.status}[/]",
-            result.target,
-            profile.username if profile else "",
-            (profile.display_name or "") if profile else "",
-            profile.url if profile else "",
-            result.detail or "",
+    visible = report.results if show_all else [r for r in report.results if r.status == "found"]
+    if visible:
+        table = Table()
+        for column in ("Source", "Status", "Target", "Handle", "Name", "URL", "Detail"):
+            table.add_column(column, overflow="fold")
+        for result in visible:
+            profile = result.profile
+            table.add_row(
+                result.source,
+                f"[{STATUS_STYLE[result.status]}]{result.status}[/]",
+                result.target,
+                profile.username if profile else "",
+                (profile.display_name or "") if profile else "",
+                profile.url if profile else "",
+                result.detail or "",
+            )
+        console.print(table)
+    else:
+        console.print("[dim]No matching profiles.[/dim]")
+    hidden = len(report.results) - len(visible)
+    if hidden:
+        console.print(
+            f"[dim]{hidden} non-matching checks hidden; use --all-checks to show them.[/dim]"
         )
-    console.print(table)
 
     if report.expanded:
         console.print(f"[dim]expanded handles: {', '.join(report.expanded)}[/dim]")

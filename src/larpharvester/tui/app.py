@@ -25,6 +25,7 @@ from textual.widgets import (
     Footer,
     Header,
     Input,
+    LoadingIndicator,
     Select,
     Static,
     TabbedContent,
@@ -74,6 +75,7 @@ class LarpharvesterTUI(App):
     #sources-input { width: 52; }
     #expand, #variants, #avatar { width: auto; margin-right: 2; }
     #pivot-status { height: auto; margin: 1 0; color: #8b98a9; }
+    #pivot-loading { height: 1; }
     #pivot-results { height: 1fr; }
     #dash-runs { height: 14; }
     #browse-runs { width: 38; }
@@ -134,6 +136,7 @@ class LarpharvesterTUI(App):
                         classes="hidden",
                     )
                     yield Static("", id="pivot-status")
+                    yield LoadingIndicator(id="pivot-loading")
                     yield DataTable(id="pivot-results")
             with TabPane("Browse", id="tab-browse"):
                 with Horizontal():
@@ -203,6 +206,7 @@ class LarpharvesterTUI(App):
         annotations_table = self.query_one("#annotations-table", DataTable)
         annotations_table.cursor_type = "row"
         annotations_table.add_columns("Kind", "Target", "Value", "When")
+        self.query_one("#pivot-loading", LoadingIndicator).display = False
         self.refresh_data()
         self.refresh_cases()
 
@@ -388,6 +392,7 @@ class LarpharvesterTUI(App):
         avatar = self.query_one("#avatar", Checkbox).value
         status = self.query_one("#pivot-status", Static)
         status.update(f"[yellow]probing {target}…[/yellow]")
+        self.query_one("#pivot-loading", LoadingIndicator).display = True
         self.query_one("#pivot-results", DataTable).clear()
         self._live_checked = 0
         self._live_found = 0
@@ -444,6 +449,7 @@ class LarpharvesterTUI(App):
             self.call_from_thread(self._pivot_finished, None, None, f"{type(exc).__name__}: {exc}")
 
     def _pivot_finished(self, report: Any, run_id: int | None, error: str | None) -> None:
+        self.query_one("#pivot-loading", LoadingIndicator).display = False
         status = self.query_one("#pivot-status", Static)
         if error:
             status.update(f"[red]pivot failed: {error}[/red]")

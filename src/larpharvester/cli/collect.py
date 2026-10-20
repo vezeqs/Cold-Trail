@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated
@@ -23,7 +24,6 @@ from ..watch import watch as run_watch
 from ._app import (
     STATUS_STYLE,
     _exit_for_found,
-    _null,
     _print_json,
     _render_edges,
     _render_links,
@@ -62,6 +62,9 @@ def pivot(
     avatar_hash: Annotated[
         bool, typer.Option("--avatar-hash/--no-avatar-hash", help="Perceptual avatar hashing")
     ] = True,
+    all_checks: Annotated[
+        bool, typer.Option("--all-checks", help="Show every check, not just found profiles")
+    ] = False,
     json_out: Annotated[bool, typer.Option("--json")] = False,
     jsonl: Annotated[bool, typer.Option("--jsonl")] = False,
     save: Annotated[bool, typer.Option("--save/--no-save")] = True,
@@ -81,10 +84,17 @@ def pivot(
         settings.negative_cache_ttl = 0
         settings.keep_raw = False
 
+    progress = {"checked": 0, "found": 0}
+
+    def on_result(result) -> None:
+        progress["checked"] += 1
+        if result.status == "found":
+            progress["found"] += 1
+
     try:
         store = Store(settings.db_path) if save else None
         try:
-            with console.status(f"probing {target}…", spinner="dots") if not json_out else _null():
+            if json_out or jsonl:
                 report = asyncio.run(
                     run_pivot(
                         target,
@@ -98,8 +108,34 @@ def pivot(
                         avatar_hash=avatar_hash,
                         use_cache=save and settings.negative_cache_ttl > 0,
                         store=store,
+                        on_result=on_result,
                     )
                 )
+            else:
+                with console.status(f"probing {target}…", spinner="dots") as status:
+                    def report_progress(result) -> None:
+                        on_result(result)
+                        status.update(
+                            f"probing {target}… {progress['checked']} checked, "
+                            f"[green]{progress['found']} found[/green]"
+                        )
+
+                    report = asyncio.run(
+                        run_pivot(
+                            target,
+                            settings=settings,
+                            sources=names,
+                            expand=expand,
+                            max_expand=max_expand,
+                            depth=depth,
+                            use_variants=variants,
+                            include_web=web,
+                            avatar_hash=avatar_hash,
+                            use_cache=save and settings.negative_cache_ttl > 0,
+                            store=store,
+                            on_result=report_progress,
+                        )
+                    )
         finally:
             if store is not None:
                 store.close()
@@ -118,7 +154,7 @@ def pivot(
         _exit_for_found(report)
         return
 
-    _render_pivot(report)
+    _render_pivot(report, show_all=all_checks)
     if report.run_id:
         console.print(f"[dim]saved as run #{report.run_id} in {settings.db_path}[/dim]")
     _exit_for_found(report)
@@ -448,8 +484,9 @@ def watch(
     store = Store(settings.db_path)
 
     def on_cycle(cycle, report, new_posts, changes):
+        stamp = time.strftime("%H:%M:%S")
         console.print(
-            f"[bold]cycle {cycle}[/bold] {target}: "
+            f"[dim]{stamp}[/dim] [bold]cycle {cycle}[/bold] {target}: "
             f"{len(report.profiles)} profiles, {len(new_posts)} new posts, "
             f"{len(changes)} changes"
         )

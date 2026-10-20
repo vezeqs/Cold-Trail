@@ -176,3 +176,47 @@ def test_runs_and_export(tmp_path, fake_sources):
 def test_export_missing_run_exits_nonzero(tmp_path):
     result = runner.invoke(app, ["--db", str(tmp_path / "x.db"), "export", "42"])
     assert result.exit_code == 1
+
+
+def test_pivot_hides_non_matching_checks_by_default(tmp_path, monkeypatch):
+    from larpharvester.sources.base import Source
+
+    class Found(Source):
+        name = "found-src"
+        label = "Found"
+        group = "social"
+
+        async def check(self, fetcher, target):
+            return self.ok(
+                target,
+                Profile(source=self.name, username=target, url=f"https://x/{target}"),
+            )
+
+    class Missing(Source):
+        name = "missing-src"
+        label = "Missing"
+        group = "social"
+
+        async def check(self, fetcher, target):
+            return self.missing(target, "no such user")
+
+    fake = {"found-src": Found(), "missing-src": Missing()}
+    monkeypatch.setattr("larpharvester.pivot.SOURCES", fake)
+    monkeypatch.setattr("larpharvester.cli.collect.SOURCES", fake)
+
+    base = ["--db", str(tmp_path / "t.db"), "pivot", "alice"]
+    default = runner.invoke(app, base)
+    assert default.exit_code == 0, default.output
+    assert "missing-src" not in default.output
+    assert "non-matching checks hidden" in default.output
+
+    full = runner.invoke(app, [*base, "--all-checks"])
+    assert full.exit_code == 0, full.output
+    assert "missing-src" in full.output
+
+
+def test_sources_query_filter():
+    result = runner.invoke(app, ["sources", "-q", "mastodon"])
+    assert result.exit_code == 0, result.output
+    assert "mastodon" in result.output
+    assert "github" not in result.output

@@ -28,6 +28,17 @@ templates are excluded from correlation and entity extraction, the corpus drops 
 availability endpoints, `diff` handles links, and `ct` reports upstream outages instead of
 showing an empty table.
 
+v0.5.2 is the speed and usability release:
+- **Faster probes:** connection failures are no longer retried, declarative checks use a single
+  8s-bounded attempt, JSON sniffing no longer decodes entire HTML pages, HTML cache bodies are
+  capped at 256 KB, and the default concurrency is 24. A cold 471-check web pivot dropped from
+  **63s to ~22s**; a warm-cache repeat is **~15s**; curated pivots are **~4s cold / ~2s warm**.
+- **Readable output:** `pivot` shows only found profiles by default (with a hidden-check count),
+  `--all-checks` shows every result, and the spinner reports live checked/found counts.
+- **Faster discovery:** `sources -q <text>` filters the registry; the web sources page has a
+  client-side filter; the TUI shows a loading indicator while a pivot runs; `watch` cycle lines
+  are timestamped.
+
 ## Install
 
 ```bash
@@ -305,7 +316,7 @@ limited per client (20 requests/minute).
 | --- | --- | --- |
 | `db_path` / `LARPHARVESTER_DB` | `$XDG_DATA_HOME/larpharvester/larpharvester.db` | SQLite path |
 | `timeout` / `LARPHARVESTER_TIMEOUT` | `10` | Request timeout |
-| `concurrency` / `LARPHARVESTER_CONCURRENCY` | `8` | In-flight requests |
+| `concurrency` / `LARPHARVESTER_CONCURRENCY` | `24` | In-flight requests (raise for fast links, lower on constrained ones) |
 | `requests_per_second` / `LARPHARVESTER_RPS` | `5` | Per-host pacing |
 | `proxy` / `LARPHARVESTER_PROXY` | unset | HTTP/SOCKS proxy |
 | `tor` / `LARPHARVESTER_TOR` | `false` | Use `socks5://127.0.0.1:9050` |
@@ -325,7 +336,7 @@ limited per client (20 requests/minute).
 ## Development
 
 ```bash
-uv run pytest                # 373 tests, no network required
+uv run pytest                # 379 tests, no network required
 uv run ruff check .
 uv run ruff format --check .
 ```
@@ -335,11 +346,11 @@ uv run ruff format --check .
 **Docker / Compose**
 
 ```bash
-docker build -t larpharvester:0.5.1 .
+docker build -t larpharvester:0.5.2 .
 docker run --rm -p 127.0.0.1:8765:8765 \
   -v larpharvester-data:/data \
   -e LARPHARVESTER_WEB_TOKEN=change-me \
-  larpharvester:0.5.1
+  larpharvester:0.5.2
 
 # Compose with an optional Tor sidecar:
 LARPHARVESTER_WEB_TOKEN=change-me docker compose up -d

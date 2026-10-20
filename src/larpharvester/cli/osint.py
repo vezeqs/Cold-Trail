@@ -47,6 +47,9 @@ from ._app import (
 def sources(
     group: Annotated[str | None, typer.Option("-g", "--group", help="Filter by group")] = None,
     all_sources: Annotated[bool, typer.Option("--all", help="Include web corpus")] = False,
+    query: Annotated[
+        str | None, typer.Option("-q", "--query", help="Filter by name or label")
+    ] = None,
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """List available sources."""
@@ -55,6 +58,13 @@ def sources(
         items = [source for source in items if source.group == group]
     elif not all_sources:
         items = [source for source in items if source.group != "web"]
+    if query:
+        needle = query.casefold()
+        items = [
+            source
+            for source in items
+            if needle in source.name.casefold() or needle in source.label.casefold()
+        ]
     rows = [
         {
             "name": source.name,

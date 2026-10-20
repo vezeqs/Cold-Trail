@@ -1,7 +1,7 @@
 services:
   larpharvester:
     build: .
-    image: larpharvester:0.5.1
+    image: larpharvester:0.5.2
     container_name: larpharvester
     restart: unless-stopped
     ports:
