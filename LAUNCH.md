@@ -35,7 +35,7 @@ gh api -X POST repos/vezeqs/Cold-Trail/pages -f build_type=workflow
 - [ ] GitHub Pages workflow succeeds; `/`, `/quickstart.html`, `/sources.html`,
       `/comparison.html`, `/privacy.html`, and `/sitemap.xml` load.
 - [ ] Upload `docs/og.png` as the repository social preview.
-- [ ] Replace the static tests badge in `README.md` with the CI badge after the first run.
+- [x] Replace the static tests badge in `README.md` with the CI badge after the first run.
 - [ ] Enable private vulnerability reporting.
 - [ ] Open the good-first issues from `GOOD_FIRST_ISSUES.md`.
 

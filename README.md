@@ -4,10 +4,10 @@
 Pivot across 482 sources, harvest profiles and posts into SQLite, correlate identities, and export
 evidence-grade dossiers — from a CLI, a TUI, or a local web UI.
 
-[![tests](https://img.shields.io/badge/tests-479%20passing-brightgreen.svg)](#verification)
+[![CI](https://github.com/vezeqs/Cold-Trail/actions/workflows/ci.yml/badge.svg)](https://github.com/vezeqs/Cold-Trail/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
-[![Docs](https://img.shields.io/badge/docs-local%20site-blue.svg)](docs/index.html)
+[![Docs](https://img.shields.io/badge/docs-live-2ea44f.svg)](https://vezeqs.github.io/Cold-Trail/)
 
 ![ColdTrail terminal demo](docs/assets/terminal-demo.gif)
 
