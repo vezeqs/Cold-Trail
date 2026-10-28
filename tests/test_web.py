@@ -352,6 +352,53 @@ def test_job_404(client):
     assert client.get("/api/jobs/doesnotexist").status_code == 404
 
 
+def test_health_does_not_leak_database_path(client):
+    payload = client.get("/healthz").json()
+    assert payload["status"] == "ok"
+    assert "db" not in payload
+
+
+def test_upload_limit_is_enforced_while_streaming(client, monkeypatch):
+    monkeypatch.setattr(web_app, "MAX_UPLOAD", 8)
+    response = client.post(
+        "/tools/ingest",
+        files={"file": ("big.json", b'{"a": 1}' * 20, "application/json")},
+        data={"format": "json"},
+    )
+    assert response.status_code == 413
+
+
+def test_login_attempts_are_rate_limited(settings):
+    settings.web_token = "secret"
+    client = TestClient(create_app(settings))
+    statuses = [client.post("/login", data={"token": "wrong"}).status_code for _ in range(11)]
+    assert statuses[:10] == [401] * 10
+    assert statuses[10] == 429
+
+
+def test_sse_stream_headers_and_done_event(client, monkeypatch):
+    monkeypatch.setattr(web_app, "run_pivot", _fake_pivot)
+    response = client.post("/api/pivot", json={"target": "eve"})
+    job_id = response.json()["job_id"]
+    _wait_job(client, job_id)
+    stream = client.get(f"/api/jobs/{job_id}/stream")
+    assert stream.headers["x-accel-buffering"] == "no"
+    assert "no-cache" in stream.headers["cache-control"]
+    assert "event: done" in stream.text
+
+
+def test_store_failure_marks_job_as_error(client, monkeypatch):
+    def broken_store(path):
+        raise OSError("db down")
+
+    monkeypatch.setattr(web_app, "Store", broken_store)
+    response = client.post("/api/pivot", json={"target": "frank"})
+    job = _wait_job(client, response.json()["job_id"])
+    assert job["status"] == "error"
+    assert "db down" in job["error"]
+    assert job["finished_at"] is not None
+
+
 def test_custom_scope_requires_sources(client):
     response = client.post(
         "/pivot",

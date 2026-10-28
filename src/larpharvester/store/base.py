@@ -28,10 +28,12 @@ class StoreBase:
         current_version = self.conn.execute("PRAGMA user_version").fetchone()[0]
         self.conn.executescript(SCHEMA)
         self._rebuild_entities()
-        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_entities_value ON entities(value)")
         for table, columns in COLUMNS.items():
             for name, decl in columns.items():
                 self._ensure_column(table, name, decl)
+        self._rebuild_profiles()
+        # Re-run the DDL so indexes attached to rebuilt tables are recreated.
+        self.conn.executescript(SCHEMA)
         self.conn.executescript(FTS)
         # Keep the update trigger narrow: tombstone/metrics updates must not churn FTS.
         self.conn.execute("DROP TRIGGER IF EXISTS posts_au")
@@ -42,12 +44,30 @@ class StoreBase:
             self.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         self.conn.commit()
 
+    def _unique_indexes(self, table: str) -> list[dict[str, str]]:
+        """Return unique indexes as ``{column: collation}`` maps.
+
+        Introspecting ``PRAGMA index_xinfo`` is stable across SQLite versions and
+        avoids guessing from the formatted ``sqlite_master`` SQL.
+        """
+        indexes: list[dict[str, str]] = []
+        for row in self.conn.execute(f"PRAGMA index_list({table})"):
+            if not row["unique"]:
+                continue
+            columns: dict[str, str] = {}
+            for info in self.conn.execute(f"PRAGMA index_xinfo({row['name']})"):
+                if info["name"]:
+                    columns[info["name"]] = (info["coll"] or "BINARY").upper()
+            indexes.append(columns)
+        return indexes
+
     def _rebuild_entities(self) -> None:
         """Upgrade the entities table to per-profile uniqueness on pre-v3 databases."""
-        row = self.conn.execute(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name='entities'"
-        ).fetchone()
-        if row is None or "UNIQUE(run_id, kind, value)" not in (row["sql"] or ""):
+        indexes = self._unique_indexes("entities")
+        current = {"run_id", "source", "username", "kind", "value"}
+        if any(set(columns) == current for columns in indexes):
+            return
+        if not any(set(columns) == {"run_id", "kind", "value"} for columns in indexes):
             return
         with self.conn:
             self.conn.execute("ALTER TABLE entities RENAME TO entities_old")
@@ -71,6 +91,58 @@ class StoreBase:
             )
             self.conn.execute("DROP TABLE entities_old")
             self.conn.execute("ALTER TABLE entities_new RENAME TO entities")
+
+    def _rebuild_profiles(self) -> None:
+        """Make profile identity case-insensitive (schema v5).
+
+        ``Alice`` and ``alice`` are the same account on every supported platform.
+        The old unique constraint was case-sensitive while every query used
+        ``COLLATE NOCASE``, which produced duplicate profiles and inconsistent
+        history/diff output.
+        """
+        indexes = self._unique_indexes("profiles")
+        for columns in indexes:
+            if {"run_id", "source", "username"} <= set(columns) and columns.get(
+                "username"
+            ) == "NOCASE":
+                return
+        with self.conn:
+            self.conn.execute(
+                """DELETE FROM profiles WHERE id NOT IN (
+                       SELECT MAX(id) FROM profiles GROUP BY run_id, source, lower(username)
+                   )"""
+            )
+            self.conn.execute("ALTER TABLE profiles RENAME TO profiles_old")
+            self.conn.execute(
+                """CREATE TABLE profiles_new (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    source TEXT NOT NULL,
+    username TEXT NOT NULL COLLATE NOCASE,
+    url TEXT NOT NULL,
+    display_name TEXT,
+    bio TEXT,
+    avatar TEXT,
+    avatar_hash TEXT,
+    website TEXT,
+    created_at TEXT,
+    followers INTEGER,
+    lang TEXT,
+    timezone TEXT,
+    extra_json TEXT NOT NULL DEFAULT '{}',
+    UNIQUE(run_id, source, username)
+)"""
+            )
+            self.conn.execute(
+                """INSERT OR IGNORE INTO profiles_new
+                   (id, run_id, source, username, url, display_name, bio, avatar,
+                    avatar_hash, website, created_at, followers, lang, timezone, extra_json)
+                   SELECT id, run_id, source, username, url, display_name, bio, avatar,
+                          avatar_hash, website, created_at, followers, lang, timezone, extra_json
+                   FROM profiles_old"""
+            )
+            self.conn.execute("DROP TABLE profiles_old")
+            self.conn.execute("ALTER TABLE profiles_new RENAME TO profiles")
 
     def _ensure_column(self, table: str, column: str, decl: str) -> None:
         existing = {row["name"] for row in self.conn.execute(f"PRAGMA table_info({table})")}

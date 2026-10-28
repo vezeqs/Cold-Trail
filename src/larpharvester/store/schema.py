@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 POSTS_AU_TRIGGER = """CREATE TRIGGER posts_au AFTER UPDATE OF text, username, source ON posts BEGIN
     INSERT INTO posts_fts(posts_fts, rowid, text, username, source)
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     run_id INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
     source TEXT NOT NULL,
-    username TEXT NOT NULL,
+    username TEXT NOT NULL COLLATE NOCASE,
     url TEXT NOT NULL,
     display_name TEXT,
     bio TEXT,
@@ -222,8 +222,10 @@ CREATE INDEX IF NOT EXISTS idx_checks_run ON checks(run_id);
 CREATE INDEX IF NOT EXISTS idx_checks_source ON checks(source);
 CREATE INDEX IF NOT EXISTS idx_profiles_run ON profiles(run_id);
 CREATE INDEX IF NOT EXISTS idx_profiles_username ON profiles(username);
+CREATE INDEX IF NOT EXISTS idx_profiles_identity ON profiles(source, username COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS idx_posts_run ON posts(run_id);
 CREATE INDEX IF NOT EXISTS idx_posts_username ON posts(username);
+CREATE INDEX IF NOT EXISTS idx_posts_source_user_nocase ON posts(source, username COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at);
 CREATE INDEX IF NOT EXISTS idx_links_run ON links(run_id);
 CREATE INDEX IF NOT EXISTS idx_entities_value ON entities(value);

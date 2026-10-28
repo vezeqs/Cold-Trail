@@ -1,0 +1,19 @@
+{
+  "source": "threads",
+  "target": "threads",
+  "observed_status": "found",
+  "profile": {
+    "username": "threads",
+    "url": "https://www.threads.net/@threads",
+    "display_name": "threads",
+    "followers": null,
+    "extra_keys": []
+  },
+  "exchanges": [
+    {
+      "url": "https://www.threads.net/@threads",
+      "status": 200,
+      "body_b64": "PCFkb2N0eXBlIGh0bWw+PGh0bWw+PGhlYWQ+CjxtZXRhIHByb3BlcnR5PSJvZzp0aXRsZSIgY29udGVudD0iVGhyZWFkcyAoQHRocmVhZHMpIG9uIFRocmVhZHMiPgo8bWV0YSBwcm9wZXJ0eT0ib2c6ZGVzY3JpcHRpb24iIGNvbnRlbnQ9IlRoZSBvZmZpY2lhbCBUaHJlYWRzIGFjY291bnQuIj4KPG1ldGEgcHJvcGVydHk9Im9nOmltYWdlIiBjb250ZW50PSJodHRwczovL3Njb250ZW50LmV4YW1wbGUvdGhyZWFkcy5qcGciPgo8L2hlYWQ+PGJvZHk+VGhyZWFkczwvYm9keT48L2h0bWw+"
+    }
+  ]
+}

@@ -80,6 +80,14 @@ CONTRACTS: dict[str, Contract] = {
     "hudsonrock": Contract("hudsonrock", "test@example.com", required=["username", "url"]),
     "leakcheck": Contract("leakcheck", "test@example.com", required=["username", "url"]),
     "libravatar": Contract("libravatar", "test@example.com", required=["username", "url"]),
+    "threads": Contract("threads", "threads", required=["username", "url"]),
+    "pinterest": Contract("pinterest", "pinterest", required=["username", "url"]),
+    "tumblr": Contract("tumblr", "staff", required=["username", "url"]),
+    "vk": Contract("vk", "vk", required=["username", "url"]),
+    "snapchat": Contract("snapchat", "snapchat", required=["username", "url"]),
+    "instagram": Contract("instagram", "instagram", required=["username", "url"]),
+    "x": Contract("x", "x", required=["username", "url"]),
+    "hunter": Contract("hunter", "test@example.com", required=["username", "url"]),
 }
 
 DEFAULT_FIXTURE_DIR = Path("tests") / "fixtures" / "contracts"

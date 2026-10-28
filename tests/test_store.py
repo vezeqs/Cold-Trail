@@ -107,3 +107,83 @@ def test_export_run(store):
 def test_export_missing_run_raises(store):
     with pytest.raises(KeyError):
         store.export_run(999)
+
+
+def test_profile_identity_is_case_insensitive(store):
+    run_id = store.start_run("pivot", "alice")
+    store.save_profiles(run_id, [make_profile(username="Alice")])
+    store.save_profiles(run_id, [make_profile(username="alice", bio="updated")])
+    rows = store.profiles(run_id=run_id)
+    assert len(rows) == 1
+    assert rows[0]["bio"] == "updated"
+
+
+def test_history_matches_previous_username_case_insensitively(store):
+    first = store.start_run("pivot", "Alice")
+    store.save_profiles(first, [make_profile(username="Alice")])
+    second = store.start_run("pivot", "alice")
+    profile = make_profile(username="alice", bio="new bio")
+    store.save_profiles(second, [profile])
+    changes = store.record_profile_history(second, [profile])
+    assert [change.field for change in changes] == ["bio"]
+    assert changes[0].old_value == "hi"
+    assert changes[0].new_value == "new bio"
+
+
+def test_v4_profiles_migrate_to_case_insensitive_identity(tmp_path):
+    import sqlite3
+
+    path = tmp_path / "old.db"
+    conn = sqlite3.connect(path)
+    conn.executescript(
+        """
+        CREATE TABLE runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind TEXT NOT NULL,
+            target TEXT NOT NULL,
+            started_at TEXT NOT NULL,
+            finished_at TEXT,
+            status TEXT NOT NULL DEFAULT 'running'
+        );
+        CREATE TABLE profiles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+            source TEXT NOT NULL,
+            username TEXT NOT NULL,
+            url TEXT NOT NULL,
+            display_name TEXT,
+            bio TEXT,
+            avatar TEXT,
+            website TEXT,
+            created_at TEXT,
+            followers INTEGER,
+            extra_json TEXT NOT NULL DEFAULT '{}',
+            UNIQUE(run_id, source, username)
+        );
+        PRAGMA user_version = 4;
+        """
+    )
+    conn.execute(
+        "INSERT INTO runs(kind, target, started_at) "
+        "VALUES ('pivot', 'Alice', '2024-01-01T00:00:00Z')"
+    )
+    conn.execute(
+        """INSERT INTO profiles(run_id, source, username, url, bio)
+           VALUES (1, 'github', 'Alice', 'https://github.com/Alice', 'old')"""
+    )
+    conn.execute(
+        """INSERT INTO profiles(run_id, source, username, url, bio)
+           VALUES (1, 'github', 'alice', 'https://github.com/alice', 'new')"""
+    )
+    conn.commit()
+    conn.close()
+
+    with Store(path) as store:
+        rows = store.profiles(run_id=1)
+        assert len(rows) == 1
+        assert rows[0]["bio"] == "new"
+        store.save_profiles(1, [make_profile(username="ALICE", bio="latest")])
+        rows = store.profiles(run_id=1)
+        assert len(rows) == 1
+        assert rows[0]["bio"] == "latest"
+        assert store.conn.execute("PRAGMA user_version").fetchone()[0] == 5

@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>larpharvester — local-first OSINT toolkit for usernames and emails</title>
+  <meta name="description" content="larpharvester is a local-first OSINT toolkit: pivot usernames and emails across 482 sources, harvest public profiles and posts into SQLite, correlate identities, and export evidence-grade dossiers from a CLI, TUI, or local web UI.">
+  <meta name="keywords" content="OSINT, username OSINT, email OSINT, open source intelligence, threat intelligence, identity correlation, social media investigation, digital forensics, Sherlock alternative, Maigret, Holehe, breach lookup">
+  <meta name="author" content="larpharvester contributors">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta name="theme-color" content="#0b0f14">
+  <link rel="canonical" href="https://slopmanufacturer.github.io/larpharvester/">
+  <link rel="sitemap" type="application/xml" href="https://slopmanufacturer.github.io/larpharvester/sitemap.xml">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="larpharvester">
+  <meta property="og:title" content="larpharvester — local-first OSINT toolkit">
+  <meta property="og:description" content="Pivot usernames and emails across 482 public sources, harvest profiles and posts, correlate identities, and export evidence-grade dossiers. CLI, TUI, and local web UI over one SQLite store.">
+  <meta property="og:url" content="https://slopmanufacturer.github.io/larpharvester/">
+  <meta property="og:image" content="https://slopmanufacturer.github.io/larpharvester/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="larpharvester OSINT toolkit">
+  <meta property="og:locale" content="en_US">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="larpharvester — local-first OSINT toolkit">
+  <meta name="twitter:description" content="Pivot usernames and emails across 482 sources, harvest public data, correlate identities, export evidence. CLI + TUI + local web UI.">
+  <meta name="twitter:image" content="https://slopmanufacturer.github.io/larpharvester/og.png">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "larpharvester",
+    "alternateName": "larp harvester",
+    "description": "Local-first OSINT toolkit for pivoting usernames and emails across public sources, harvesting profiles and posts into SQLite, correlating identities, and exporting evidence-grade dossiers.",
+    "applicationCategory": "SecurityApplication",
+    "applicationSubCategory": "Open Source Intelligence",
+    "operatingSystem": "Linux, macOS, Windows",
+    "softwareVersion": "0.7.0",
+    "license": "https://opensource.org/licenses/MIT",
+    "codeRepository": "https://github.com/slopmanufacturer/larpharvester",
+    "url": "https://slopmanufacturer.github.io/larpharvester/",
+    "downloadUrl": "https://github.com/slopmanufacturer/larpharvester",
+    "programmingLanguage": "Python",
+    "keywords": "OSINT, username enumeration, email OSINT, identity correlation, threat intelligence, digital forensics",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "author": {
+      "@type": "Organization",
+      "name": "larpharvester contributors",
+      "url": "https://github.com/slopmanufacturer/larpharvester"
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "larpharvester documentation",
+    "url": "https://slopmanufacturer.github.io/larpharvester/",
+    "inLanguage": "en",
+    "publisher": {
+      "@type": "Organization",
+      "name": "larpharvester contributors"
+    }
+  }
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site">
+    <nav class="nav" aria-label="Primary">
+      <a class="brand" href="./">larp<span>harvester</span></a>
+      <div class="nav-links">
+        <a href="./" aria-current="page">Overview</a>
+        <a href="quickstart.html">Quickstart</a>
+        <a href="sources.html">Coverage</a>
+        <a href="https://github.com/slopmanufacturer/larpharvester">GitHub</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <span class="eyebrow">Open source · MIT · Python 3.11+</span>
+      <h1>Find the <span class="grad">person behind the handle</span>.</h1>
+      <p class="lede">
+        A local-first OSINT toolkit that pivots usernames and emails across 482 public sources,
+        harvests profiles and posts into one SQLite store, correlates identities with calibrated
+        confidence, and exports evidence-grade dossiers — from a CLI, a TUI, or a local web UI.
+      </p>
+      <div class="cta">
+        <a class="btn primary" href="quickstart.html">Get started</a>
+        <a class="btn" href="https://github.com/slopmanufacturer/larpharvester">View source</a>
+      </div>
+      <pre><code>git clone https://github.com/slopmanufacturer/larpharvester
+cd larpharvester &amp;&amp; uv sync
+uv run larpharvester pivot alice
+uv run larpharvester serve --open</code></pre>
+    </section>
+
+    <section aria-labelledby="features">
+      <h2 id="features">Why larpharvester</h2>
+      <p class="sub">Built for investigations that need reproducible, auditable results — not a pile of browser tabs.</p>
+      <div class="grid">
+        <article class="card">
+          <span class="tag">Coverage</span>
+          <h3>482 sources</h3>
+          <p>50 curated sources plus 432 declarative site definitions generated from the Sherlock corpus. Handle variants and multi-hop expansion included.</p>
+        </article>
+        <article class="card">
+          <span class="tag">Evidence</span>
+          <h3>Content-addressed storage</h3>
+          <p>Every run, profile, post, link, and entity lands in SQLite. Raw responses and attachments are hashed (SHA-256) and verifiable later.</p>
+        </article>
+        <article class="card">
+          <span class="tag">Correlation</span>
+          <h3>Explainable identity clusters</h3>
+          <p>Additive scoring with per-signal reasons, Jaro-Winkler handle similarity, avatar perceptual hashes, EXIF, and cryptographic identifiers.</p>
+        </article>
+        <article class="card">
+          <span class="tag">Interfaces</span>
+          <h3>CLI, TUI, and web</h3>
+          <p>Scriptable commands, a Textual terminal console, and a FastAPI app with SSE-streamed pivots and an interactive graph — all over the same database.</p>
+        </article>
+        <article class="card">
+          <span class="tag">Integrations</span>
+          <h3>Bring your own tools</h3>
+          <p>Import findings from Maigret, Sherlock, Holehe, theHarvester, Subfinder, Instaloader, twscrape, SpiderFoot, Maltego, and more.</p>
+        </article>
+        <article class="card">
+          <span class="tag">Output</span>
+          <h3>Ten export formats</h3>
+          <p>JSON, JSONL, CSV, GraphML, GEXF, DOT, HTML, Markdown, STIX 2.1, and Maltego CSV — with optional redaction and encryption.</p>
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="how">
+      <h2 id="how">How it works</h2>
+      <p class="sub">One pipeline, shared by every interface.</p>
+      <div class="grid">
+        <article class="card"><h3>1. Pivot</h3><p>Probe curated APIs and declarative sites with per-host pacing, caching, retries, circuit breaking, and optional Tor/proxy.</p></article>
+        <article class="card"><h3>2. Harvest</h3><p>Pull profile fields, paginated posts, follow graphs, and profile-change history with incremental cursors.</p></article>
+        <article class="card"><h3>3. Correlate</h3><p>Score pairs, build clusters, extract emails/wallets/keys/coordinates, and store the reasons for every link.</p></article>
+        <article class="card"><h3>4. Report</h3><p>Export a run or a multi-run case dossier in the format your workflow already uses.</p></article>
+      </div>
+    </section>
+
+    <section aria-labelledby="interfaces">
+      <h2 id="interfaces">Three interfaces, one database</h2>
+      <table>
+        <thead><tr><th>Interface</th><th>Best for</th><th>Start with</th></tr></thead>
+        <tbody>
+          <tr><td><strong>CLI</strong></td><td>Scripts, batch jobs, JSON pipelines</td><td><code>larpharvester --help</code></td></tr>
+          <tr><td><strong>TUI</strong></td><td>Interactive triage and browsing</td><td><code>larpharvester tui</code></td></tr>
+          <tr><td><strong>Web</strong></td><td>Graph exploration, cases, evidence review</td><td><code>larpharvester serve --open</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section aria-labelledby="safety">
+      <h2 id="safety">Safety by default</h2>
+      <div class="note">
+        <strong>Public data only.</strong> Use larpharvester for authorized research, journalism,
+        threat intelligence, and defensive security. You are responsible for applicable law,
+        platform terms, and scope authorization.
+      </div>
+      <p class="sub" style="margin-top:16px">
+        The web UI binds to <code>127.0.0.1</code> by default and has no authentication unless
+        <code>--token</code> is set. Breach features report metadata only; Pwned Passwords uses
+        k-anonymity and never sends the password or full hash. External tools run as argument
+        vectors with option-injection validation.
+      </p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">Next steps</h2>
+      <p class="sub">
+        <a href="quickstart.html">Quickstart</a> ·
+        <a href="sources.html">Source and integration coverage</a> ·
+        <a href="https://github.com/slopmanufacturer/larpharvester">GitHub repository</a> ·
+        <a href="https://github.com/slopmanufacturer/larpharvester/blob/master/SECURITY.md">Security policy</a>
+      </p>
+    </section>
+  </main>
+
+  <footer class="site">
+    <div class="footer-inner">
+      <span>© 2026 larpharvester contributors · MIT</span>
+      <span>Last updated 2026-10-27 · <a href="sitemap.xml">Sitemap</a></span>
+    </div>
+  </footer>
+</body>
+</html>

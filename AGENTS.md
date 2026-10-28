@@ -62,7 +62,7 @@ src/larpharvester/
 │   ├── templates/    Jinja2 templates (autoescape on; help.html, run.html evidence)
 │   └── static/       style.css, app.js (scope toggle, SSE stream, canvas graph, source filter)
 ├── store/          Store composed from mixins (public API: from larpharvester.store import Store)
-│   ├── schema.py     DDL, FTS definitions, column migrations, SCHEMA_VERSION (4)
+│   ├── schema.py     DDL, FTS definitions, column migrations, SCHEMA_VERSION (5)
 │   ├── base.py       connection, PRAGMA setup, user_version gate, row helpers
 │   ├── runs.py       runs, count_runs
 │   ├── writes.py     checks/profiles/posts/links/clusters/entities/edges/history writes
@@ -164,14 +164,21 @@ tests/fixtures/contracts/ (recorded source fixtures)
   Do not add a global `Accept: application/json`; GitHub returns a 410
   API-retirement page for HTML requests with it.
 - **Schema changes** must keep the `PRAGMA user_version` migration path working
-  (current version: 4). Add columns via `store/schema.py::COLUMNS`.
+  (current version: 5). Add columns via `store/schema.py::COLUMNS`.
+  Schema v5 made `profiles.username` `COLLATE NOCASE`; `_rebuild_profiles()` dedupes
+  and rebuilds old tables, and `_unique_indexes()` introspects `PRAGMA index_xinfo`
+  instead of matching formatted SQL.
 - **Evidence is content-addressed:** `evidence.add_evidence()` hashes bytes,
   writes `<db dir>/evidence/<sha[:2]>/<sha>` atomically, and inserts an
   `attachments` row. Never store evidence only in the DB; `evidence verify`
   must be able to detect missing/corrupted blobs.
 - **External tools run via argument vectors, never a shell.** `integrations.run_tool`
-  uses `subprocess.run(list, shell=False, timeout=..., cwd=tempdir)` and preserves
+  validates the target (`validate_target` rejects leading `-`, NUL, and newlines)
+  before executing, then uses
+  `subprocess.run(list, shell=False, timeout=..., cwd=tempdir)` and preserves
   the environment (`HOME`, proxies, tokens) with `NO_COLOR`/`TERM=dumb` overrides.
+  Username/social wrappers: sherlock, maigret, naminter, social-analyzer, blackbird
+  (via otinstaller), instaloader, twscrape. Import-only: SpiderFoot and Maltego.
   Missing binaries raise `ToolUnavailable` with an install hint.
 - **Importers normalize to models:** Maltego CSV → profiles/links/entities;
   SpiderFoot JSON → entities/profiles; theHarvester JSON → entities; generic JSON

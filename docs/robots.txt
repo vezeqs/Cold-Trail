@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://slopmanufacturer.github.io/larpharvester/sitemap.xml

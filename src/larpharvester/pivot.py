@@ -305,30 +305,31 @@ def discovered_usernames(results: list[CheckResult], limit: int | None = MAX_EXP
     which is not an account on other platforms and would pivot into strangers.
     """
     found: list[str] = []
+    seen: set[str] = set()
     for result in results:
         profile: Profile | None = result.profile
         if profile is None:
             continue
         source = SOURCES.get(profile.source)
         if source is not None and source.kind == "username":
-            _add(found, profile.username)
+            _add(found, seen, profile.username)
         for account in profile.extra.get("accounts") or []:
             if isinstance(account, dict):
-                _add(found, account.get("username"))
-                _add(found, _username_from_url(account.get("url")))
+                _add(found, seen, account.get("username"))
+                _add(found, seen, _username_from_url(account.get("url")))
             else:
-                _add(found, account)
+                _add(found, seen, account)
         for proof in profile.extra.get("proofs") or []:
             if isinstance(proof, dict):
-                _add(found, proof.get("username"))
-                _add(found, _username_from_url(proof.get("url") or proof.get("proof_url")))
+                _add(found, seen, proof.get("username"))
+                _add(found, seen, _username_from_url(proof.get("url") or proof.get("proof_url")))
         for login in profile.extra.get("logins") or []:
-            _add(found, login)
+            _add(found, seen, login)
         for handle in profile.extra.get("handle_history") or []:
-            _add(found, handle)
+            _add(found, seen, handle)
         nip05 = profile.extra.get("nip05")
         if isinstance(nip05, str):
-            _add(found, nip05.split("@", 1)[0])
+            _add(found, seen, nip05.split("@", 1)[0])
     return found if limit in (None, 0) else found[:limit]
 
 
@@ -361,7 +362,7 @@ def discovered_emails(results: list[CheckResult], limit: int | None = MAX_EXPAND
     return found if limit in (None, 0) else found[:limit]
 
 
-def _add(found: list[str], value: object) -> None:
+def _add(found: list[str], seen: set[str], value: object) -> None:
     if not isinstance(value, str):
         return
     handle = value.strip().lstrip("@").removesuffix("/")
@@ -373,7 +374,9 @@ def _add(found: list[str], value: object) -> None:
         or not _HANDLE_RE.match(handle)
     ):
         return
-    if handle.casefold() not in {item.casefold() for item in found}:
+    key = handle.casefold()
+    if key not in seen:
+        seen.add(key)
         found.append(handle)
 
 

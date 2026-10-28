@@ -196,6 +196,8 @@ class WritesMixin:
     def record_profile_history(self, run_id: int, profiles: list[Profile]) -> list[ProfileChange]:
         changes: list[ProfileChange] = []
         observed = now_iso()
+        if not profiles:
+            return changes
 
         def normalize(value: object) -> str | None:
             if value is None:
@@ -203,14 +205,30 @@ class WritesMixin:
             text = str(value)
             return text if text != "" else None
 
+        pairs = list(dict.fromkeys((profile.source, profile.username) for profile in profiles))
+        with self.conn:
+            self.conn.execute(
+                "CREATE TEMP TABLE IF NOT EXISTS _history_targets (source TEXT, username TEXT)"
+            )
+            self.conn.execute("DELETE FROM _history_targets")
+            self.conn.executemany(
+                "INSERT INTO _history_targets (source, username) VALUES (?, ?)", pairs
+            )
+        rows = self.conn.execute(
+            """SELECT p.* FROM profiles p
+               JOIN _history_targets t
+                 ON p.source = t.source AND p.username = t.username COLLATE NOCASE
+               WHERE p.run_id < ?
+               ORDER BY p.run_id DESC, p.id DESC""",
+            (run_id,),
+        ).fetchall()
+        previous: dict[tuple[str, str], Any] = {}
+        for row in rows:
+            previous.setdefault((row["source"], row["username"].casefold()), row)
+
         for profile in profiles:
-            previous = self.conn.execute(
-                """SELECT * FROM profiles
-                   WHERE source = ? AND username = ? COLLATE NOCASE AND run_id < ?
-                   ORDER BY run_id DESC, id DESC LIMIT 1""",
-                (profile.source, profile.username, run_id),
-            ).fetchone()
-            if previous is None:
+            prior = previous.get((profile.source, profile.username.casefold()))
+            if prior is None:
                 continue
             for field in (
                 "display_name",
@@ -222,7 +240,7 @@ class WritesMixin:
                 "lang",
                 "timezone",
             ):
-                old = normalize(previous[field])
+                old = normalize(prior[field])
                 new = normalize(getattr(profile, field))
                 if old == new:
                     continue

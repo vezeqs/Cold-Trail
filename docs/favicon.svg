@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="larpharvester">
+  <rect width="64" height="64" rx="14" fill="#0b0f14"/>
+  <path d="M18 44V20h6v18h12v6H18z" fill="#4ade80"/>
+  <circle cx="45" cy="22" r="6" fill="#38bdf8"/>
+  <path d="M39 44c0-6 3-10 8-10s8 4 8 10" stroke="#38bdf8" stroke-width="5" fill="none" stroke-linecap="round"/>
+</svg>

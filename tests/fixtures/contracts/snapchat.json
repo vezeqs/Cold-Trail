@@ -1,0 +1,19 @@
+{
+  "source": "snapchat",
+  "target": "snapchat",
+  "observed_status": "found",
+  "profile": {
+    "username": "snapchat",
+    "url": "https://www.snapchat.com/add/snapchat",
+    "display_name": "snapchat",
+    "followers": null,
+    "extra_keys": []
+  },
+  "exchanges": [
+    {
+      "url": "https://www.snapchat.com/add/snapchat",
+      "status": 200,
+      "body_b64": "PCFkb2N0eXBlIGh0bWw+PGh0bWw+PGhlYWQ+CjxtZXRhIHByb3BlcnR5PSJvZzp0aXRsZSIgY29udGVudD0iVGVhbSBTbmFwY2hhdCB8IFNuYXBjaGF0Ij4KPG1ldGEgcHJvcGVydHk9Im9nOmRlc2NyaXB0aW9uIiBjb250ZW50PSJPZmZpY2lhbCBTbmFwY2hhdCBhY2NvdW50LiI+CjxtZXRhIHByb3BlcnR5PSJvZzppbWFnZSIgY29udGVudD0iaHR0cHM6Ly9jZi1zdC5zYy1jZG4ubmV0L3NuYXBjaGF0LmpwZyI+CjwvaGVhZD48Ym9keT5TbmFwY2hhdDwvYm9keT48L2h0bWw+"
+    }
+  ]
+}

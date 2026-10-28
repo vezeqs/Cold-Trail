@@ -172,8 +172,11 @@ class Fetcher:
             return response.status, response.json
         if response.status in (204, 304) or not response.text.strip():
             return response.status, None
-        if "html" in response.headers.get("content-type", "") and response.status == 200:
+        content_type = response.headers.get("content-type", "").lower()
+        if "html" in content_type and response.status == 200:
             raise BlockedError(f"non-JSON response from {url} (bot wall or changed API)")
+        if "json" in content_type and response.status == 200:
+            raise FetchError(f"invalid JSON from {url} (API response changed or was truncated)")
         return response.status, None
 
     async def get_text(
@@ -382,14 +385,21 @@ class Fetcher:
         if parser is None:
             parser = RobotFileParser()
             try:
-                parser.parse(await self._fetch_robots(host))
+                parser.parse(await self._fetch_robots(url))
             except FetchError:
                 parser.parse([])
             self._robots[host] = parser
         return parser.can_fetch(self.settings.user_agent, url)
 
-    async def _fetch_robots(self, host: str) -> list[str]:
-        """Fetch robots.txt through the normal pacing/budget accounting."""
+    async def _fetch_robots(self, url: str) -> list[str]:
+        """Fetch robots.txt through the normal pacing/budget accounting.
+
+        Many hosts serve an HTML soft-404 for a missing robots.txt; parsing that
+        as rules can silently disallow the whole host, so reject non-text bodies.
+        """
+        parts = urlsplit(url)
+        scheme = parts.scheme or "https"
+        host = parts.netloc
         state = self._host_state(host)
         async with self._req_lock:
             if self.settings.max_requests and self.requests >= self.settings.max_requests:
@@ -398,13 +408,17 @@ class Fetcher:
         await self._pace(host, state)
         try:
             async with self._sem:
-                response = await self._client.get(f"https://{host}/robots.txt")
+                response = await self._client.get(f"{scheme}://{host}/robots.txt")
         except httpx.HTTPError as exc:
             self._record_failure(state)
             raise FetchError(f"{type(exc).__name__}: {exc}") from exc
         if response.status_code != 200:
             return []
-        return response.text.splitlines()
+        content_type = response.headers.get("content-type", "").lower()
+        body = response.text
+        if "html" in content_type or "<html" in body[:500].lower():
+            return []
+        return body.splitlines()
 
     def _cache_row(self, key: str) -> dict[str, Any] | None:
         if not self.settings.cache_ttl or self.store is None:

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Source and integration coverage — larpharvester</title>
+  <meta name="description" content="Full coverage list for larpharvester: 50 curated sources, 432 declarative web sources, external OSINT tool integrations, import formats, and how to add your own source.">
+  <meta name="keywords" content="OSINT sources, username enumeration sites, email OSINT APIs, Sherlock corpus, Maigret, Instaloader, SpiderFoot, Maltego, source coverage">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta name="theme-color" content="#0b0f14">
+  <link rel="canonical" href="https://slopmanufacturer.github.io/larpharvester/sources.html">
+  <link rel="sitemap" type="application/xml" href="https://slopmanufacturer.github.io/larpharvester/sitemap.xml">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="larpharvester">
+  <meta property="og:title" content="Source and integration coverage — larpharvester">
+  <meta property="og:description" content="482 sources, 50 curated sources, 432 declarative sites, and integrations for the most-used OSINT tools.">
+  <meta property="og:url" content="https://slopmanufacturer.github.io/larpharvester/sources.html">
+  <meta property="og:image" content="https://slopmanufacturer.github.io/larpharvester/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {"@type": "ListItem", "position": 1, "name": "Overview", "item": "https://slopmanufacturer.github.io/larpharvester/"},
+      {"@type": "ListItem", "position": 2, "name": "Coverage", "item": "https://slopmanufacturer.github.io/larpharvester/sources.html"}
+    ]
+  }
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site">
+    <nav class="nav" aria-label="Primary">
+      <a class="brand" href="./">larp<span>harvester</span></a>
+      <div class="nav-links">
+        <a href="./">Overview</a>
+        <a href="quickstart.html">Quickstart</a>
+        <a href="sources.html" aria-current="page">Coverage</a>
+        <a href="https://github.com/slopmanufacturer/larpharvester">GitHub</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero" style="padding-bottom:8px">
+      <span class="eyebrow">482 sources · 50 curated · 432 declarative</span>
+      <h1>Coverage</h1>
+      <p class="lede">Every source is a probe with a typed result: <code>found</code>, <code>not_found</code>, <code>blocked</code>, or <code>error</code>. Failures stay isolated — one broken site never sinks a pivot.</p>
+    </section>
+
+    <section aria-labelledby="curated">
+      <h2 id="curated">Curated API sources (50)</h2>
+      <p class="sub">Hand-written parsers with typed profile fields, posts, and follow graphs where the platform exposes them.</p>
+
+      <h3>Social &amp; media (26)</h3>
+      <p>
+        <span class="pill">bluesky</span><span class="pill">chesscom</span><span class="pill">duolingo</span>
+        <span class="pill">ens</span><span class="pill">hackernews</span><span class="pill">instagram</span>
+        <span class="pill">lichess</span><span class="pill">linktree</span><span class="pill">mastodon</span>
+        <span class="pill">matrix</span><span class="pill">medium</span><span class="pill">nostr</span>
+        <span class="pill">pinterest</span><span class="pill">reddit</span><span class="pill">roblox</span>
+        <span class="pill">snapchat</span><span class="pill">steam</span><span class="pill">substack</span>
+        <span class="pill">telegram</span><span class="pill">threads</span><span class="pill">tiktok</span>
+        <span class="pill">tumblr</span><span class="pill">twitch</span><span class="pill">vk</span>
+        <span class="pill">x (key)</span><span class="pill">youtube</span>
+      </p>
+
+      <h3>Developer &amp; package registries (14)</h3>
+      <p>
+        <span class="pill">codeberg</span><span class="pill">crates</span><span class="pill">devto</span>
+        <span class="pill">dockerhub</span><span class="pill">github</span><span class="pill">gitlab</span>
+        <span class="pill">hackerone</span><span class="pill">huggingface</span><span class="pill">kaggle</span>
+        <span class="pill">npm</span><span class="pill">packagist</span><span class="pill">pypi</span>
+        <span class="pill">rubygems</span><span class="pill">stackoverflow</span>
+      </p>
+
+      <h3>Email &amp; cryptographic identity (10)</h3>
+      <p>
+        <span class="pill">emailrep (key)</span><span class="pill">github-commits</span>
+        <span class="pill">gravatar</span><span class="pill">hibp (key)</span><span class="pill">hudsonrock</span>
+        <span class="pill">hunter (key)</span><span class="pill">keybase</span><span class="pill">leakcheck</span>
+        <span class="pill">libravatar</span><span class="pill">pgp</span>
+      </p>
+    </section>
+
+    <section aria-labelledby="web">
+      <h2 id="web">Declarative web corpus (432)</h2>
+      <p class="sub">
+        Generated from the <a href="https://github.com/sherlock-project/sherlock">Sherlock</a> dataset
+        (MIT) by <code>scripts/build_sites.py --fetch</code>, with the upstream ref and SHA-256 stamped
+        into <code>src/larpharvester/data/sites.toml</code>. Entries that collide with a curated source
+        are skipped. Enable with <code>--web</code> or the web UI's “web” scope.
+      </p>
+      <pre><code>uv run larpharvester pivot alice --web
+uv run larpharvester sources -q social
+uv run larpharvester sources --group dev</code></pre>
+    </section>
+
+    <section aria-labelledby="tools">
+      <h2 id="tools">External tools</h2>
+      <p class="sub">Run installed binaries and import their findings into the same database. Raw output is stored as evidence.</p>
+      <table>
+        <thead><tr><th>Tool</th><th>Category</th><th>Input</th><th>Import</th></tr></thead>
+        <tbody>
+          <tr><td><code>sherlock</code></td><td>Username</td><td>username</td><td>profiles + entities</td></tr>
+          <tr><td><code>maigret</code></td><td>Username</td><td>username</td><td>profiles + entities</td></tr>
+          <tr><td><code>naminter</code></td><td>Username</td><td>username</td><td>WhatsMyName dataset hits</td></tr>
+          <tr><td><code>social-analyzer</code></td><td>Username</td><td>username</td><td>profiles</td></tr>
+          <tr><td><code>blackbird</code></td><td>Username</td><td>username</td><td>profiles</td></tr>
+          <tr><td><code>holehe</code></td><td>Email</td><td>email</td><td>service registrations</td></tr>
+          <tr><td><code>h8mail</code></td><td>Email</td><td>email</td><td>breach indicators</td></tr>
+          <tr><td><code>ghunt</code></td><td>Email</td><td>email</td><td>Google account metadata</td></tr>
+          <tr><td><code>instaloader</code></td><td>Social</td><td>username</td><td>Instagram profile + posts</td></tr>
+          <tr><td><code>twscrape</code></td><td>Social</td><td>username</td><td>X/Twitter profile</td></tr>
+          <tr><td><code>theHarvester</code></td><td>Infrastructure</td><td>domain</td><td>emails, hosts, IPs</td></tr>
+          <tr><td><code>subfinder</code></td><td>Infrastructure</td><td>domain</td><td>subdomains</td></tr>
+          <tr><td><code>whois</code>, <code>dig</code>, <code>nmap</code></td><td>Infrastructure</td><td>domain/IP</td><td>registration, DNS, ports</td></tr>
+          <tr><td><code>exiftool</code></td><td>Files</td><td>file</td><td>EXIF/GPS/author</td></tr>
+          <tr><td><code>yt-dlp</code></td><td>Media</td><td>URL</td><td>video/channel metadata</td></tr>
+          <tr><td>SpiderFoot / Maltego</td><td>Import</td><td>JSON/CSV</td><td>entities, profiles, links</td></tr>
+        </tbody>
+      </table>
+      <pre><code>uv run larpharvester integrations
+uv run larpharvester run maigret alice --json
+uv run larpharvester ingest maltego.csv --format auto</code></pre>
+    </section>
+
+    <section aria-labelledby="add">
+      <h2 id="add">Add your own source</h2>
+      <p class="sub">Subclass <code>Source</code>, decorate with <code>@register</code>, and import the module. Or ship a plugin through the <code>larpharvester.sources</code> entry-point group.</p>
+      <pre><code>from larpharvester.models import CheckResult, Profile
+from larpharvester.sources import Source, register
+
+@register
+class Example(Source):
+    name = "example"
+    label = "Example"
+    group = "social"
+
+    async def check(self, fetcher, target):
+        status, data = await fetcher.get_json(
+            f"https://api.example.com/users/{target}"
+        )
+        if status == 404:
+            return self.missing(target)
+        if status != 200:
+            return self.failed(target, f"HTTP {status}")
+        return self.ok(target, Profile(
+            source=self.name,
+            username=target,
+            url=data["html_url"],
+            display_name=data.get("name"),
+        ))</code></pre>
+      <p class="sub">Then record a replayable contract fixture so upstream drift fails loudly:</p>
+      <pre><code>uv run larpharvester source verify --record -s example
+uv run larpharvester source verify -s example</code></pre>
+    </section>
+  </main>
+
+  <footer class="site">
+    <div class="footer-inner">
+      <span>© 2026 larpharvester contributors · MIT</span>
+      <span><a href="./">Overview</a> · <a href="quickstart.html">Quickstart</a> · <a href="sitemap.xml">Sitemap</a></span>
+    </div>
+  </footer>
+</body>
+</html>

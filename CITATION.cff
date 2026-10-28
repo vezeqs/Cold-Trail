@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use larpharvester in research or reporting, cite it as below."
+title: larpharvester
+abstract: >-
+  Local-first OSINT toolkit for pivoting usernames and emails across public
+  sources, harvesting profiles and posts into SQLite, correlating identities,
+  and exporting evidence-grade dossiers.
+authors:
+  - name: "larpharvester contributors"
+version: 0.7.0
+date-released: 2026-10-27
+license: MIT
+repository-code: "https://github.com/slopmanufacturer/larpharvester"
+keywords:
+  - osint
+  - threat-intelligence
+  - username-enumeration
+  - email-osint
+  - identity-correlation
+  - digital-forensics

@@ -107,6 +107,11 @@ async def watch(
             change for change in changes if _change_key(change) not in notified_changes
         ]
         notified_changes.update(_change_key(change) for change in fresh_changes)
+        if len(notified_changes) > 10_000:
+            # Long-running watches must not grow without bound. Dropping the
+            # de-duplication memory can re-alert an old change once, which is
+            # safer than an unbounded process.
+            notified_changes.clear()
 
         if on_cycle:
             on_cycle(cycle, report, new_posts, changes)

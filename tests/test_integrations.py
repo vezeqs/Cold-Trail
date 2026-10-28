@@ -328,3 +328,163 @@ def test_list_tools_reports_installed_flag(monkeypatch):
     rows = {row["name"]: row for row in list_tools()}
     assert rows["nmap"]["installed"] is True
     assert rows["sherlock"]["installed"] is False
+
+
+# -- hardening --------------------------------------------------------------
+
+
+def test_validate_target_rejects_option_like_values():
+    from larpharvester.integrations import validate_target
+
+    for bad in ("--timeout=999", "-oN", "", "a\nb", "a\x00b"):
+        with pytest.raises(ToolError):
+            validate_target(bad)
+    assert validate_target("  alice  ") == "alice"
+
+
+def test_run_tool_never_executes_option_injection(monkeypatch):
+    calls: list[object] = []
+    monkeypatch.setattr(integrations_mod.shutil, "which", lambda binary: "/bin/true")
+    monkeypatch.setattr(integrations_mod.subprocess, "run", lambda *a, **k: calls.append(a))
+    with pytest.raises(ToolError):
+        run_tool("sherlock", "--script=/tmp/evil.nse")
+    assert calls == []
+
+
+# -- new username/social wrappers ------------------------------------------
+
+
+def test_maigret_parser_uses_matches_and_skips_available_sites():
+    stdout = json.dumps(
+        {
+            "query_username": "alice",
+            "matches": [
+                {
+                    "site": "GitHub",
+                    "url_user": "https://github.com/alice",
+                    "status": "FOUND",
+                },
+                {
+                    "site": "Reddit",
+                    "url_user": "https://reddit.com/user/alice",
+                    "status": "NOT_FOUND",
+                },
+            ],
+        }
+    )
+    parsed = TOOLS["maigret"].parse(stdout, "alice", Path("."))
+    assert [profile.source for profile in parsed.profiles] == ["maigret:github"]
+    assert parsed.profiles[0].url == "https://github.com/alice"
+
+
+def test_maigret_parser_reads_json_report_file(tmp_path):
+    (tmp_path / "alice.json").write_text(
+        json.dumps(
+            {
+                "matches": [
+                    {"site": "GitHub", "url_user": "https://github.com/alice", "status": "FOUND"}
+                ]
+            }
+        )
+    )
+    parsed = TOOLS["maigret"].parse("", "alice", tmp_path)
+    assert parsed.profiles[0].source == "maigret:github"
+
+
+def test_naminter_parser_falls_back_to_print_found_lines():
+    stdout = "[+] GitHub: https://github.com/alice\n[-] Reddit: not found\n"
+    parsed = TOOLS["naminter"].parse(stdout, "alice", Path("."))
+    assert len(parsed.profiles) == 1
+    assert parsed.profiles[0].source == "naminter:github"
+
+
+def test_naminter_parser_reads_json_export(tmp_path):
+    (tmp_path / "naminter.json").write_text(
+        json.dumps(
+            [
+                {"site": "GitHub", "url": "https://github.com/alice", "status": "exists"},
+                {"site": "Reddit", "url": "https://reddit.com/user/alice", "status": "missing"},
+            ]
+        )
+    )
+    parsed = TOOLS["naminter"].parse("", "alice", tmp_path)
+    assert [profile.source for profile in parsed.profiles] == ["naminter:github"]
+
+
+def test_social_analyzer_parser_detected_entries():
+    stdout = json.dumps(
+        {
+            "detected": [
+                {"site": "GitHub", "url": "https://github.com/alice"},
+                {"site": "Reddit", "url": "https://reddit.com/user/alice"},
+            ],
+            "uncertain": [{"site": "Nope", "url": "https://nope.example/alice"}],
+        }
+    )
+    parsed = TOOLS["social-analyzer"].parse(stdout, "alice", Path("."))
+    assert {profile.source for profile in parsed.profiles} == {
+        "social-analyzer:github",
+        "social-analyzer:reddit",
+    }
+
+
+def test_blackbird_parser_json_results():
+    stdout = json.dumps(
+        {"results": [{"site": "GitHub", "url": "https://github.com/alice", "found": True}]}
+    )
+    parsed = TOOLS["blackbird"].parse(stdout, "alice", Path("."))
+    assert parsed.profiles[0].source == "blackbird:github"
+
+
+def test_instaloader_parser_reads_profile_and_posts(tmp_path):
+    folder = tmp_path / "instagram"
+    folder.mkdir()
+    (folder / "123.json").write_text(
+        json.dumps(
+            {
+                "node": {
+                    "id": "123",
+                    "username": "alice",
+                    "full_name": "Alice A",
+                    "biography": "contact alice@example.com",
+                    "external_url": "https://alice.example",
+                    "profile_pic_url": "https://x/a.jpg",
+                    "edge_followed_by": {"count": 42},
+                    "is_verified": True,
+                }
+            }
+        )
+    )
+    (folder / "post.json").write_text(
+        json.dumps(
+            {
+                "shortcode": "abc123",
+                "taken_at_timestamp": 1700000000,
+                "node": {"username": "alice"},
+                "edge_media_to_caption": {"edges": [{"node": {"text": "hello"}}]},
+            }
+        )
+    )
+    parsed = TOOLS["instaloader"].parse("", "alice", tmp_path)
+    assert parsed.profiles[0].username == "alice"
+    assert parsed.profiles[0].followers == 42
+    assert any(
+        entity.kind == "email" and entity.value == "alice@example.com" for entity in parsed.entities
+    )
+    assert parsed.posts[0].post_id == "abc123"
+
+
+def test_twscrape_parser_profile_json():
+    stdout = json.dumps(
+        {
+            "id": "42",
+            "username": "alice",
+            "displayname": "Alice",
+            "description": "security@example.com",
+            "followersCount": 7,
+        }
+    )
+    parsed = TOOLS["twscrape"].parse(stdout, "alice", Path("."))
+    assert parsed.profiles[0].source == "x"
+    assert parsed.profiles[0].followers == 7
+    assert any(entity.kind == "email" for entity in parsed.entities)

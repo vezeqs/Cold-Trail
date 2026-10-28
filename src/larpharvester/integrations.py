@@ -52,6 +52,28 @@ class ToolUnavailable(ToolError):
     """The tool is registered but its binary is not installed."""
 
 
+MAX_TARGET_LENGTH = 2048
+
+
+def validate_target(target: str) -> str:
+    """Reject targets that a CLI tool could mistake for an option.
+
+    Targets are appended to a fixed argv, so a value such as ``--timeout=999``
+    or ``--script=/tmp/x.nse`` would be parsed as a flag by argparse/getopt
+    tools. This is reachable from the CLI and the web workbench.
+    """
+    value = target.strip()
+    if not value:
+        raise ToolError("target is required")
+    if len(value) > MAX_TARGET_LENGTH:
+        raise ToolError(f"target is longer than {MAX_TARGET_LENGTH} characters")
+    if value.startswith("-"):
+        raise ToolError("target must not start with '-' (option injection is not allowed)")
+    if any(char in value for char in ("\x00", "\n", "\r")):
+        raise ToolError("target must not contain NUL or newline characters")
+    return value
+
+
 @dataclass(slots=True)
 class Parsed:
     profiles: list[Profile] = field(default_factory=list)
@@ -571,6 +593,370 @@ def _nmap_parse(stdout: str, target: str, workdir: Path) -> Parsed:
     )
 
 
+# -- username / social coverage tools ---------------------------------------
+
+
+def _first_json(stdout: str) -> Any:
+    """Parse a JSON document even when the tool prints progress lines first."""
+    text = stdout.strip()
+    if not text:
+        return None
+    try:
+        return json.loads(text)
+    except ValueError:
+        pass
+    for opener, closer in (("{", "}"), ("[", "]")):
+        start = text.find(opener)
+        end = text.rfind(closer)
+        if start != -1 and end > start:
+            try:
+                return json.loads(text[start : end + 1])
+            except ValueError:
+                continue
+    return None
+
+
+def _site_profile(site: str, url: str, target: str, tool: str) -> Profile:
+    return Profile(
+        source=f"{tool}:{slugify(site)}",
+        username=target,
+        url=url,
+        display_name=site,
+        extra={"tool": tool, "site": site},
+    )
+
+
+def _line_profiles(stdout: str, target: str, tool: str) -> list[Profile]:
+    profiles: list[Profile] = []
+    for line in stdout.splitlines():
+        match = SHERLOCK_LINE.match(line.strip())
+        if match:
+            profiles.append(
+                _site_profile(match.group(1).strip(), match.group(2).strip(), target, tool)
+            )
+    return profiles
+
+
+def _json_site_entries(data: Any) -> list[tuple[str, str, bool]]:
+    """Normalize the common ``{site: {url, status}}`` / ``[{site, url}]`` shapes."""
+    entries: list[tuple[str, str, bool]] = []
+    if isinstance(data, dict):
+        containers = [data]
+        for key in ("detected", "results", "sites", "data", "found", "matches"):
+            value = data.get(key)
+            if isinstance(value, (list, dict)):
+                containers.append(value)
+        for container in containers:
+            if isinstance(container, list):
+                for item in container:
+                    if not isinstance(item, dict):
+                        continue
+                    site = item.get("site") or item.get("name") or item.get("site_name")
+                    url = item.get("url") or item.get("url_user") or item.get("profile_url")
+                    status = item.get("status")
+                    if status is not None and str(status).casefold() not in {
+                        "found",
+                        "claimed",
+                        "exists",
+                        "true",
+                        "detected",
+                        "registered",
+                    }:
+                        continue
+                    if site and url:
+                        entries.append((str(site), str(url), True))
+            else:
+                for site, payload in container.items():
+                    if not isinstance(payload, dict):
+                        continue
+                    url = (
+                        payload.get("url_user")
+                        or payload.get("url")
+                        or payload.get("profile_url")
+                        or payload.get("url_main")
+                    )
+                    status = payload.get("status")
+                    if isinstance(status, dict):
+                        status = status.get("status")
+                    flag = payload.get("is_found", payload.get("found"))
+                    found = (
+                        bool(flag)
+                        if flag is not None
+                        else str(status).casefold()
+                        in {"claimed", "found", "exists", "true", "detected", "registered"}
+                    )
+                    if url and found:
+                        entries.append((str(site), str(url), True))
+    elif isinstance(data, list):
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            site = item.get("site") or item.get("name") or item.get("site_name")
+            url = item.get("url") or item.get("url_user") or item.get("profile_url")
+            status = item.get("status")
+            if status is not None and str(status).casefold() not in {
+                "found",
+                "claimed",
+                "exists",
+                "true",
+                "detected",
+                "registered",
+            }:
+                continue
+            if site and url:
+                entries.append((str(site), str(url), True))
+    return entries
+
+
+def _maigret_build(target: str, extra: list[str], workdir: Path) -> list[str]:
+    return [
+        "maigret",
+        target,
+        "--json",
+        "simple",
+        "--folderoutput",
+        str(workdir),
+        "--no-color",
+        "--timeout",
+        "10",
+        *extra,
+    ]
+
+
+def _maigret_parse(stdout: str, target: str, workdir: Path) -> Parsed:
+    entries = _json_site_entries(_first_json(stdout))
+    if not entries:
+        for path in sorted(workdir.rglob("*.json"))[:20]:
+            try:
+                entries = _json_site_entries(json.loads(path.read_text(encoding="utf-8")))
+            except (OSError, ValueError):
+                continue
+            if entries:
+                break
+    profiles = [_site_profile(site, url, target, "maigret") for site, url, _ in entries]
+    if not profiles:
+        profiles = _line_profiles(stdout, target, "maigret")
+    entities = [
+        entity for profile in profiles for entity in _entities(profile.url, profile.source, target)
+    ]
+    return Parsed(
+        profiles=profiles,
+        entities=entities,
+        summary=f"{len(profiles)} profile(s) found by maigret",
+    )
+
+
+def _naminter_build(target: str, extra: list[str], workdir: Path) -> list[str]:
+    return [
+        "naminter",
+        "-u",
+        target,
+        "--json",
+        "--json-path",
+        str(workdir / "naminter.json"),
+        *extra,
+    ]
+
+
+def _naminter_parse(stdout: str, target: str, workdir: Path) -> Parsed:
+    data = _first_json(stdout)
+    if data is None:
+        path = workdir / "naminter.json"
+        if path.is_file():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+            except (OSError, ValueError):
+                data = None
+    entries = _json_site_entries(data)
+    profiles = [_site_profile(site, url, target, "naminter") for site, url, _ in entries]
+    if not profiles:
+        profiles = _line_profiles(stdout, target, "naminter")
+    entities = [
+        entity for profile in profiles for entity in _entities(profile.url, profile.source, target)
+    ]
+    return Parsed(
+        profiles=profiles,
+        entities=entities,
+        summary=f"{len(profiles)} profile(s) found by naminter (WhatsMyName dataset)",
+    )
+
+
+def _social_analyzer_build(target: str, extra: list[str], workdir: Path) -> list[str]:
+    return ["social-analyzer", "--username", target, "--output", "json", "--silent", *extra]
+
+
+def _social_analyzer_parse(stdout: str, target: str, workdir: Path) -> Parsed:
+    entries = _json_site_entries(_first_json(stdout))
+    profiles = [_site_profile(site, url, target, "social-analyzer") for site, url, _ in entries]
+    if not profiles:
+        profiles = _line_profiles(stdout, target, "social-analyzer")
+    entities = [
+        entity for profile in profiles for entity in _entities(profile.url, profile.source, target)
+    ]
+    return Parsed(
+        profiles=profiles,
+        entities=entities,
+        summary=f"{len(profiles)} profile(s) found by social-analyzer",
+    )
+
+
+def _blackbird_build(target: str, extra: list[str], workdir: Path) -> list[str]:
+    return ["otinstaller", "run", "blackbird", "--", "--username", target, *extra]
+
+
+def _blackbird_parse(stdout: str, target: str, workdir: Path) -> Parsed:
+    entries = _json_site_entries(_first_json(stdout))
+    profiles = [_site_profile(site, url, target, "blackbird") for site, url, _ in entries]
+    if not profiles:
+        profiles = _line_profiles(stdout, target, "blackbird")
+    entities = [
+        entity for profile in profiles for entity in _entities(profile.url, profile.source, target)
+    ]
+    return Parsed(
+        profiles=profiles,
+        entities=entities,
+        summary=f"{len(profiles)} profile(s) found by blackbird",
+    )
+
+
+def _instaloader_build(target: str, extra: list[str], workdir: Path) -> list[str]:
+    return [
+        "instaloader",
+        "--no-pictures",
+        "--no-videos",
+        "--no-captions",
+        "--no-compress-json",
+        "--max-count",
+        "12",
+        "--dirname-pattern",
+        str(workdir / "instagram"),
+        *extra,
+        target,
+    ]
+
+
+def _instaloader_parse(stdout: str, target: str, workdir: Path) -> Parsed:
+    profiles: list[Profile] = []
+    posts: list[Post] = []
+    entities: list[Entity] = []
+    seen_profiles: set[str] = set()
+    for path in sorted(workdir.rglob("*.json"))[:200]:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        node = data.get("node") if isinstance(data.get("node"), dict) else data
+        username = node.get("username")
+        if not username:
+            continue
+        username = str(username)
+        if username.casefold() not in seen_profiles:
+            seen_profiles.add(username.casefold())
+            profile = Profile(
+                source="instagram",
+                username=username,
+                url=f"https://www.instagram.com/{username}/",
+                display_name=node.get("full_name"),
+                bio=node.get("biography"),
+                avatar=node.get("profile_pic_url_hd") or node.get("profile_pic_url"),
+                website=node.get("external_url"),
+                followers=(node.get("edge_followed_by") or {}).get("count")
+                if isinstance(node.get("edge_followed_by"), dict)
+                else None,
+                extra={
+                    "tool": "instaloader",
+                    "instagram_id": node.get("id"),
+                    "verified": node.get("is_verified"),
+                    "business_email": node.get("business_email"),
+                    "public_email": node.get("public_email"),
+                    "phone": node.get("contact_phone_number"),
+                },
+            )
+            profiles.append(profile)
+            for key in ("biography", "external_url", "business_email", "public_email"):
+                value = node.get(key)
+                if isinstance(value, str):
+                    entities.extend(_entities(value, "instagram", profile.username))
+            caption_edges = (node.get("edge_media_to_caption") or {}).get("edges") or []
+            for edge in caption_edges:
+                caption = ((edge or {}).get("node") or {}).get("text")
+                if caption:
+                    entities.extend(_entities(caption, "instagram", profile.username))
+        shortcode = data.get("shortcode")
+        if shortcode:
+            caption_edges = (data.get("edge_media_to_caption") or {}).get("edges") or []
+            caption = ((caption_edges[0] if caption_edges else {}).get("node") or {}).get("text")
+            posts.append(
+                Post(
+                    source="instagram",
+                    username=username,
+                    post_id=str(shortcode),
+                    url=f"https://www.instagram.com/p/{shortcode}/",
+                    created_at=_now(data.get("taken_at_timestamp")),
+                    text=caption,
+                )
+            )
+    if not profiles:
+        match = re.search(r"Profile:\s*(\S+)", stdout)
+        if match:
+            profiles.append(
+                Profile(
+                    source="instagram",
+                    username=match.group(1),
+                    url=f"https://www.instagram.com/{match.group(1)}/",
+                    extra={"tool": "instaloader"},
+                )
+            )
+    return Parsed(
+        profiles=profiles,
+        posts=posts,
+        entities=entities,
+        summary=f"{len(profiles)} Instagram profile(s), {len(posts)} post(s)",
+    )
+
+
+def _twscrape_build(target: str, extra: list[str], workdir: Path) -> list[str]:
+    return ["twscrape", "user_by_login", target, *extra]
+
+
+def _twscrape_parse(stdout: str, target: str, workdir: Path) -> Parsed:
+    data = _first_json(stdout)
+    if isinstance(data, list):
+        data = data[0] if data else None
+    profiles: list[Profile] = []
+    entities: list[Entity] = []
+    if isinstance(data, dict):
+        username = str(data.get("username") or target)
+        metrics = data.get("public_metrics")
+        if not isinstance(metrics, dict):
+            metrics = {}
+        profiles.append(
+            Profile(
+                source="x",
+                username=username,
+                url=f"https://x.com/{username}",
+                display_name=data.get("displayname") or data.get("name"),
+                bio=data.get("description") or data.get("rawDescription"),
+                avatar=data.get("profileImageUrl") or data.get("profile_image_url"),
+                website=data.get("url"),
+                created_at=_now(data.get("createdAt") or data.get("created_at")),
+                followers=data.get("followersCount") or metrics.get("followers_count"),
+                extra={"tool": "twscrape", "x_id": data.get("id")},
+            )
+        )
+        for key in ("description", "location", "url"):
+            value = data.get(key)
+            if isinstance(value, str):
+                entities.extend(_entities(value, "x", username))
+    return Parsed(
+        profiles=profiles,
+        entities=entities,
+        summary=f"{len(profiles)} X/Twitter profile(s) via twscrape",
+    )
+
+
 # -- registry ---------------------------------------------------------------
 
 TOOLS: dict[str, ToolSpec] = {
@@ -684,6 +1070,66 @@ TOOLS: dict[str, ToolSpec] = {
         build=_nmap_build,
         parse=_nmap_parse,
     ),
+    "maigret": ToolSpec(
+        name="maigret",
+        binary="maigret",
+        category="username",
+        input_kind="username",
+        description="Deep username search across 3,000+ sites (successor to Sherlock).",
+        install="pipx install maigret",
+        build=_maigret_build,
+        parse=_maigret_parse,
+    ),
+    "naminter": ToolSpec(
+        name="naminter",
+        binary="naminter",
+        category="username",
+        input_kind="username",
+        description="Async client for the WebBreacher WhatsMyName dataset (JSON export).",
+        install="pipx install naminter",
+        build=_naminter_build,
+        parse=_naminter_parse,
+    ),
+    "social-analyzer": ToolSpec(
+        name="social-analyzer",
+        binary="social-analyzer",
+        category="username",
+        input_kind="username",
+        description="Profile detection with confidence metadata across social sites.",
+        install="pipx install social-analyzer",
+        build=_social_analyzer_build,
+        parse=_social_analyzer_parse,
+    ),
+    "blackbird": ToolSpec(
+        name="blackbird",
+        binary="otinstaller",
+        category="username",
+        input_kind="username",
+        description="Username/email OSINT with per-site JSON and CSV exports (via otinstaller).",
+        install="pipx install otinstaller && otinstaller init && otinstaller install blackbird",
+        build=_blackbird_build,
+        parse=_blackbird_parse,
+    ),
+    "instaloader": ToolSpec(
+        name="instaloader",
+        binary="instaloader",
+        category="social",
+        input_kind="username",
+        description="Public Instagram profile metadata and recent post JSON.",
+        install="pipx install instaloader",
+        build=_instaloader_build,
+        parse=_instaloader_parse,
+    ),
+    "twscrape": ToolSpec(
+        name="twscrape",
+        binary="twscrape",
+        category="social",
+        input_kind="username",
+        description="X/Twitter profile lookup through a logged-in account pool.",
+        install="pipx install twscrape && twscrape add_accounts accounts.txt",
+        build=_twscrape_build,
+        parse=_twscrape_parse,
+    ),
     "spiderfoot": ToolSpec(
         name="spiderfoot",
         binary="sf.py",
@@ -743,11 +1189,9 @@ def run_tool(
         raise ToolError(f"unknown tool {name!r}; see `larpharvester integrations`")
     if spec.runner_only:
         raise ToolError(f"{name} is import-only; use `larpharvester ingest --format {name}`")
+    target = validate_target(target)
     if not shutil.which(spec.binary):
         raise ToolUnavailable(f"{spec.binary} is not installed. Install with: {spec.install}")
-    target = target.strip()
-    if not target:
-        raise ToolError("target is required")
     if spec.input_kind == "file" and not Path(target).is_file():
         raise ToolError(f"not a file: {target}")
     extra = [str(item) for item in (extra_args or [])]

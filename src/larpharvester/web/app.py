@@ -104,7 +104,13 @@ MAX_JOBS = 200
 JOB_RETENTION = 3600.0
 RATE_LIMIT = 20
 RATE_WINDOW = 60.0
+LOGIN_RATE_LIMIT = 10
+LOGIN_RATE_WINDOW = 300.0
+RATE_CLIENTS = 2048
 MAX_UPLOAD = 50 * 1024 * 1024
+UPLOAD_CHUNK = 1024 * 1024
+SSE_HEARTBEAT = 15.0
+SSE_MAX_SECONDS = 3600.0
 PUBLIC_PATHS = {"/healthz", "/api/health", "/login"}
 
 
@@ -344,17 +350,56 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         payload = {"settings": settings, **(context or {})}
         return templates.TemplateResponse(request, name, payload, status_code=status_code)
 
-    def _rate_limited(request: Request) -> bool:
-        """Simple per-client sliding-window limiter for expensive endpoints."""
-        client = request.client.host if request.client else "local"
+    def _client_key(request: Request) -> str:
+        """Rate-limit key. X-Forwarded-For is only trusted when explicitly configured."""
+        if settings.trust_proxy:
+            forwarded = request.headers.get("x-forwarded-for", "")
+            if forwarded:
+                return forwarded.split(",", 1)[0].strip() or "unknown"
+        return request.client.host if request.client else "local"
+
+    def _rate_limited(
+        request: Request,
+        *,
+        limit: int = RATE_LIMIT,
+        window: float = RATE_WINDOW,
+        bucket: str = "default",
+    ) -> bool:
+        """Bounded per-client sliding-window limiter for expensive endpoints."""
         now = time.time()
-        stamps = [stamp for stamp in app.state.rate.get(client, []) if now - stamp < RATE_WINDOW]
-        if len(stamps) >= RATE_LIMIT:
-            app.state.rate[client] = stamps
+        rate = app.state.rate
+        if len(rate) > RATE_CLIENTS:
+            for key, stamps in list(rate.items()):
+                if not stamps or now - stamps[-1] > max(window, RATE_WINDOW):
+                    rate.pop(key, None)
+            if len(rate) > RATE_CLIENTS:
+                for key in list(rate)[: len(rate) - RATE_CLIENTS]:
+                    rate.pop(key, None)
+        key = f"{bucket}:{_client_key(request)}"
+        stamps = [stamp for stamp in rate.get(key, []) if now - stamp < window]
+        if len(stamps) >= limit:
+            rate[key] = stamps
             return True
         stamps.append(now)
-        app.state.rate[client] = stamps
+        rate[key] = stamps
         return False
+
+    async def _read_upload(file: UploadFile) -> bytes:
+        """Read an upload in bounded chunks so oversized files never reach RAM."""
+        declared = getattr(file, "size", None)
+        if declared is not None and declared > MAX_UPLOAD:
+            raise HTTPException(status_code=413, detail="upload exceeds 50 MB")
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = await file.read(UPLOAD_CHUNK)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > MAX_UPLOAD:
+                raise HTTPException(status_code=413, detail="upload exceeds 50 MB")
+            chunks.append(chunk)
+        return b"".join(chunks)
 
     def _export_response(
         payload: dict[str, Any],
@@ -415,6 +460,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/login", response_class=HTMLResponse)
     async def login_submit(request: Request, token: Annotated[str, Form()] = ""):
+        if _rate_limited(request, limit=LOGIN_RATE_LIMIT, window=LOGIN_RATE_WINDOW, bucket="login"):
+            return _render(
+                request,
+                "login.html",
+                {"error": "too many attempts; try again later", "active": "login"},
+                status_code=429,
+            )
         expected = settings.web_token or ""
         if expected and hmac.compare_digest(token.strip(), expected):
             response = RedirectResponse("/", status_code=303)
@@ -423,6 +475,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 token.strip(),
                 httponly=True,
                 samesite="strict",
+                secure=request.url.scheme == "https",
+                path="/",
                 max_age=86_400,
             )
             return response
@@ -867,9 +921,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=429, detail="rate limit exceeded")
         error: str | None = None
         payload: dict[str, Any] | None = None
-        data = await file.read()
-        if len(data) > MAX_UPLOAD:
-            raise HTTPException(status_code=413, detail="upload exceeds 50 MB")
+        data = await _read_upload(file)
         suffix = Path(file.filename or "import.json").suffix
         temp_path: Path | None = None
         try:
@@ -1094,8 +1146,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             async with app.state.pivot_lock:
                 job.status = "running"
                 job.started_at = time.time()
-                store = Store(settings.db_path)
+                store: Store | None = None
                 try:
+                    store = Store(settings.db_path)
                     report = await run_pivot(
                         target,
                         settings=settings,
@@ -1117,7 +1170,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     job.status = "error"
                     job.error = f"{type(exc).__name__}: {exc}"
                 finally:
-                    store.close()
+                    if store is not None:
+                        store.close()
                     job.finished_at = time.time()
 
         task = asyncio.create_task(_execute())
@@ -1177,6 +1231,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         async def _event_gen():
             cursor = 0
+            started = time.monotonic()
+            last_beat = started
             while True:
                 while cursor < len(job.events):
                     ev = job.events[cursor]
@@ -1192,9 +1248,31 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     }
                     yield f"event: done\ndata: {json.dumps(summary)}\n\n"
                     break
+                if time.monotonic() - started > SSE_MAX_SECONDS:
+                    summary = {
+                        "status": "error",
+                        "run_id": job.run_id,
+                        "result_count": job.result_count,
+                        "found_count": job.found_count,
+                        "error": "stream timed out before the job finished",
+                    }
+                    yield f"event: done\ndata: {json.dumps(summary)}\n\n"
+                    break
+                now = time.monotonic()
+                if now - last_beat >= SSE_HEARTBEAT:
+                    last_beat = now
+                    yield ": keep-alive\n\n"
                 await asyncio.sleep(0.15)
 
-        return StreamingResponse(_event_gen(), media_type="text/event-stream")
+        return StreamingResponse(
+            _event_gen(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
 
     @app.post("/api/pivot", status_code=202)
     async def api_pivot(payload: PivotRequest, request: Request):
@@ -1228,7 +1306,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "status": "ok" if healthy else "error",
             "detail": detail,
             "version": __version__,
-            "db": str(settings.db_path),
         }
         if not healthy:
             return JSONResponse(payload, status_code=503)

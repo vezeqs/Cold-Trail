@@ -1,0 +1,19 @@
+{
+  "source": "vk",
+  "target": "vk",
+  "observed_status": "found",
+  "profile": {
+    "username": "vk",
+    "url": "https://vk.com/vk",
+    "display_name": "vk",
+    "followers": null,
+    "extra_keys": []
+  },
+  "exchanges": [
+    {
+      "url": "https://vk.com/vk",
+      "status": 200,
+      "body_b64": "PCFkb2N0eXBlIGh0bWw+PGh0bWw+PGhlYWQ+CjxtZXRhIHByb3BlcnR5PSJvZzp0aXRsZSIgY29udGVudD0iVksgVGVhbSB8IFZLIj4KPG1ldGEgcHJvcGVydHk9Im9nOmRlc2NyaXB0aW9uIiBjb250ZW50PSJPZmZpY2lhbCBWSyBjb21tdW5pdHkuIj4KPG1ldGEgcHJvcGVydHk9Im9nOmltYWdlIiBjb250ZW50PSJodHRwczovL3N1bjkuZXhhbXBsZS92ay5qcGciPgo8L2hlYWQ+PGJvZHk+Vks8L2JvZHk+PC9odG1sPg=="
+    }
+  ]
+}

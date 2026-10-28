@@ -1,0 +1,19 @@
+{
+  "source": "pinterest",
+  "target": "pinterest",
+  "observed_status": "found",
+  "profile": {
+    "username": "pinterest",
+    "url": "https://www.pinterest.com/pinterest/",
+    "display_name": "pinterest",
+    "followers": null,
+    "extra_keys": []
+  },
+  "exchanges": [
+    {
+      "url": "https://www.pinterest.com/pinterest/",
+      "status": 200,
+      "body_b64": "PCFkb2N0eXBlIGh0bWw+PGh0bWw+PGhlYWQ+CjxtZXRhIHByb3BlcnR5PSJvZzp0aXRsZSIgY29udGVudD0iUGludGVyZXN0IChwaW50ZXJlc3QpIC0gUHJvZmlsZSB8IFBpbnRlcmVzdCI+CjxtZXRhIHByb3BlcnR5PSJvZzpkZXNjcmlwdGlvbiIgY29udGVudD0iUGludGVyZXN0IGhlbHBzIHlvdSBmaW5kIGlkZWFzLiI+CjxtZXRhIHByb3BlcnR5PSJvZzppbWFnZSIgY29udGVudD0iaHR0cHM6Ly9pLnBpbmltZy5jb20vcGludGVyZXN0LmpwZyI+CjwvaGVhZD48Ym9keT5QaW50ZXJlc3Q8L2JvZHk+PC9odG1sPg=="
+    }
+  ]
+}

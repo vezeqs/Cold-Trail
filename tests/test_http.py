@@ -180,3 +180,30 @@ async def test_declarative_probe_times_out_once(settings):
         with pytest.raises(FetchError):
             await source.check(fetcher, "alice")
     assert route.call_count == 1
+
+
+@respx.mock
+async def test_html_robots_soft_404_does_not_block(settings):
+    settings.respect_robots = True
+    respx.get("https://example.test/robots.txt").mock(
+        return_value=httpx.Response(
+            200,
+            text="<html><body>\nUser-agent: *\nDisallow: /\n</body></html>",
+            headers={"content-type": "text/html"},
+        )
+    )
+    respx.get("https://example.test/page").mock(return_value=httpx.Response(200, json={"ok": True}))
+    async with Fetcher(settings) as fetcher:
+        assert await fetcher.get_json("https://example.test/page") == (200, {"ok": True})
+
+
+@respx.mock
+async def test_invalid_json_raises_instead_of_silent_none(settings):
+    respx.get("https://api.example/broken").mock(
+        return_value=httpx.Response(
+            200, content=b'{"a": ', headers={"content-type": "application/json"}
+        )
+    )
+    async with Fetcher(settings) as fetcher:
+        with pytest.raises(FetchError):
+            await fetcher.get_json("https://api.example/broken")
