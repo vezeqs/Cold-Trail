@@ -47,6 +47,43 @@ class DiscordAlerter(Alerter):
             return False
 
 
+class SlackAlerter(Alerter):
+    name = "slack"
+
+    def __init__(self, url: str) -> None:
+        self.url = url
+
+    async def send(self, title: str, body: str) -> bool:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.post(self.url, json={"text": f"*{title}*\n{body[:2500]}"})
+            return response.status_code < 400
+        except httpx.HTTPError:
+            return False
+
+
+class TelegramAlerter(Alerter):
+    name = "telegram"
+
+    def __init__(self, target: str) -> None:
+        token, _, chat_id = target.partition(":")
+        self.token = token.strip()
+        self.chat_id = chat_id.strip()
+
+    async def send(self, title: str, body: str) -> bool:
+        if not self.token or not self.chat_id:
+            return False
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.post(
+                    f"https://api.telegram.org/bot{self.token}/sendMessage",
+                    json={"chat_id": self.chat_id, "text": f"{title}\n{body[:3500]}"},
+                )
+            return response.status_code < 400
+        except httpx.HTTPError:
+            return False
+
+
 class NtfyAlerter(Alerter):
     name = "ntfy"
 
@@ -104,6 +141,10 @@ def build_alerters(kind: str, target: str) -> list[Alerter]:
         return [WebhookAlerter(target)]
     if kind == "discord":
         return [DiscordAlerter(target)]
+    if kind == "slack":
+        return [SlackAlerter(target)]
+    if kind == "telegram":
+        return [TelegramAlerter(target)]
     if kind == "ntfy":
         return [NtfyAlerter(target)]
     if kind == "smtp":

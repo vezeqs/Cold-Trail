@@ -484,7 +484,9 @@ def watch(
     iterations: Annotated[int, typer.Option("--iterations", min=0, help="0 = forever")] = 0,
     limit: Annotated[int, typer.Option("-n", "--limit", min=1)] = 20,
     expand: Annotated[bool, typer.Option("--expand")] = False,
-    alert: Annotated[str | None, typer.Option("--alert", help="webhook|discord|ntfy|smtp")] = None,
+    alert: Annotated[
+        str | None, typer.Option("--alert", help="webhook|discord|slack|telegram|ntfy|smtp")
+    ] = None,
     alert_target: Annotated[
         str | None, typer.Option("--alert-target", help="URL, ntfy topic, or email")
     ] = None,

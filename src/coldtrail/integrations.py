@@ -959,6 +959,194 @@ def _twscrape_parse(stdout: str, target: str, workdir: Path) -> Parsed:
     )
 
 
+# -- projectdiscovery / recon / secrets / phone ------------------------------
+
+
+def _line_entities(stdout: str, target: str, source: str, kind: str) -> list[Entity]:
+    values = [line.strip() for line in stdout.splitlines() if line.strip()]
+    return [
+        Entity(source=source, username=target, kind=kind, value=value)
+        for value in values
+        if not value.startswith("[")
+    ]
+
+
+def _amass_build(target: str, extra: list[str], workdir: Path) -> list[str]:
+    return ["amass", "enum", "-passive", "-d", target, "-silent", *extra]
+
+
+def _amass_parse(stdout: str, target: str, workdir: Path) -> Parsed:
+    entities = _line_entities(stdout, target, "amass", "domain")
+    return Parsed(entities=entities, summary=f"{len(entities)} subdomain(s) from amass")
+
+
+def _assetfinder_build(target: str, extra: list[str], workdir: Path) -> list[str]:
+    return ["assetfinder", "--subs-only", target, *extra]
+
+
+def _assetfinder_parse(stdout: str, target: str, workdir: Path) -> Parsed:
+    entities = _line_entities(stdout, target, "assetfinder", "domain")
+    return Parsed(entities=entities, summary=f"{len(entities)} subdomain(s) from assetfinder")
+
+
+def _httpx_build(target: str, extra: list[str], workdir: Path) -> list[str]:
+    return ["httpx", "-silent", "-u", target, *extra]
+
+
+def _httpx_parse(stdout: str, target: str, workdir: Path) -> Parsed:
+    entities = _line_entities(stdout, target, "httpx", "url")
+    return Parsed(entities=entities, summary=f"{len(entities)} live URL(s) from httpx")
+
+
+def _nuclei_build(target: str, extra: list[str], workdir: Path) -> list[str]:
+    return ["nuclei", "-u", target, "-silent", "-jsonl", *extra]
+
+
+def _nuclei_parse(stdout: str, target: str, workdir: Path) -> Parsed:
+    entities: list[Entity] = []
+    for line in stdout.splitlines():
+        try:
+            item = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(item, dict):
+            continue
+        template = item.get("template-id") or item.get("templateID")
+        if not template:
+            continue
+        matched = item.get("matched-at") or item.get("host") or ""
+        severity = (item.get("info") or {}).get("severity", "")
+        entities.append(
+            Entity(
+                source="nuclei",
+                username=target,
+                kind="vulnerability",
+                value=str(template),
+                context=f"{severity} {matched}".strip(),
+            )
+        )
+    return Parsed(entities=entities, summary=f"{len(entities)} nuclei finding(s)")
+
+
+def _naabu_build(target: str, extra: list[str], workdir: Path) -> list[str]:
+    return ["naabu", "-host", target, "-silent", *extra]
+
+
+def _naabu_parse(stdout: str, target: str, workdir: Path) -> Parsed:
+    entities = _line_entities(stdout, target, "naabu", "port")
+    return Parsed(entities=entities, summary=f"{len(entities)} open port(s) from naabu")
+
+
+def _katana_build(target: str, extra: list[str], workdir: Path) -> list[str]:
+    return ["katana", "-u", target, "-silent", *extra]
+
+
+def _katana_parse(stdout: str, target: str, workdir: Path) -> Parsed:
+    entities = _line_entities(stdout, target, "katana", "url")
+    return Parsed(entities=entities, summary=f"{len(entities)} URL(s) from katana")
+
+
+def _dnsx_build(target: str, extra: list[str], workdir: Path) -> list[str]:
+    return ["dnsx", "-silent", "-a", "-resp", target, *extra]
+
+
+def _dnsx_parse(stdout: str, target: str, workdir: Path) -> Parsed:
+    entities = _line_entities(stdout, target, "dnsx", "domain")
+    return Parsed(entities=entities, summary=f"{len(entities)} DNS answer(s) from dnsx")
+
+
+def _gau_build(target: str, extra: list[str], workdir: Path) -> list[str]:
+    return ["gau", target, "--subs", *extra]
+
+
+def _gau_parse(stdout: str, target: str, workdir: Path) -> Parsed:
+    entities = _line_entities(stdout, target, "gau", "url")
+    return Parsed(entities=entities, summary=f"{len(entities)} URL(s) from gau")
+
+
+def _phoneinfoga_build(target: str, extra: list[str], workdir: Path) -> list[str]:
+    return ["phoneinfoga", "scan", "-n", target, *extra]
+
+
+def _phoneinfoga_parse(stdout: str, target: str, workdir: Path) -> Parsed:
+    profile = Profile(
+        source="phoneinfoga",
+        username=target,
+        url=f"tel:{target}",
+        bio=" ".join(stdout.split())[:1000],
+        extra={"tool": "phoneinfoga", "raw": stdout[:4000]},
+    )
+    return Parsed(
+        profiles=[profile],
+        entities=[Entity(source="phoneinfoga", username=target, kind="phone", value=target)],
+        summary="phoneinfoga scan",
+    )
+
+
+def _gitleaks_build(target: str, extra: list[str], workdir: Path) -> list[str]:
+    return [
+        "gitleaks",
+        "detect",
+        "--source",
+        target,
+        "--no-banner",
+        "--report-format",
+        "json",
+        "--report-path",
+        "-",
+        *extra,
+    ]
+
+
+def _gitleaks_parse(stdout: str, target: str, workdir: Path) -> Parsed:
+    data = _first_json(stdout)
+    entities: list[Entity] = []
+    if isinstance(data, list):
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            rule = item.get("RuleID") or item.get("Description") or "secret"
+            file = item.get("File") or target
+            line = item.get("StartLine") or ""
+            entities.append(
+                Entity(
+                    source="gitleaks",
+                    username=target,
+                    kind="secret_finding",
+                    value=f"{rule} @ {file}:{line}".rstrip(":"),
+                )
+            )
+    return Parsed(entities=entities, summary=f"{len(entities)} gitleaks finding(s)")
+
+
+def _trufflehog_build(target: str, extra: list[str], workdir: Path) -> list[str]:
+    return ["trufflehog", "filesystem", target, "--json", "--no-update", *extra]
+
+
+def _trufflehog_parse(stdout: str, target: str, workdir: Path) -> Parsed:
+    entities: list[Entity] = []
+    for line in stdout.splitlines():
+        try:
+            item = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(item, dict):
+            continue
+        detector = item.get("DetectorName") or item.get("DetectorType") or "secret"
+        meta = item.get("SourceMetadata") or {}
+        files = ((meta.get("Data") or {}).get("Filesystem") or {}) if isinstance(meta, dict) else {}
+        path = files.get("file") or target
+        entities.append(
+            Entity(
+                source="trufflehog",
+                username=target,
+                kind="secret_finding",
+                value=f"{detector} @ {path}",
+            )
+        )
+    return Parsed(entities=entities, summary=f"{len(entities)} trufflehog finding(s)")
+
+
 # -- registry ---------------------------------------------------------------
 
 TOOLS: dict[str, ToolSpec] = {
@@ -1131,6 +1319,116 @@ TOOLS: dict[str, ToolSpec] = {
         install="pipx install twscrape && twscrape add_accounts accounts.txt",
         build=_twscrape_build,
         parse=_twscrape_parse,
+    ),
+    "amass": ToolSpec(
+        name="amass",
+        binary="amass",
+        category="domain",
+        input_kind="domain",
+        description="Passive subdomain enumeration (OWASP Amass).",
+        install="go install github.com/owasp-amass/amass/v4/...@master",
+        build=_amass_build,
+        parse=_amass_parse,
+    ),
+    "assetfinder": ToolSpec(
+        name="assetfinder",
+        binary="assetfinder",
+        category="domain",
+        input_kind="domain",
+        description="Find domains and subdomains from public sources.",
+        install="go install github.com/tomnomnom/assetfinder@latest",
+        build=_assetfinder_build,
+        parse=_assetfinder_parse,
+    ),
+    "httpx": ToolSpec(
+        name="httpx",
+        binary="httpx",
+        category="domain",
+        input_kind="domain",
+        description="Probe live hosts and HTTP metadata (ProjectDiscovery).",
+        install="go install github.com/projectdiscovery/httpx/cmd/httpx@latest",
+        build=_httpx_build,
+        parse=_httpx_parse,
+    ),
+    "nuclei": ToolSpec(
+        name="nuclei",
+        binary="nuclei",
+        category="domain",
+        input_kind="domain",
+        description="Template-based vulnerability findings (JSONL).",
+        install="go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest",
+        build=_nuclei_build,
+        parse=_nuclei_parse,
+    ),
+    "naabu": ToolSpec(
+        name="naabu",
+        binary="naabu",
+        category="network",
+        input_kind="ip/domain",
+        description="Fast port discovery (ProjectDiscovery).",
+        install="go install github.com/projectdiscovery/naabu/v2/cmd/naabu@latest",
+        build=_naabu_build,
+        parse=_naabu_parse,
+    ),
+    "katana": ToolSpec(
+        name="katana",
+        binary="katana",
+        category="domain",
+        input_kind="url",
+        description="Crawl URLs and JavaScript endpoints (ProjectDiscovery).",
+        install="go install github.com/projectdiscovery/katana/cmd/katana@latest",
+        build=_katana_build,
+        parse=_katana_parse,
+    ),
+    "dnsx": ToolSpec(
+        name="dnsx",
+        binary="dnsx",
+        category="domain",
+        input_kind="domain",
+        description="Bulk DNS resolution and records (ProjectDiscovery).",
+        install="go install github.com/projectdiscovery/dnsx/cmd/dnsx@latest",
+        build=_dnsx_build,
+        parse=_dnsx_parse,
+    ),
+    "gau": ToolSpec(
+        name="gau",
+        binary="gau",
+        category="domain",
+        input_kind="domain",
+        description="Fetch known URLs from AlienVault, Wayback, Common Crawl, URLScan.",
+        install="go install github.com/lc/gau/v2/cmd/gau@latest",
+        build=_gau_build,
+        parse=_gau_parse,
+    ),
+    "phoneinfoga": ToolSpec(
+        name="phoneinfoga",
+        binary="phoneinfoga",
+        category="phone",
+        input_kind="phone",
+        description="Phone number OSINT scan (carrier, region, links).",
+        install="go install github.com/sundowndev/phoneinfoga/v2/cmd/phoneinfoga@latest",
+        build=_phoneinfoga_build,
+        parse=_phoneinfoga_parse,
+    ),
+    "gitleaks": ToolSpec(
+        name="gitleaks",
+        binary="gitleaks",
+        category="secrets",
+        input_kind="file",
+        description="Detect hardcoded secrets in a file or repository (no secret values stored).",
+        install="go install github.com/gitleaks/gitleaks/v8@latest",
+        build=_gitleaks_build,
+        parse=_gitleaks_parse,
+    ),
+    "trufflehog": ToolSpec(
+        name="trufflehog",
+        binary="trufflehog",
+        category="secrets",
+        input_kind="file",
+        description="Find verified secrets in files/repos (metadata only, no secret values).",
+        install="go install github.com/trufflesecurity/trufflehog/v3@latest",
+        build=_trufflehog_build,
+        parse=_trufflehog_parse,
     ),
     "spiderfoot": ToolSpec(
         name="spiderfoot",

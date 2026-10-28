@@ -34,6 +34,11 @@ export HIBP_API_KEY=...        # Have I Been Pwned
 export EMAILREP_API_KEY=...
 export HUNTER_API_KEY=...      # Hunter.io email verification
 export X_BEARER_TOKEN=...      # X/Twitter API v2
+export SERPER_API_KEY=...      # Google search via Serper
+export BRAVE_API_KEY=...       # Brave Search API
+export SEARXNG_URL=...         # self-hosted SearXNG base URL
+export OPENCORPORATES_API_KEY=...
+export COMPANIES_HOUSE_API_KEY=...
 ```
 
 ## Who it's for
@@ -142,7 +147,9 @@ Already installed tools are detected and can be imported into the same database:
 
 ```bash
 uv run coldtrail integrations                  # status + install hints
-uv run coldtrail run maigret alice --json      # import findings
+uv run coldtrail websearch 'site:example.com admin'   # search-engine query
+uv run coldtrail company "Acme Ltd"            # corporate/sanctions lookup
+uv run coldtrail run nuclei example.com --json # import findings
 uv run coldtrail ingest spiderfoot.json        # auto-detect format
 ```
 
@@ -151,7 +158,8 @@ uv run coldtrail ingest spiderfoot.json        # auto-detect format
 | Username | `sherlock`, `maigret`, `naminter` (WhatsMyName), `social-analyzer`, `blackbird` |
 | Email | `holehe`, `h8mail`, `ghunt` |
 | Social | `instaloader` (Instagram), `twscrape` (X/Twitter) |
-| Infrastructure | `theHarvester`, `subfinder`, `whois`, `dig`, `nmap` |
+| Infrastructure | `theHarvester`, `subfinder`, `amass`, `assetfinder`, `httpx`, `nuclei`, `naabu`, `katana`, `dnsx`, `gau`, `whois`, `dig`, `nmap` |
+| Phone / secrets | `phoneinfoga`, `gitleaks`, `trufflehog` |
 | Files/media | `exiftool`, `yt-dlp` |
 | Import-only | SpiderFoot JSON, Maltego CSV, theHarvester JSON, generic JSON |
 

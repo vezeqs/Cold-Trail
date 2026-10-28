@@ -6,6 +6,7 @@ from . import (  # noqa: F401, E402
     breach,
     cases,
     collect,
+    company,
     evidence,
     integrations,
     interfaces,
@@ -14,6 +15,7 @@ from . import (  # noqa: F401, E402
     osint,
     output,
     query,
+    websearch,
 )
 from ._app import app
 
