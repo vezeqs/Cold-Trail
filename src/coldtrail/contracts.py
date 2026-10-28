@@ -13,7 +13,7 @@ from __future__ import annotations
 import base64
 import json
 import zlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -112,6 +112,9 @@ async def record_contract(
     source = SOURCES[source_name]
     directory = directory or DEFAULT_FIXTURE_DIR
     directory.mkdir(parents=True, exist_ok=True)
+    # Recording is the one workflow that must retain raw bodies, even though
+    # normal collection defaults to privacy-preserving `keep_raw=False`.
+    settings = replace(settings, keep_raw=True)
     with Store(directory / "_record.db") as store:
         run_id = store.start_run("contract", f"{source_name}:{probe_target}")
         fetcher = Fetcher(settings, store=store, run_id=run_id)

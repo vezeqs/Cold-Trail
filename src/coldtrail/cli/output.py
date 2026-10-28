@@ -24,6 +24,7 @@ from ..report import (
 )
 from ..sites import slugify
 from ..store import Store
+from ..utils import write_private
 from ._app import _settings, app, console
 
 # -- export / report --------------------------------------------------------
@@ -67,7 +68,7 @@ def export_cmd(
             sys.stdout.buffer.write(b"\n")
         return
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_bytes(data)
+    write_private(out, data)
     console.print(f"wrote {out}")
 
 
@@ -90,8 +91,7 @@ def report(
         payload = redact_payload(payload)
     target = (payload.get("run") or {}).get("target", "run")
     destination = out or Path(f"dossier-{run_id}-{slugify(str(target))}.html")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(to_html(payload, redacted=redact), encoding="utf-8")
+    write_private(destination, to_html(payload, redacted=redact).encode("utf-8"))
     console.print(f"wrote {destination}")
 
 
@@ -137,5 +137,5 @@ def decrypt(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    output_file.write_bytes(data)
+    write_private(output_file, data)
     console.print(f"wrote {output_file}")

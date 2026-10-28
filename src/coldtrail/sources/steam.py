@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
 from urllib.parse import quote
+
+from defusedxml import ElementTree as ET
+from defusedxml.common import DefusedXmlException
 
 from ..http import Fetcher
 from ..models import CheckResult, Profile
@@ -24,7 +26,7 @@ class Steam(Source):
             return self.missing(target) if status == 404 else self.failed(target, f"HTTP {status}")
         try:
             root = ET.fromstring(text)
-        except ET.ParseError:
+        except (ET.ParseError, DefusedXmlException):
             return self.failed(target, "unparseable XML profile")
         if root.findtext("error"):
             return self.missing(target, root.findtext("error"))

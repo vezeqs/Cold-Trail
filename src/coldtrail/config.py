@@ -51,7 +51,8 @@ class Settings:
     proxy: str | None = None
     tor: bool = False
     respect_robots: bool = False
-    keep_raw: bool = True
+    keep_raw: bool = False
+    avatar_hash: bool = False
     cache_ttl: int = 86_400
     negative_cache_ttl: int = 86_400
     max_requests: int = 0
@@ -109,6 +110,8 @@ class Settings:
             self.tor = value.lower() in ("1", "true", "yes")
         if value := env.get("COLDTRAIL_KEEP_RAW"):
             self.keep_raw = value.lower() in ("1", "true", "yes")
+        if value := env.get("COLDTRAIL_AVATAR_HASH"):
+            self.avatar_hash = value.lower() in ("1", "true", "yes")
         if value := env.get("COLDTRAIL_WEB_TOKEN"):
             self.web_token = value
         if value := env.get("COLDTRAIL_TRUST_PROXY"):

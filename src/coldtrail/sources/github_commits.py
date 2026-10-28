@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ..http import Fetcher
 from ..models import CheckResult, Profile
+from ..utils import sensitive_cache_key
 from .base import Source, register
 
 API = "https://api.github.com"
@@ -26,6 +27,7 @@ class GitHubCommits(Source):
             f"{API}/search/commits",
             params={"q": f"author-email:{target}", "per_page": 20},
             headers=headers,
+            cache_key=sensitive_cache_key("github-commits", target),
         )
         if status == 200 and isinstance(data, dict):
             total = int(data.get("total_count") or 0)

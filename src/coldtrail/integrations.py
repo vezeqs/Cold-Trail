@@ -539,11 +539,12 @@ def _nmap_build(target: str, extra: list[str], workdir: Path) -> list[str]:
 
 
 def _nmap_parse(stdout: str, target: str, workdir: Path) -> Parsed:
-    import xml.etree.ElementTree as ET
+    from defusedxml import ElementTree as ET
+    from defusedxml.common import DefusedXmlException
 
     try:
         root = ET.fromstring(stdout)
-    except ET.ParseError as exc:
+    except (ET.ParseError, DefusedXmlException) as exc:
         raise ToolError(f"nmap produced invalid XML: {exc}") from exc
     ports: list[dict[str, Any]] = []
     addresses: list[str] = []

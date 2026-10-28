@@ -31,6 +31,40 @@ app.add_typer(source_app, name="source", rich_help_panel="Intel")
 
 console = Console()
 STATUS_STYLE = {"found": "green", "not_found": "dim", "blocked": "yellow", "error": "red"}
+SENSITIVE_FLAGS = {
+    "--token",
+    "--web-token",
+    "--passphrase",
+    "--password",
+    "--api-key",
+    "--secret",
+    "--key",
+}
+
+
+def _redact_argv(argv: list[str]) -> list[str]:
+    """Keep secrets out of the local audit log.
+
+    ``coldtrail serve --token …`` and similar commands would otherwise persist
+    bearer tokens/passphrases in the database and in ``coldtrail audit`` output.
+    """
+    redacted: list[str] = []
+    hide_next = False
+    for item in argv:
+        if hide_next:
+            redacted.append("[redacted]")
+            hide_next = False
+            continue
+        name = item.split("=", 1)[0]
+        if name in SENSITIVE_FLAGS:
+            if "=" in item:
+                redacted.append(f"{name}=[redacted]")
+            else:
+                redacted.append(item)
+                hide_next = True
+            continue
+        redacted.append(item)
+    return redacted
 
 
 # -- global options ---------------------------------------------------------
@@ -48,9 +82,16 @@ def main(
     proxy: Annotated[str | None, typer.Option("--proxy", help="HTTP/SOCKS proxy URL")] = None,
     tor: Annotated[bool, typer.Option("--tor", help="Route via 127.0.0.1:9050")] = False,
     cache: Annotated[bool, typer.Option("--cache/--no-cache", help="HTTP + probe cache")] = True,
-    raw: Annotated[bool, typer.Option("--raw/--no-raw", help="Retain raw responses")] = True,
+    raw: Annotated[
+        bool | None,
+        typer.Option("--raw/--no-raw", help="Retain raw HTTP responses (privacy: off by default)"),
+    ] = None,
     max_requests: Annotated[
         int | None, typer.Option("--max-requests", help="Per-run request budget (0 = unlimited)")
+    ] = None,
+    retention_days: Annotated[
+        int | None,
+        typer.Option("--retention-days", min=0, help="Auto-prune data older than N days"),
     ] = None,
     respect_robots: Annotated[
         bool, typer.Option("--respect-robots", help="Honour robots.txt")
@@ -78,10 +119,12 @@ def main(
     if not cache:
         settings.cache_ttl = 0
         settings.negative_cache_ttl = 0
-    if not raw:
-        settings.keep_raw = False
+    if raw is not None:
+        settings.keep_raw = raw
     if max_requests is not None:
         settings.max_requests = max_requests
+    if retention_days is not None:
+        settings.retention_days = retention_days
     if respect_robots:
         settings.respect_robots = True
     if replay:
@@ -105,7 +148,7 @@ def main(
                 store.audit_log(
                     ctx.invoked_subcommand,
                     None,
-                    {"argv": sys.argv[1:]},
+                    {"argv": _redact_argv(sys.argv[1:])},
                 )
         except (OSError, ValueError):
             pass

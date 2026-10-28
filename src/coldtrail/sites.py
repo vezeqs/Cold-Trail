@@ -21,6 +21,29 @@ class SiteDef(BaseModel):
     headers: dict[str, str] = Field(default_factory=dict)
     nsfw: bool = False
 
+    @field_validator("headers", mode="before")
+    @classmethod
+    def _clean_headers(cls, value: object) -> dict[str, str]:
+        """Drop invalid/control-character headers from the generated corpus.
+
+        Some upstream site definitions carry cookies with trailing whitespace,
+        which httpx correctly rejects as an illegal header value.
+        """
+        if not isinstance(value, dict):
+            return {}
+        cleaned: dict[str, str] = {}
+        for key, item in value.items():
+            if not isinstance(key, str) or not isinstance(item, str):
+                continue
+            name = key.strip()
+            header = item.strip()
+            if not name or not header:
+                continue
+            if any(ord(char) < 32 or ord(char) == 127 for char in f"{name}{header}"):
+                continue
+            cleaned[name] = header
+        return cleaned
+
     @field_validator("error_msg", mode="before")
     @classmethod
     def _as_list(cls, value: object) -> list[str]:

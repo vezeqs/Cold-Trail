@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import hashlib
 import html
+import os
 import re
 from datetime import UTC, datetime
+from pathlib import Path
 from urllib.parse import urlsplit
 
 _TAG_RE = re.compile(r"<[^>]+>")
@@ -28,6 +31,25 @@ def ssh_fingerprint(key_line: str | None) -> str | None:
 
 def now_iso() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
+
+
+def sensitive_cache_key(prefix: str, value: str) -> str:
+    """Stable cache/raw key for a sensitive identifier (email, phone, token).
+
+    The identifier itself never enters ``http_cache``/``raw`` URLs, so a local
+    database leak does not expose which addresses were investigated.
+    """
+    digest = hashlib.sha256(value.strip().casefold().encode("utf-8")).hexdigest()
+    return f"{prefix}:{digest}"
+
+
+def write_private(path: Path, data: bytes) -> None:
+    """Write an export/evidence copy with owner-only permissions."""
+    destination = Path(path).expanduser()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_bytes(data)
+    with contextlib.suppress(OSError):
+        os.chmod(destination, 0o600)
 
 
 def strip_html(text: str | None) -> str | None:

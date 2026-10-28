@@ -8,7 +8,7 @@ import struct
 from typing import Any
 
 from .http import Fetcher, FetchError
-from .utils import dedupe
+from .utils import dedupe, sensitive_cache_key
 
 RDAP = "https://rdap.org/domain"
 RDAP_IP = "https://rdap.org/ip"
@@ -273,7 +273,9 @@ async def reverse_ip(fetcher: Fetcher, address: str, key: str | None = None) -> 
     if key:
         try:
             status, data = await fetcher.get_json(
-                "https://api.shodan.io/dns/reverse", params={"ips": address, "key": key}
+                "https://api.shodan.io/dns/reverse",
+                params={"ips": address, "key": key},
+                cache_key=sensitive_cache_key("shodan-reverse", address),
             )
         except FetchError:
             return []
@@ -440,7 +442,9 @@ async def shodan_host(
         return None
     try:
         status, data = await fetcher.get_json(
-            f"https://api.shodan.io/shodan/host/{address}", params={"key": key}
+            f"https://api.shodan.io/shodan/host/{address}",
+            params={"key": key},
+            cache_key=sensitive_cache_key("shodan-host", address),
         )
     except FetchError:
         return None

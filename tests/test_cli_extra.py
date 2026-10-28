@@ -183,3 +183,9 @@ def test_export_encrypted_roundtrip(tmp_path, monkeypatch):
     decrypted = tmp_path / "dec.json"
     invoke(["--db", str(db), "decrypt", str(out), str(decrypted)])
     assert json.loads(decrypted.read_text())["run"]["target"] == "alice"
+
+
+def test_serve_refuses_non_loopback_without_token(tmp_path):
+    result = runner.invoke(app, ["--db", str(tmp_path / "t.db"), "serve", "--host", "0.0.0.0"])
+    assert result.exit_code == 2
+    assert "refusing" in result.output

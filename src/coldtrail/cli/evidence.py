@@ -10,6 +10,7 @@ from rich.table import Table
 
 from ..evidence import add_evidence, evidence_path, verify_evidence
 from ..store import Store
+from ..utils import write_private
 from ._app import _print_json, _settings, app, console
 
 evidence_app = typer.Typer(help="Content-addressed evidence files (hashes, dedupe, verify).")
@@ -115,7 +116,7 @@ def evidence_export(
             typer.echo(f"evidence blob missing: {source}", err=True)
             raise typer.Exit(code=1)
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_bytes(source.read_bytes())
+        write_private(out, source.read_bytes())
     if json_out:
         _print_json({"id": attachment_id, "out": str(out), "size": out.stat().st_size})
         return

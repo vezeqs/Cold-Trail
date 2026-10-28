@@ -16,7 +16,7 @@ class Gravatar(Source):
     homepage = "https://gravatar.com"
 
     async def check(self, fetcher: Fetcher, target: str) -> CheckResult:
-        digest = hashlib.md5(target.strip().casefold().encode()).hexdigest()
+        digest = hashlib.md5(target.strip().casefold().encode(), usedforsecurity=False).hexdigest()
         status, data = await fetcher.get_json(f"https://gravatar.com/{digest}.json?d=404")
         entry = None
         if isinstance(data, dict):

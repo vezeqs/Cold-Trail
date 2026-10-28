@@ -26,7 +26,8 @@ def select_sources(names: list[str] | None, kind: Kind, include_web: bool = Fals
         resolved: list[Source] = []
         unknown: list[str] = []
         wrong_kind: list[str] = []
-        for name in names:
+        expanded = [part.strip() for name in names for part in str(name).split(",") if part.strip()]
+        for name in expanded:
             if name == "all":
                 resolved.extend(source for source in SOURCES.values() if source.kind == kind)
             elif name in GROUPS:
@@ -125,7 +126,7 @@ async def pivot(
     depth: int = 1,
     use_variants: bool = False,
     include_web: bool = False,
-    avatar_hash: bool = True,
+    avatar_hash: bool | None = None,
     use_cache: bool = True,
     store=None,
     on_result: Callable[[CheckResult], None] | None = None,
@@ -133,6 +134,8 @@ async def pivot(
 ) -> PivotReport:
     target = target.strip().lstrip("@")
     kind: Kind = "email" if "@" in target else "username"
+    if avatar_hash is None:
+        avatar_hash = settings.avatar_hash
     selected = select_sources(sources, kind, include_web=include_web)
     if not selected:
         raise ValueError(f"no sources selected for {kind} pivots")

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ..http import Fetcher
 from ..models import CheckResult, Profile
+from ..utils import sensitive_cache_key
 from .base import Source, register
 
 API = "https://keybase.io/_/api/1.0/user/lookup.json"
@@ -16,7 +17,11 @@ class Keybase(Source):
     homepage = "https://keybase.io"
 
     async def check(self, fetcher: Fetcher, target: str) -> CheckResult:
-        status, data = await fetcher.get_json(API, params={"emails": target})
+        status, data = await fetcher.get_json(
+            API,
+            params={"emails": target},
+            cache_key=sensitive_cache_key("keybase", target),
+        )
         if status == 200 and isinstance(data, dict):
             them = data.get("them") or []
             user = them[0] if them else None

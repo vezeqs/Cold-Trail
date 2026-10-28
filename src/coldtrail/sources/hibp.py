@@ -4,6 +4,7 @@ from urllib.parse import quote
 
 from ..http import Fetcher
 from ..models import CheckResult, Profile
+from ..utils import sensitive_cache_key
 from .base import Source, register
 
 
@@ -24,6 +25,7 @@ class HIBP(Source):
             f"https://haveibeenpwned.com/api/v3/breachedaccount/{quote(target)}",
             params={"truncateResponse": "false"},
             headers={"hibp-api-key": key},
+            cache_key=sensitive_cache_key("hibp", target),
         )
         if status == 200 and isinstance(data, list):
             breaches = [

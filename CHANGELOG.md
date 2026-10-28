@@ -4,6 +4,53 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] - 2026-10-27
+
+### Privacy
+
+- **Raw HTTP bodies are now opt-in.** `keep_raw` defaults to `False`; use
+  `--raw` for replay/contract fixtures. Recording forces raw capture only for
+  the fixture workflow. `--raw/--no-raw` is tri-state, so config/env values
+  are preserved when the flag is omitted.
+- **Avatar hashing is opt-in.** `--avatar-hash` (or
+  `COLDTRAIL_AVATAR_HASH=1`) downloads third-party profile images.
+- **Owner-only storage.** The SQLite DB, WAL/SHM sidecars, and evidence blobs
+  are created `0600`; evidence directories are `0700`.
+- **Owner-only exports.** CLI exports, dossiers, case exports, decrypted files,
+  and evidence copies are written `0600`.
+- **Tor no longer leaks DNS.** `--tor` uses `socks5h://127.0.0.1:9050`.
+- **Sensitive identifiers stay out of cache/raw keys.** Email targets are
+  SHA-256 hashed; Shodan/Hunter API keys are no longer persisted in cache keys.
+  Hunter now authenticates with `X-API-Key`.
+- **Auth cookies are HMAC-derived**, not the raw bearer token. Added
+  `/logout`, HSTS on HTTPS, and `Permissions-Policy`/`base-uri`/`form-action`
+  CSP hardening.
+- **Non-loopback binds fail closed** without `--token`; use
+  `--allow-unauthenticated` only as an explicit override.
+- **Audit log redacts secrets** from `--token`, `--passphrase`, `--api-key`,
+  and similar flags.
+- **Privacy headers:** `img-src 'self' data:`, `Permissions-Policy`,
+  `Cache-Control: no-store`, and existing `no-referrer`.
+- **Retention covers evidence and audit rows.** `prune` removes orphan evidence
+  blobs and old audit entries; `--retention-days` and web/TUI startup apply it.
+- **Doctor privacy posture:** `doctor --offline --json` reports telemetry, raw
+  retention, cache TTL, retention, proxy/Tor, token, DB mode, and config mode.
+- README and the Pages site now document the privacy model and its limits.
+
+### Security
+
+- Parse untrusted XML with `defusedxml` (nmap, Medium RSS, Steam).
+- Replace a production `assert` in evidence loading with a real error.
+- Cap stored/parsed HTTP bodies at 2 MB.
+- Sanitize corpus headers with control characters/trailing whitespace.
+- Sanitize user-controlled case names in `Content-Disposition`.
+
+### Fixed
+
+- Accept comma-separated source lists (`-s github,reddit`).
+- Quote email values in PGP and EmailRep profile URLs.
+- Bound web job event memory and prune retention on web/TUI startup.
+
 ## [0.8.0] - 2026-10-27
 
 ### Changed

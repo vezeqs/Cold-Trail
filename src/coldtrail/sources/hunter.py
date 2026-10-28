@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ..http import Fetcher
 from ..models import CheckResult, Profile
+from ..utils import sensitive_cache_key
 from .base import Source, register
 
 UNDELIVERABLE = {"invalid", "undeliverable"}
@@ -22,7 +23,9 @@ class Hunter(Source):
             return self.blocked(target, "HUNTER_API_KEY is not configured")
         status, data = await fetcher.get_json(
             "https://api.hunter.io/v2/email-verifier",
-            params={"email": target, "api_key": key},
+            params={"email": target},
+            headers={"X-API-Key": key},
+            cache_key=sensitive_cache_key("hunter", target),
         )
         if status == 404:
             return self.missing(target, "email not found")

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,25 @@ class StoreBase:
         self.conn.execute("PRAGMA busy_timeout=5000")
         self.conn.execute("PRAGMA synchronous=NORMAL")
         self._migrate()
+        self._secure_files()
+
+    def _secure_files(self) -> None:
+        """Restrict the database and its WAL/SHM sidecars to the current user.
+
+        Investigations contain sensitive personal data; a default umask can
+        leave the SQLite file world-readable on shared hosts.
+        """
+        for candidate in (
+            self.path,
+            Path(f"{self.path}-wal"),
+            Path(f"{self.path}-shm"),
+        ):
+            with contextlib.suppress(OSError):
+                if candidate.exists():
+                    os.chmod(candidate, 0o600)
+        with contextlib.suppress(OSError):
+            if self.path.parent.name == "coldtrail":
+                os.chmod(self.path.parent, 0o700)
 
     def _migrate(self) -> None:
         current_version = self.conn.execute("PRAGMA user_version").fetchone()[0]

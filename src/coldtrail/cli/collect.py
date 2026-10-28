@@ -60,8 +60,12 @@ def pivot(
     web: Annotated[bool, typer.Option("--web", help="Include the 478-site web corpus")] = False,
     all_sources: Annotated[bool, typer.Option("--all", help="Every registered source")] = False,
     avatar_hash: Annotated[
-        bool, typer.Option("--avatar-hash/--no-avatar-hash", help="Perceptual avatar hashing")
-    ] = True,
+        bool | None,
+        typer.Option(
+            "--avatar-hash/--no-avatar-hash",
+            help="Download avatars for perceptual hashing (privacy: off by default)",
+        ),
+    ] = None,
     all_checks: Annotated[
         bool, typer.Option("--all-checks", help="Show every check, not just found profiles")
     ] = False,

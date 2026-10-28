@@ -117,6 +117,7 @@ async def test_pwned_password_reports_count(settings):
             result = await pwned_password(fetcher, password)
     assert result["status"] == "pwned"
     assert result["count"] == 42
+    assert "prefix" not in result
     # Privacy: only the 5-char prefix is transmitted; the full hash never is.
     full_hash = hashlib.sha1(password.encode()).hexdigest().upper()
     request_url = str(route.calls[0].request.url)

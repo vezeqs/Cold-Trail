@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 from ..http import Fetcher
 from ..models import CheckResult, Profile
+from ..utils import sensitive_cache_key
 from .base import Source, register
 
 
@@ -19,6 +20,7 @@ class PGP(Source):
         status, text = await fetcher.get_text(
             "https://keyserver.ubuntu.com/pks/lookup",
             params={"search": target, "op": "index", "options": "mr"},
+            cache_key=sensitive_cache_key("pgp", target),
         )
         if status != 200:
             return self.missing(target) if status == 404 else self.failed(target, f"HTTP {status}")
@@ -38,7 +40,7 @@ class PGP(Source):
             Profile(
                 source=self.name,
                 username=target,
-                url=f"https://keyserver.ubuntu.com/pks/lookup?search={target}&op=index",
+                url=f"https://keyserver.ubuntu.com/pks/lookup?search={quote(target)}&op=index",
                 display_name=uids[0],
                 bio="; ".join(uids),
                 extra={"uids": uids, "keyserver": "keyserver.ubuntu.com"},

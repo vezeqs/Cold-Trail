@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import re
-import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
 from urllib.parse import quote
+
+from defusedxml import ElementTree as ET
+from defusedxml.common import DefusedXmlException
 
 from ..http import Fetcher
 from ..models import CheckResult, Post, Profile
@@ -73,7 +75,7 @@ class Medium(Source):
             return []
         try:
             root = ET.fromstring(text)
-        except ET.ParseError:
+        except (ET.ParseError, DefusedXmlException):
             return []
         items: list[Post] = []
         for item in root.findall("./channel/item"):

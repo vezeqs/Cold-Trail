@@ -171,3 +171,28 @@ def test_declarative_source_name_and_group():
     assert source.name == "web.about-me"
     assert source.group == "web"
     assert source.label == "About.me"
+
+
+def test_site_headers_are_sanitized():
+    site = SiteDef(
+        name="Example",
+        url="https://example.test/{username}",
+        headers={"Cookie": " a=1; ", "Bad": "line\nbreak"},
+    )
+    assert site.headers == {"Cookie": "a=1;"}
+
+
+@respx.mock
+async def test_generic_adult_landing_is_not_a_profile(settings):
+    site = make_site(name="RoyalCams", url="https://royalcams.com/profile/{username}")
+    source = DeclarativeSource(site)
+    respx.get("https://royalcams.com/profile/simonw").mock(
+        return_value=httpx.Response(
+            200,
+            text="<title>Live Sexcams: XXX Adult Shows - Free Porn Chat - Royalcams</title>",
+            headers={"content-type": "text/html"},
+        )
+    )
+    async with Fetcher(settings) as fetcher:
+        result = await source.check(fetcher, "simonw")
+    assert result.status == "not_found"

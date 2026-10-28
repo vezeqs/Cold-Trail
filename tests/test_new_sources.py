@@ -253,6 +253,7 @@ async def test_pgp(settings):
         result = await SOURCES["pgp"].check(fetcher, "alice@example.com")
     assert result.status == "found"
     assert result.profile.display_name == "Alice <alice@example.com>"
+    assert "alice%40example.com" in result.profile.url
 
 
 @respx.mock
@@ -319,3 +320,4 @@ async def test_emailrep(settings):
         result = await SOURCES["emailrep"].check(fetcher, "alice@example.com")
     assert result.status == "found"
     assert result.profile.extra["accounts"][0]["url"] == "https://github.com/alice"
+    assert "alice%40example.com" in result.profile.url

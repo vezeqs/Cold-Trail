@@ -178,7 +178,7 @@ class ColdTrailTUI(App):
                     with Horizontal():
                         yield Checkbox("expand", id="expand")
                         yield Checkbox("variants", id="variants")
-                        yield Checkbox("avatar hash", value=True, id="avatar")
+                        yield Checkbox("avatar hash", value=False, id="avatar")
                     yield Input(
                         placeholder="custom sources: github, reddit, social, all",
                         id="sources-input",
@@ -699,4 +699,7 @@ class ColdTrailTUI(App):
 
 
 def run_tui(settings: Settings) -> None:
+    if settings.retention_days:
+        with Store(settings.db_path) as store:
+            store.prune(settings.retention_days)
     ColdTrailTUI(settings).run()

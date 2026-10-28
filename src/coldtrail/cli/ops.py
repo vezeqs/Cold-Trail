@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import os
 from typing import Annotated
 
 import typer
@@ -37,23 +39,45 @@ def audit(
 def doctor(
     ctx: typer.Context,
     json_out: Annotated[bool, typer.Option("--json")] = False,
+    offline: Annotated[
+        bool, typer.Option("--offline", help="Skip the network reachability probe")
+    ] = False,
 ) -> None:
-    """Check database, network, keys, and source health."""
+    """Check database, privacy posture, network, keys, and source health."""
     settings = _settings(ctx)
     with Store(settings.db_path) as store:
         info = store.db_info()
         stats = store.stats()
         health = store.check_stats()
 
-    async def probe():
-        try:
-            async with Fetcher(settings) as fetcher:
-                response = await fetcher.get("https://api.github.com/zen")
-            return response.status == 200
-        except Exception:
-            return False
+    online: bool | None = None
+    if not offline:
 
-    online = asyncio.run(probe())
+        async def probe():
+            try:
+                async with Fetcher(settings) as fetcher:
+                    response = await fetcher.get("https://api.github.com/zen")
+                return response.status == 200
+            except Exception:
+                return False
+
+        online = asyncio.run(probe())
+
+    config_mode = None
+    if settings.config_path:
+        with contextlib.suppress(OSError):
+            config_mode = oct(os.stat(settings.config_path).st_mode & 0o777)
+    privacy = {
+        "telemetry": "none",
+        "raw_retention": settings.keep_raw,
+        "http_cache_ttl": settings.cache_ttl,
+        "retention_days": settings.retention_days,
+        "tor": settings.tor,
+        "proxy": settings.proxy,
+        "web_token": bool(settings.web_token),
+        "db_mode": info.get("mode"),
+        "config_mode": config_mode,
+    }
     payload = {
         "db": info,
         "stats": stats,
@@ -62,19 +86,32 @@ def doctor(
         "hibp_key": bool(settings.hibp_api_key),
         "emailrep_key": bool(settings.emailrep_api_key),
         "shodan_key": bool(settings.shodan_api_key),
+        "hunter_key": bool(settings.hunter_api_key),
+        "x_token": bool(settings.x_bearer_token),
         "proxy": settings.proxy or ("tor" if settings.tor else None),
         "config": str(settings.config_path) if settings.config_path else None,
+        "privacy": privacy,
         "health": health,
     }
     if json_out:
         _print_json(payload)
         return
     console.print(f"database: {info['path']} ({info['size']} bytes, v{info['user_version']})")
-    console.print(f"network: {'[green]ok[/]' if online else '[red]unreachable[/]'}")
+    if online is None:
+        console.print("network: [dim]skipped (--offline)[/dim]")
+    else:
+        console.print(f"network: {'[green]ok[/]' if online else '[red]unreachable[/]'}")
     console.print(f"GITHUB_TOKEN: {'set' if settings.github_token else 'unset'}")
     console.print(f"HIBP_API_KEY: {'set' if settings.hibp_api_key else 'unset'}")
     console.print(f"EMAILREP_API_KEY: {'set' if settings.emailrep_api_key else 'unset'}")
     console.print(f"SHODAN_API_KEY: {'set' if settings.shodan_api_key else 'unset'}")
+    console.print(f"HUNTER_API_KEY: {'set' if settings.hunter_api_key else 'unset'}")
+    console.print(f"X_BEARER_TOKEN: {'set' if settings.x_bearer_token else 'unset'}")
+    console.print(
+        f"privacy: telemetry=none raw={'on' if settings.keep_raw else 'off'} "
+        f"cache_ttl={settings.cache_ttl}s retention={settings.retention_days or 'off'} "
+        f"tor={'on' if settings.tor else 'off'} db_mode={privacy['db_mode'] or '?'}"
+    )
     if health:
         table = Table(title="Source health")
         for column in ("Source", "Status", "Count"):

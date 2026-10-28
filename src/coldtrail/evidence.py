@@ -7,6 +7,7 @@ metadata row (attachments) and the SHA-256 lets us verify integrity later.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import mimetypes
 import os
@@ -36,13 +37,22 @@ def _sha256_bytes(data: bytes) -> str:
 def _store_blob(root: Path, digest: str, data: bytes) -> Path:
     directory = root / digest[:2]
     directory.mkdir(parents=True, exist_ok=True)
+    for folder in (root, directory):
+        with contextlib.suppress(OSError):
+            os.chmod(folder, 0o700)
     destination = directory / digest
     if destination.is_file():
+        with contextlib.suppress(OSError):
+            os.chmod(destination, 0o600)
         return destination
     with tempfile.NamedTemporaryFile(dir=directory, delete=False) as handle:
         handle.write(data)
         temp_path = Path(handle.name)
+    with contextlib.suppress(OSError):
+        os.chmod(temp_path, 0o600)
     os.replace(temp_path, destination)
+    with contextlib.suppress(OSError):
+        os.chmod(destination, 0o600)
     return destination
 
 
@@ -62,7 +72,8 @@ def add_evidence(
     if data is None and source_path is None:
         raise ValueError("provide data or source_path")
     if data is None:
-        assert source_path is not None
+        if source_path is None:
+            raise ValueError("provide data or source_path")
         source_path = Path(source_path)
         data = source_path.read_bytes()
         filename = filename or source_path.name

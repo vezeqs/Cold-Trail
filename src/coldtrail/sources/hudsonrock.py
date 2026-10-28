@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ..http import Fetcher
 from ..models import CheckResult, Profile
+from ..utils import sensitive_cache_key
 from .base import Source, register
 
 
@@ -17,6 +18,7 @@ class HudsonRock(Source):
         status, data = await fetcher.get_json(
             "https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-email",
             params={"email": target.strip()},
+            cache_key=sensitive_cache_key("hudsonrock", target),
         )
         if status == 200 and isinstance(data, dict):
             stealers = data.get("stealers") or []

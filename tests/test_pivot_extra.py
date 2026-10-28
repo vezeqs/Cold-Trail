@@ -179,3 +179,10 @@ def test_entities_for_profiles():
     assert any(
         entity.kind == "email" and entity.value == "alice@example.com" for entity in entities
     )
+
+
+def test_select_sources_accepts_comma_separated_names():
+    selected = select_sources(["github,reddit"], "username")
+    assert [source.name for source in selected] == ["github", "reddit"]
+    selected = select_sources(["emailrep,hibp"], "email")
+    assert [source.name for source in selected] == ["emailrep", "hibp"]

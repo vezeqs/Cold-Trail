@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ..http import Fetcher
 from ..models import CheckResult, Profile
+from ..utils import sensitive_cache_key
 from .base import Source, register
 
 
@@ -17,6 +18,7 @@ class LeakCheck(Source):
         status, data = await fetcher.get_json(
             "https://leakcheck.io/api/public",
             params={"check": target.strip()},
+            cache_key=sensitive_cache_key("leakcheck", target),
         )
         if status == 200 and isinstance(data, dict):
             found = int(data.get("found") or 0)

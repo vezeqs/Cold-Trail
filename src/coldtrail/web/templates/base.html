@@ -21,7 +21,8 @@
     <a href="/sources" class="{{ 'on' if active == 'sources' }}">Sources</a>
     <a href="/cases" class="{{ 'on' if active == 'cases' }}">Cases</a>
     <a href="/help" class="{{ 'on' if active == 'help' }}">Help</a>
-    <a href="/api/docs" target="_blank" rel="noopener">API</a>
+    <a href="/api/docs" target="_blank" rel="noopener noreferrer">API</a>
+    {% if settings.web_token %}<a href="/logout">Logout</a>{% endif %}
   </nav>
 </header>
 <main>

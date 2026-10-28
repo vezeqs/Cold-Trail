@@ -38,11 +38,29 @@ def serve(
         str | None,
         typer.Option("--token", help="Require this bearer token / login cookie"),
     ] = None,
+    allow_unauthenticated: Annotated[
+        bool,
+        typer.Option(
+            "--allow-unauthenticated",
+            help="Allow binding a non-loopback address without a token (not recommended)",
+        ),
+    ] = False,
 ) -> None:
     """Serve the local web UI (FastAPI + uvicorn)."""
     settings = _settings(ctx)
     if token:
         settings.web_token = token
+    if host not in LOCAL_HOSTS and not settings.web_token and not allow_unauthenticated:
+        console.print(
+            "[red]refusing to bind a non-loopback address without a token.[/red]\n"
+            "Set [bold]--token[/bold] (or COLDTRAIL_WEB_TOKEN), or pass "
+            "[bold]--allow-unauthenticated[/bold] if you really mean it."
+        )
+        raise typer.Exit(code=2)
+    if settings.web_token and len(settings.web_token) < 16:
+        console.print(
+            "[yellow]warning:[/yellow] web token is short; use at least 16 random characters."
+        )
     try:
         import uvicorn
     except ImportError as exc:

@@ -17,7 +17,8 @@ async def _enrich_profile(fetcher: Fetcher, result: CheckResult) -> None:
     ents = profile_entities(profile)
     if ents:
         profile.extra["extracted_entities"] = [{"kind": e.kind, "value": e.value} for e in ents]
-    await hash_avatars(fetcher, [profile])
+    if fetcher.settings.avatar_hash:
+        await hash_avatars(fetcher, [profile])
 
 
 async def harvest(

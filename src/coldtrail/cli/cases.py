@@ -11,6 +11,7 @@ from rich.table import Table
 from ..casework import merge_case_payload
 from ..report import encrypt_bytes, redact_payload
 from ..store import Store
+from ..utils import write_private
 from ._app import _print_json, _settings, app, case_app, console
 from .output import _render_format
 
@@ -130,7 +131,7 @@ def case_export(
             sys.stdout.buffer.write(b"\n")
         return
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_bytes(data)
+    write_private(out, data)
     console.print(f"wrote {out}")
 
 

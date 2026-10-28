@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 
 
@@ -75,7 +76,27 @@ class MaintenanceMixin:
         if days <= 0:
             return 0
         cutoff = f"-{days} days"
+        old_runs = [
+            row["id"]
+            for row in self.conn.execute(
+                "SELECT id FROM runs WHERE datetime(started_at) < datetime('now', ?)",
+                (cutoff,),
+            )
+        ]
+        attachments: list[str] = []
         with self.conn:
+            if old_runs:
+                placeholders = ",".join("?" for _ in old_runs)
+                attachments = [
+                    row["sha256"]
+                    for row in self.conn.execute(
+                        f"SELECT sha256 FROM attachments WHERE run_id IN ({placeholders})",
+                        old_runs,
+                    )
+                ]
+                self.conn.execute(
+                    f"DELETE FROM attachments WHERE run_id IN ({placeholders})", old_runs
+                )
             cursor = self.conn.execute(
                 "DELETE FROM runs WHERE datetime(started_at) < datetime('now', ?)", (cutoff,)
             )
@@ -90,6 +111,18 @@ class MaintenanceMixin:
                 "DELETE FROM probe_cache WHERE datetime(checked_at) < datetime('now', ?)",
                 (cutoff,),
             )
+            self.conn.execute(
+                "DELETE FROM audit WHERE datetime(at) < datetime('now', ?)", (cutoff,)
+            )
+        for digest in set(attachments):
+            still_referenced = self.conn.execute(
+                "SELECT 1 FROM attachments WHERE sha256 = ? LIMIT 1", (digest,)
+            ).fetchone()
+            if still_referenced:
+                continue
+            blob = self.path.parent / "evidence" / digest[:2] / digest
+            with contextlib.suppress(OSError):
+                blob.unlink()
         return cursor.rowcount
 
     def vacuum(self) -> None:
@@ -98,4 +131,7 @@ class MaintenanceMixin:
     def db_info(self) -> dict[str, Any]:
         size = self.path.stat().st_size if self.path.exists() else 0
         version = self.conn.execute("PRAGMA user_version").fetchone()[0]
-        return {"path": str(self.path), "size": size, "user_version": version}
+        mode = None
+        with contextlib.suppress(OSError):
+            mode = oct(self.path.stat().st_mode & 0o777)
+        return {"path": str(self.path), "size": size, "user_version": version, "mode": mode}

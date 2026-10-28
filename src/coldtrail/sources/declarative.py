@@ -73,6 +73,8 @@ GENERIC_TITLES = (
     "learn language in context",
     "live gay video chat",
     "watch hundreds of free hd porn videos",
+    "live sexcams",
+    "free porn chat",
     "undefined |",
     "pagetitle:",
 )

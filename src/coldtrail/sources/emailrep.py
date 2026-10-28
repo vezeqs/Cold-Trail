@@ -4,6 +4,7 @@ from urllib.parse import quote
 
 from ..http import Fetcher
 from ..models import CheckResult, Profile
+from ..utils import sensitive_cache_key
 from .base import Source, register
 
 
@@ -21,7 +22,9 @@ class EmailRep(Source):
         if not key:
             return self.blocked(target, "EMAILREP_API_KEY is not configured")
         status, data = await fetcher.get_json(
-            f"https://emailrep.io/{quote(target)}", headers={"Key": key}
+            f"https://emailrep.io/{quote(target)}",
+            headers={"Key": key},
+            cache_key=sensitive_cache_key("emailrep", target),
         )
         if status == 200 and isinstance(data, dict) and data.get("email"):
             details = data.get("details") or {}
@@ -35,7 +38,7 @@ class EmailRep(Source):
                 Profile(
                     source=self.name,
                     username=target,
-                    url=f"https://emailrep.io/{target}",
+                    url=f"https://emailrep.io/{quote(target)}",
                     bio=f"reputation: {data.get('reputation')}",
                     extra={
                         "reputation": data.get("reputation"),

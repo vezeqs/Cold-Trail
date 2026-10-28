@@ -13,6 +13,7 @@ Design notes:
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import hmac
 import json
 import logging
@@ -101,6 +102,7 @@ EXPORTERS = {
 }
 
 MAX_JOBS = 200
+MAX_JOB_EVENTS = 10_000
 JOB_RETENTION = 3600.0
 RATE_LIMIT = 20
 RATE_WINDOW = 60.0
@@ -111,7 +113,17 @@ MAX_UPLOAD = 50 * 1024 * 1024
 UPLOAD_CHUNK = 1024 * 1024
 SSE_HEARTBEAT = 15.0
 SSE_MAX_SECONDS = 3600.0
-PUBLIC_PATHS = {"/healthz", "/api/health", "/login"}
+PUBLIC_PATHS = {"/healthz", "/api/health", "/login", "/logout"}
+COOKIE_NAME = "coldtrail_token"
+
+
+def _cookie_value(token: str) -> str:
+    """Derive the browser cookie from the shared token.
+
+    The cookie is an HMAC, never the bearer secret itself, so a cookie leak or
+    browser sync does not expose the API token.
+    """
+    return hmac.new(token.encode("utf-8"), b"coldtrail-cookie-v1", hashlib.sha256).hexdigest()
 
 
 @dataclass
@@ -152,7 +164,7 @@ class PivotRequest(BaseModel):
     expand: bool = False
     depth: int = Field(default=1, ge=1, le=5)
     variants: bool = False
-    avatar_hash: bool = True
+    avatar_hash: bool | None = None
 
 
 def _short(value: Any, width: int = 90) -> str:
@@ -163,6 +175,12 @@ def _short(value: Any, width: int = 90) -> str:
 def _ts(value: Any) -> str:
     text = str(value or "")
     return text.replace("T", " ")[:19]
+
+
+def _safe_filename(value: str, fallback: str) -> str:
+    """Keep user-controlled names out of Content-Disposition headers."""
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", value).strip("-")
+    return (cleaned or fallback)[:80]
 
 
 def _safe_url(value: Any) -> str:
@@ -323,6 +341,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.tasks = set()
     app.state.pivot_lock = asyncio.Lock()
     app.state.rate = {}
+    if settings.retention_days:
+        try:
+            with Store(settings.db_path) as store:
+                store.prune(settings.retention_days)
+        except Exception:
+            log.warning("retention prune failed", exc_info=True)
 
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.filters["short"] = _short
@@ -349,6 +373,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ):
         payload = {"settings": settings, **(context or {})}
         return templates.TemplateResponse(request, name, payload, status_code=status_code)
+
+    def _is_https(request: Request) -> bool:
+        if request.url.scheme == "https":
+            return True
+        if settings.trust_proxy:
+            proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip()
+            return proto.casefold() == "https"
+        return False
 
     def _client_key(request: Request) -> str:
         """Rate-limit key. X-Forwarded-For is only trusted when explicitly configured."""
@@ -446,9 +478,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             supplied = authorization[7:].strip()
         elif request.headers.get("x-api-key"):
             supplied = request.headers["x-api-key"].strip()
-        elif request.cookies.get("coldtrail_token"):
-            supplied = request.cookies["coldtrail_token"]
-        if supplied and hmac.compare_digest(supplied, token):
+        cookie = request.cookies.get(COOKIE_NAME, "")
+        valid_header = bool(supplied) and hmac.compare_digest(supplied, token)
+        valid_cookie = bool(cookie) and hmac.compare_digest(cookie, _cookie_value(token))
+        if valid_header or valid_cookie:
             return await call_next(request)
         if path.startswith("/api"):
             return JSONResponse({"detail": "unauthorized"}, status_code=401)
@@ -471,11 +504,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if expected and hmac.compare_digest(token.strip(), expected):
             response = RedirectResponse("/", status_code=303)
             response.set_cookie(
-                "coldtrail_token",
-                token.strip(),
+                COOKIE_NAME,
+                _cookie_value(token.strip()),
                 httponly=True,
                 samesite="strict",
-                secure=request.url.scheme == "https",
+                secure=_is_https(request),
                 path="/",
                 max_age=86_400,
             )
@@ -487,6 +520,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             status_code=401,
         )
 
+    @app.get("/logout")
+    def logout(request: Request):
+        response = RedirectResponse("/login" if settings.web_token else "/", status_code=303)
+        response.delete_cookie(
+            COOKIE_NAME,
+            path="/",
+            secure=_is_https(request),
+            httponly=True,
+            samesite="strict",
+        )
+        return response
+
     # -- security headers ---------------------------------------------------
 
     @app.middleware("http")
@@ -497,10 +542,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "no-referrer")
         response.headers.setdefault(
-            "Content-Security-Policy",
-            "default-src 'self'; img-src 'self' data: https:; style-src 'self'; "
-            "script-src 'self'; connect-src 'self'; frame-ancestors 'none'",
+            "Permissions-Policy", "geolocation=(), microphone=(), camera=()"
         )
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'; "
+            "img-src 'self' data:; style-src 'self'; script-src 'self'; "
+            "connect-src 'self'; frame-ancestors 'none'",
+        )
+        if _is_https(request):
+            response.headers.setdefault(
+                "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+            )
+        if not request.url.path.startswith("/static"):
+            response.headers.setdefault("Cache-Control", "no-store")
         elapsed = (time.perf_counter() - started) * 1000
         log.info("%s %s %s %.1fms", request.method, request.url.path, response.status_code, elapsed)
         return response
@@ -644,7 +699,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return FileResponse(
             path,
             media_type=row.get("media_type") or "application/octet-stream",
-            filename=row["filename"],
+            filename=_safe_filename(row["filename"], "evidence.bin"),
         )
 
     @app.get("/api/evidence/{attachment_id}")
@@ -834,7 +889,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if case is None:
                 raise HTTPException(status_code=404, detail=f"no such case: {name}")
             payload = merge_case_payload(store, case)
-        return _export_response(payload, format, table, redact, f"coldtrail-case-{name}.{format}")
+        return _export_response(
+            payload,
+            format,
+            table,
+            redact,
+            f"coldtrail-case-{_safe_filename(name, 'case')}.{format}",
+        )
 
     # -- OSINT tools workbench ----------------------------------------------
 
@@ -1106,9 +1167,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         expand: bool,
         depth: int = 1,
         variants: bool,
-        avatar_hash: bool,
+        avatar_hash: bool | None,
     ) -> Job:
         _prune_jobs()
+        if avatar_hash is None:
+            avatar_hash = settings.avatar_hash
         job = Job(
             id=uuid.uuid4().hex[:12],
             target=target,
@@ -1127,16 +1190,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             job.result_count += 1
             if res.status == "found":
                 job.found_count += 1
-            job.events.append(
-                {
-                    "source": res.source,
-                    "target": res.target,
-                    "status": res.status,
-                    "username": res.profile.username if res.profile else "",
-                    "url": _safe_url(res.profile.url) if res.profile else "",
-                    "detail": res.detail or "",
-                }
-            )
+            if len(job.events) < MAX_JOB_EVENTS:
+                job.events.append(
+                    {
+                        "source": res.source,
+                        "target": res.target,
+                        "status": res.status,
+                        "username": res.profile.username if res.profile else "",
+                        "url": _safe_url(res.profile.url) if res.profile else "",
+                        "detail": res.detail or "",
+                    }
+                )
 
         async def _execute() -> None:
             async with app.state.pivot_lock:
@@ -1184,7 +1248,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         expand: Annotated[bool, Form()] = False,
         depth: Annotated[int, Form(ge=1, le=5)] = 1,
         variants: Annotated[bool, Form()] = False,
-        avatar_hash: Annotated[bool, Form()] = False,
+        avatar_hash: Annotated[bool | None, Form()] = None,
     ):
         if _rate_limited(request):
             raise HTTPException(status_code=429, detail="rate limit exceeded")

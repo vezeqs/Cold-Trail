@@ -19,6 +19,7 @@ from typing import Any
 from urllib.parse import quote
 
 from .http import Fetcher, FetchError
+from .utils import sensitive_cache_key
 
 HIBP_BREACH_URL = "https://haveibeenpwned.com/api/v3/breachedaccount/{email}"
 HUDSONROCK_URL = "https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-email"
@@ -54,6 +55,7 @@ async def hibp_breaches(fetcher: Fetcher, email: str) -> dict[str, Any]:
         HIBP_BREACH_URL.format(email=quote(email)),
         params={"truncateResponse": "false"},
         headers={"hibp-api-key": key},
+        cache_key=sensitive_cache_key("hibp", email),
     )
     if status is None:
         return {"status": "error", "detail": data, "breaches": []}
@@ -95,6 +97,7 @@ async def hudsonrock_exposure(fetcher: Fetcher, email: str) -> dict[str, Any]:
         fetcher,
         HUDSONROCK_URL,
         params={"email": email.strip()},
+        cache_key=sensitive_cache_key("hudsonrock", email),
     )
     if status is None:
         return {"status": "error", "detail": data, "stealers": []}
@@ -122,6 +125,7 @@ async def leakcheck_public(fetcher: Fetcher, email: str) -> dict[str, Any]:
         fetcher,
         LEAKCHECK_URL,
         params={"check": email.strip()},
+        cache_key=sensitive_cache_key("leakcheck", email),
     )
     if status is None:
         return {"status": "error", "detail": data, "sources": [], "fields": []}
@@ -167,7 +171,7 @@ async def full_breach_audit(fetcher: Fetcher, email: str) -> dict[str, Any]:
 
 def sha1_prefix(password: str) -> tuple[str, str]:
     """Split the SHA-1 of a password into (5-char prefix, suffix) for k-anonymity."""
-    digest = hashlib.sha1(password.encode("utf-8")).hexdigest().upper()
+    digest = hashlib.sha1(password.encode("utf-8"), usedforsecurity=False).hexdigest().upper()
     return digest[:5], digest[5:]
 
 
@@ -180,9 +184,9 @@ async def pwned_password(fetcher: Fetcher, password: str) -> dict[str, Any]:
         headers={"Accept": "text/plain", "Add-Padding": "true"},
     )
     if status is None:
-        return {"status": "error", "detail": text, "count": 0, "prefix": prefix}
+        return {"status": "error", "detail": text, "count": 0}
     if status != 200:
-        return {"status": "error", "detail": f"HTTP {status}", "count": 0, "prefix": prefix}
+        return {"status": "error", "detail": f"HTTP {status}", "count": 0}
     count = 0
     for line in text.splitlines():
         part, _, value = line.partition(":")
@@ -199,5 +203,4 @@ async def pwned_password(fetcher: Fetcher, password: str) -> dict[str, Any]:
             f"seen {count} time(s) in breach corpora" if count else "not found in any breach corpus"
         ),
         "count": count,
-        "prefix": prefix,
     }

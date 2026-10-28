@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import random
+import re
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -61,6 +62,17 @@ WAF_HEADER_MARKERS = (
     ("x-sucuri-block", ""),
 )
 
+EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+SECRET_PARAM_RE = re.compile(
+    r"((?:api[_-]?key|access[_-]?token|token|secret|password)=)[^&\s]+", re.IGNORECASE
+)
+
+
+def redact_url(value: str) -> str:
+    """Remove emails and secret query values before a URL reaches logs/errors."""
+    cleaned = SECRET_PARAM_RE.sub(r"\1[redacted]", value)
+    return EMAIL_RE.sub("[email]", cleaned)
+
 
 class FetchError(Exception):
     """A request could not be completed (network error, retries exhausted, no recording)."""
@@ -98,7 +110,7 @@ class Fetcher:
         self.settings = settings
         self.store = store
         self.run_id = run_id
-        proxy = "socks5://127.0.0.1:9050" if settings.tor else settings.proxy
+        proxy = "socks5h://127.0.0.1:9050" if settings.tor else settings.proxy
         self._client = httpx.AsyncClient(
             timeout=settings.timeout,
             follow_redirects=True,
@@ -137,9 +149,16 @@ class Fetcher:
         headers: dict[str, str] | None = None,
         timeout: float | None = None,
         retries: int | None = None,
+        cache_key: str | None = None,
     ) -> Fetched:
         return await self._request(
-            "GET", url, params=params, headers=headers, timeout=timeout, retries=retries
+            "GET",
+            url,
+            params=params,
+            headers=headers,
+            timeout=timeout,
+            retries=retries,
+            cache_key=cache_key,
         )
 
     async def post(
@@ -160,6 +179,7 @@ class Fetcher:
         headers: dict[str, str] | None = None,
         timeout: float | None = None,
         retries: int | None = None,
+        cache_key: str | None = None,
     ) -> tuple[int, Any]:
         response = await self.get(
             url,
@@ -167,6 +187,7 @@ class Fetcher:
             headers={"Accept": "application/json", **(headers or {})},
             timeout=timeout,
             retries=retries,
+            cache_key=cache_key,
         )
         if response.json is not None:
             return response.status, response.json
@@ -174,9 +195,13 @@ class Fetcher:
             return response.status, None
         content_type = response.headers.get("content-type", "").lower()
         if "html" in content_type and response.status == 200:
-            raise BlockedError(f"non-JSON response from {url} (bot wall or changed API)")
+            raise BlockedError(
+                f"non-JSON response from {redact_url(url)} (bot wall or changed API)"
+            )
         if "json" in content_type and response.status == 200:
-            raise FetchError(f"invalid JSON from {url} (API response changed or was truncated)")
+            raise FetchError(
+                f"invalid JSON from {redact_url(url)} (API response changed or was truncated)"
+            )
         return response.status, None
 
     async def get_text(
@@ -187,6 +212,7 @@ class Fetcher:
         headers: dict[str, str] | None = None,
         timeout: float | None = None,
         retries: int | None = None,
+        cache_key: str | None = None,
     ) -> tuple[int, str]:
         response = await self.get(
             url,
@@ -197,6 +223,7 @@ class Fetcher:
             },
             timeout=timeout,
             retries=retries,
+            cache_key=cache_key,
         )
         return response.status, response.text
 
@@ -229,9 +256,10 @@ class Fetcher:
         json: Any = None,
         timeout: float | None = None,
         retries: int | None = None,
+        cache_key: str | None = None,
     ) -> Fetched:
-        key = _cache_key(url, params)
-        host = urlsplit(key).netloc
+        key = cache_key or _cache_key(url, params)
+        host = urlsplit(url).netloc
 
         if self.settings.replay:
             return self._replay(key)
@@ -242,7 +270,7 @@ class Fetcher:
         stale = self._cache_row(key) if method == "GET" and cached is None else None
 
         if not await self._allowed(key):
-            raise BlockedError(f"robots.txt disallows {key}")
+            raise BlockedError(f"robots.txt disallows {redact_url(key)}")
 
         state = self._host_state(host)
         delay = BACKOFF
@@ -315,25 +343,29 @@ class Fetcher:
             state["fails"] = 0
             fetched = self._build(response, key)
             if self.settings.keep_raw and self.store is not None:
-                self.store.raw_put(key, fetched.status, response.content, self.run_id)
+                self.store.raw_put(key, fetched.status, fetched.content, self.run_id)
             if method == "GET" and response.status_code == 200:
-                self._cache_put(key, response)
+                self._cache_put(key, response, store_final_url=cache_key is None)
             if _looks_blocked(fetched):
                 raise BlockedError(f"bot wall / access denied on {host} (HTTP {fetched.status})")
             return fetched
 
-        raise FetchError(f"request to {url} failed: {last_error}")
+        raise FetchError(f"request to {redact_url(url)} failed: {last_error}")
 
     def _build(self, response: httpx.Response, key: str) -> Fetched:
         content_type = response.headers.get("content-type", "")
         payload: Any = None
         first = response.content[:1]
-        if response.content and ("json" in content_type or first in (b"{", b"[")):
+        if (
+            response.content
+            and len(response.content) <= MAX_BODY
+            and ("json" in content_type or first in (b"{", b"["))
+        ):
             try:
                 payload = response.json()
             except ValueError:
                 payload = None
-        raw = response.content
+        raw = response.content[:MAX_BODY]
         text_bytes = raw[:MAX_TEXT]
         try:
             text = text_bytes.decode(response.encoding or "utf-8", "replace")
@@ -461,11 +493,13 @@ class Fetcher:
             from_cache=True,
         )
 
-    def _cache_put(self, key: str, response: httpx.Response) -> None:
+    def _cache_put(
+        self, key: str, response: httpx.Response, *, store_final_url: bool = True
+    ) -> None:
         if not self.settings.cache_ttl or self.store is None:
             return
         content_type = response.headers.get("content-type", "")
-        body = response.content
+        body = response.content[:MAX_BODY]
         if "html" in content_type.lower():
             body = body[:CACHE_HTML_MAX]
         self.store.cache_put(
@@ -476,7 +510,7 @@ class Fetcher:
             response.headers.get("etag", ""),
             response.headers.get("last-modified", ""),
             now_iso(),
-            final_url=str(response.url) if response.url else key,
+            final_url=(str(response.url) if store_final_url and response.url else key),
         )
 
     def _replay(self, key: str) -> Fetched:
@@ -484,7 +518,7 @@ class Fetcher:
             raise FetchError("replay requires a store")
         row = self.store.raw_get(key)
         if row is None:
-            raise FetchError(f"no recording for {key}")
+            raise FetchError(f"no recording for {redact_url(key)}")
         body = row["body"]
         text = body[:MAX_TEXT].decode("utf-8", "replace")
         try:

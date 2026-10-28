@@ -218,7 +218,8 @@ async def test_hunter_verifies_email(settings):
     settings.hunter_api_key = "key"
     respx.get(
         "https://api.hunter.io/v2/email-verifier",
-        params={"email": "alice@example.com", "api_key": "key"},
+        params={"email": "alice@example.com"},
+        headers={"X-API-Key": "key"},
     ).mock(
         return_value=httpx.Response(
             200,

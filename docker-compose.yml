@@ -1,7 +1,7 @@
 services:
   coldtrail:
     build: .
-    image: coldtrail:0.8.0
+    image: coldtrail:0.9.0
     container_name: coldtrail
     restart: unless-stopped
     ports:
@@ -10,8 +10,8 @@ services:
       - coldtrail-data:/data
     environment:
       COLDTRAIL_DB: /data/coldtrail.db
-      # Strongly recommended when publishing the port or sharing the host.
-      COLDTRAIL_WEB_TOKEN: ${COLDTRAIL_WEB_TOKEN:-}
+      # Required: the container binds 0.0.0.0 and refuses to start without a token.
+      COLDTRAIL_WEB_TOKEN: ${COLDTRAIL_WEB_TOKEN:?set COLDTRAIL_WEB_TOKEN to a long random string}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       HIBP_API_KEY: ${HIBP_API_KEY:-}
       EMAILREP_API_KEY: ${EMAILREP_API_KEY:-}

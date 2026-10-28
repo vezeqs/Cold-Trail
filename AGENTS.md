@@ -192,6 +192,12 @@ tests/fixtures/contracts/ (recorded source fixtures)
 - **Declarative corpus** entries that collide with curated source names are
   skipped at load time. `scripts/build_sites.py --fetch` pins a Sherlock git
   ref and stamps ref+sha256 into the file header; bump `PINNED_REF` deliberately.
+- **Privacy defaults are part of the contract:** `keep_raw=False`,
+  `avatar_hash=False`, DB/WAL/SHM/evidence/exports `0600`, evidence dirs
+  `0700`, Tor via `socks5h://`, email targets hashed with
+  `utils.sensitive_cache_key`, no telemetry, and non-loopback `serve` requires
+  a token unless `--allow-unauthenticated` is explicit. Do not regress these
+  without updating README/SECURITY/privacy docs and tests.
 - **No guard rails that weaken collection:** do not add artificial caps,
   allowlists, or "safety" filters that reduce source coverage or pivot breadth.
   Rate limiting/pacing is politeness, not restriction — keep it.

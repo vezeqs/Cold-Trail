@@ -130,11 +130,19 @@ def test_export_is_not_truncated(store):
 
 
 def test_prune(store):
+    from coldtrail.evidence import add_evidence, evidence_path
+
     run_id = store.start_run("pivot", "old")
+    evidence = add_evidence(store, data=b"old evidence", filename="old.txt", run_id=run_id)
+    blob = evidence_path(store, evidence["sha256"])
+    store.audit_log("pivot", "old", {"argv": []})
     store.conn.execute("UPDATE runs SET started_at = '2000-01-01T00:00:00+00:00'")
+    store.conn.execute("UPDATE audit SET at = '2000-01-01T00:00:00+00:00'")
     store.conn.commit()
     assert store.prune(30) == 1
     assert store.run(run_id) is None
+    assert not blob.exists()
+    assert store.audit() == []
 
 
 def test_check_stats(store):
