@@ -85,6 +85,14 @@ Do not merge changes that break these:
   CSP/no-referrer/no-store, no third-party assets.
 - **Breach features are metadata-only**; Pwned Passwords stays k-anonymous.
 
+## Before shipping
+
+Any push, tag, release, package/container publish, or deployment must run the
+`pre-ship-audit` skill (`.devin/skills/pre-ship-audit/SKILL.md`). It is also
+referenced by the always-on rule in `.devin/rules/pre-ship-audit.md`. Do not
+ship with failing tests, lint, build, or docs validation, and do not bypass
+checks.
+
 ## Commit and review
 
 - One logical change per commit; imperative subject, reason in the body.
