@@ -16,8 +16,8 @@ evidence-grade dossiers — from a CLI, a TUI, or a local web UI.
 ## Quickstart
 
 ```bash
-git clone https://github.com/slopmanufacturer/coldtrail
-cd coldtrail
+git clone https://github.com/slopmanufacturer/Cold-Trail
+cd Cold-Trail
 uv sync
 
 uv run coldtrail pivot alice          # curated sources + correlation

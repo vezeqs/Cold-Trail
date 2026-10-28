@@ -70,6 +70,7 @@ def doctor(
     privacy = {
         "telemetry": "none",
         "raw_retention": settings.keep_raw,
+        "avatar_hash": settings.avatar_hash,
         "http_cache_ttl": settings.cache_ttl,
         "retention_days": settings.retention_days,
         "tor": settings.tor,
@@ -109,6 +110,7 @@ def doctor(
     console.print(f"X_BEARER_TOKEN: {'set' if settings.x_bearer_token else 'unset'}")
     console.print(
         f"privacy: telemetry=none raw={'on' if settings.keep_raw else 'off'} "
+        f"avatar={'on' if settings.avatar_hash else 'off'} "
         f"cache_ttl={settings.cache_ttl}s retention={settings.retention_days or 'off'} "
         f"tor={'on' if settings.tor else 'off'} db_mode={privacy['db_mode'] or '?'}"
     )
