@@ -7,9 +7,9 @@ import httpx
 import pytest
 import respx
 
-from larpharvester.config import Settings
-from larpharvester.http import Fetcher
-from larpharvester.sources import SOURCES
+from coldtrail.config import Settings
+from coldtrail.http import Fetcher
+from coldtrail.sources import SOURCES
 
 
 @pytest.fixture

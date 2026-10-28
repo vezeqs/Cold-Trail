@@ -9,19 +9,19 @@ import httpx
 import pytest
 import respx
 
-from larpharvester.analysis import extract_entities
-from larpharvester.config import Settings
-from larpharvester.correlate import jaro_winkler, recluster_rows, score_pair
-from larpharvester.domain import (
+from coldtrail.analysis import extract_entities
+from coldtrail.config import Settings
+from coldtrail.correlate import jaro_winkler, recluster_rows, score_pair
+from coldtrail.domain import (
     extract_spf,
     favicon_shodan_hash,
     guess_mx_provider,
     lookup_domain,
     mmh3_32,
 )
-from larpharvester.http import Fetcher
-from larpharvester.models import Profile
-from larpharvester.report import to_maltego_csv, to_markdown, to_stix
+from coldtrail.http import Fetcher
+from coldtrail.models import Profile
+from coldtrail.report import to_maltego_csv, to_markdown, to_stix
 
 
 @pytest.fixture

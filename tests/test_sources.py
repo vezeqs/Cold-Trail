@@ -6,9 +6,9 @@ import httpx
 import pytest
 import respx
 
-from larpharvester.config import Settings
-from larpharvester.http import Fetcher
-from larpharvester.sources import SOURCES
+from coldtrail.config import Settings
+from coldtrail.http import Fetcher
+from coldtrail.sources import SOURCES
 
 
 @pytest.fixture
@@ -385,7 +385,7 @@ async def test_keybase_found(settings):
 
 @respx.mock
 async def test_retries_on_429_then_succeeds(settings, monkeypatch):
-    monkeypatch.setattr("larpharvester.http.BACKOFF", 0)
+    monkeypatch.setattr("coldtrail.http.BACKOFF", 0)
     route = respx.get("https://api.github.com/users/octocat")
     route.side_effect = [
         httpx.Response(429, headers={"Retry-After": "0"}),

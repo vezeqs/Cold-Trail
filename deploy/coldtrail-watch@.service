@@ -1,0 +1,26 @@
+[Unit]
+Description=ColdTrail watch cycle for %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=coldtrail
+Group=coldtrail
+Environment=COLDTRAIL_DB=/var/lib/coldtrail/coldtrail.db
+EnvironmentFile=-/etc/coldtrail/env
+ExecStart=/usr/local/bin/coldtrail watch %i --interval 3600
+Restart=on-failure
+RestartSec=30
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/coldtrail
+CapabilityBoundingSet=
+AmbientCapabilities=
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -9,15 +9,15 @@ import pytest
 import respx
 from typer.testing import CliRunner
 
-from larpharvester.cli import app
-from larpharvester.config import Settings
-from larpharvester.correlate import diff_runs
-from larpharvester.http import Fetcher
-from larpharvester.models import CheckResult, PivotReport, Post, Profile, ProfileChange
-from larpharvester.report import iter_csv, iter_jsonl, to_csv, to_jsonl
-from larpharvester.sources import SOURCES
-from larpharvester.store import Store
-from larpharvester.watch import watch
+from coldtrail.cli import app
+from coldtrail.config import Settings
+from coldtrail.correlate import diff_runs
+from coldtrail.http import Fetcher
+from coldtrail.models import CheckResult, PivotReport, Post, Profile, ProfileChange
+from coldtrail.report import iter_csv, iter_jsonl, to_csv, to_jsonl
+from coldtrail.sources import SOURCES
+from coldtrail.store import Store
+from coldtrail.watch import watch
 
 runner = CliRunner()
 
@@ -97,8 +97,8 @@ async def test_watch_shares_one_fetcher_per_cycle_and_dedupes(settings, monkeypa
         return CheckResult(source_name, username, "found", profile=report_profile), []
 
     change = ProfileChange("github", "alice", "bio", None, "new bio", "2024-01-01T00:00:00Z")
-    monkeypatch.setattr("larpharvester.watch.pivot", fake_pivot)
-    monkeypatch.setattr("larpharvester.watch.harvest", fake_harvest)
+    monkeypatch.setattr("coldtrail.watch.pivot", fake_pivot)
+    monkeypatch.setattr("coldtrail.watch.harvest", fake_harvest)
     monkeypatch.setattr(store, "record_profile_history", lambda run_id, profiles: [change])
 
     dispatched: list[tuple[str, str]] = []
@@ -227,7 +227,7 @@ def test_diff_runs_reports_changes(tmp_path):
 
 
 def test_diff_runs_serializes_links(tmp_path):
-    from larpharvester.models import Link
+    from coldtrail.models import Link
 
     db = tmp_path / "t.db"
     with Store(db) as store:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from larpharvester.utils import host_of, norm, norm_url, strip_html
+from coldtrail.utils import host_of, norm, norm_url, strip_html
 
 
 def test_strip_html():

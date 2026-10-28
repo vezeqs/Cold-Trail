@@ -4,8 +4,8 @@
 
 | Version | Supported |
 | ------- | --------- |
-| 0.7.x   | yes       |
-| < 0.7   | no        |
+| 0.8.x   | yes       |
+| < 0.8   | no        |
 
 ## Reporting a vulnerability
 
@@ -24,16 +24,16 @@ give us a reasonable window before public disclosure.
 
 ## Threat model
 
-`larpharvester` is a **local-first** OSINT tool. The default `serve` bind is
+`ColdTrail` is a **local-first** OSINT tool. The default `serve` bind is
 `127.0.0.1`; the web UI has no authentication unless `--token` /
-`LARPHARVESTER_WEB_TOKEN` is set. Binding to a non-loopback address without a
+`COLDTRAIL_WEB_TOKEN` is set. Binding to a non-loopback address without a
 token exposes the database, evidence store, and external-tool runner to the
 network. Do not do that.
 
 When exposed behind a reverse proxy:
 
-- set `--token` (or `LARPHARVESTER_WEB_TOKEN`),
-- set `LARPHARVESTER_TRUST_PROXY=1` so rate limiting keys on `X-Forwarded-For`,
+- set `--token` (or `COLDTRAIL_WEB_TOKEN`),
+- set `COLDTRAIL_TRUST_PROXY=1` so rate limiting keys on `X-Forwarded-For`,
 - terminate TLS at the proxy and forward `X-Forwarded-Proto`,
 - keep the job store single-process (in-memory jobs are not shared across
   `uvicorn --workers`).

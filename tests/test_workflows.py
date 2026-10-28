@@ -8,11 +8,11 @@ import json
 import pytest
 from typer.testing import CliRunner
 
-from larpharvester.cli import app
-from larpharvester.config import Settings
-from larpharvester.models import Profile
-from larpharvester.pivot import pivot
-from larpharvester.sources.base import Source
+from coldtrail.cli import app
+from coldtrail.config import Settings
+from coldtrail.models import Profile
+from coldtrail.pivot import pivot
+from coldtrail.sources.base import Source
 
 runner = CliRunner()
 
@@ -84,7 +84,7 @@ def settings(tmp_path):
 
 async def test_depth_one_expands_once(settings, monkeypatch):
     user, email = UserSource(), EmailSource()
-    monkeypatch.setattr("larpharvester.pivot.SOURCES", {user.name: user, email.name: email})
+    monkeypatch.setattr("coldtrail.pivot.SOURCES", {user.name: user, email.name: email})
     report = await pivot("alice", settings=settings, expand=True, depth=1, avatar_hash=False)
     # One hop: email discovered from the username profile.
     assert "alice@example.com" in report.expanded
@@ -93,7 +93,7 @@ async def test_depth_one_expands_once(settings, monkeypatch):
 
 async def test_depth_two_adds_second_hop(settings, monkeypatch):
     user, email = UserSource(), EmailSource()
-    monkeypatch.setattr("larpharvester.pivot.SOURCES", {user.name: user, email.name: email})
+    monkeypatch.setattr("coldtrail.pivot.SOURCES", {user.name: user, email.name: email})
     report = await pivot("alice", settings=settings, expand=True, depth=2, avatar_hash=False)
     assert "alice@example.com" in report.expanded
     # Second hop: the email source advertised alice-hop, which user-src probed.
@@ -103,14 +103,14 @@ async def test_depth_two_adds_second_hop(settings, monkeypatch):
 
 async def test_depth_does_not_reprobe_visited_targets(settings, monkeypatch):
     user, email = UserSource(), EmailSource()
-    monkeypatch.setattr("larpharvester.pivot.SOURCES", {user.name: user, email.name: email})
+    monkeypatch.setattr("coldtrail.pivot.SOURCES", {user.name: user, email.name: email})
     await pivot("alice", settings=settings, expand=True, depth=3, avatar_hash=False)
     assert user.seen.count("alice") == 1
 
 
 async def test_on_result_streams_every_check(settings, monkeypatch):
     user, email = UserSource(), EmailSource()
-    monkeypatch.setattr("larpharvester.pivot.SOURCES", {user.name: user, email.name: email})
+    monkeypatch.setattr("coldtrail.pivot.SOURCES", {user.name: user, email.name: email})
     streamed: list[tuple[str, str, str]] = []
     report = await pivot(
         "alice",
@@ -129,7 +129,7 @@ async def test_on_result_streams_every_check(settings, monkeypatch):
 
 def test_cli_batch_json(tmp_path, monkeypatch):
     user, email = UserSource(), EmailSource()
-    monkeypatch.setattr("larpharvester.pivot.SOURCES", {user.name: user, email.name: email})
+    monkeypatch.setattr("coldtrail.pivot.SOURCES", {user.name: user, email.name: email})
     result = runner.invoke(
         app,
         ["--db", str(tmp_path / "t.db"), "batch", "alice", "bob", "--json"],
@@ -142,7 +142,7 @@ def test_cli_batch_json(tmp_path, monkeypatch):
 
 def test_cli_batch_from_file(tmp_path, monkeypatch):
     user, email = UserSource(), EmailSource()
-    monkeypatch.setattr("larpharvester.pivot.SOURCES", {user.name: user, email.name: email})
+    monkeypatch.setattr("coldtrail.pivot.SOURCES", {user.name: user, email.name: email})
     targets = tmp_path / "targets.txt"
     targets.write_text("# comment\nalice\n\nbob\n")
     result = runner.invoke(
@@ -160,8 +160,8 @@ def test_cli_batch_requires_targets(tmp_path):
 
 
 def test_cli_recluster(tmp_path):
-    from larpharvester.models import CheckResult
-    from larpharvester.store import Store
+    from coldtrail.models import CheckResult
+    from coldtrail.store import Store
 
     db = tmp_path / "t.db"
     with Store(db) as store:

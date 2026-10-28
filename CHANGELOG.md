@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-10-27
+
+### Changed
+
+- **Renamed the project to ColdTrail.** The distribution and import package are
+  now `coldtrail`, the CLI is `coldtrail`, environment variables use the
+  `COLDTRAIL_*` prefix, default config/data paths are
+  `~/.config/coldtrail` and `~/.local/share/coldtrail`, the login cookie is
+  `coldtrail_token`, and the Docker user/image, systemd units, docs, and
+  GitHub Pages URLs were updated.
+- Existing databases are not moved automatically. Point `--db` at the old file
+  or move it to `~/.local/share/coldtrail/coldtrail.db`.
+
 ## [0.7.0] - 2026-10-27
 
 ### Added

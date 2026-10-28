@@ -4,8 +4,8 @@ import io
 
 from PIL import Image
 
-from larpharvester.avatars import dhash
-from larpharvester.utils import hamming_hex
+from coldtrail.avatars import dhash
+from coldtrail.utils import hamming_hex
 
 
 def gradient(size: int = 64) -> bytes:
@@ -40,8 +40,8 @@ def test_hamming_hex():
 
 
 async def test_web_profiles_skip_avatar_downloads(monkeypatch):
-    from larpharvester.avatars import hash_avatars
-    from larpharvester.models import Profile
+    from coldtrail.avatars import hash_avatars
+    from coldtrail.models import Profile
 
     calls = []
 

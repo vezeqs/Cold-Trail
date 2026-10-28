@@ -8,9 +8,9 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-import larpharvester.web.app as web_app
-from larpharvester.config import Settings
-from larpharvester.models import (
+import coldtrail.web.app as web_app
+from coldtrail.config import Settings
+from coldtrail.models import (
     CheckResult,
     Cluster,
     Edge,
@@ -20,8 +20,8 @@ from larpharvester.models import (
     Post,
     Profile,
 )
-from larpharvester.store import Store
-from larpharvester.web import create_app
+from coldtrail.store import Store
+from coldtrail.web import create_app
 
 
 def _profile(**kwargs) -> Profile:
@@ -105,7 +105,7 @@ def test_dashboard_renders(client):
     response = client.get("/")
     assert response.status_code == 200
     assert "Dashboard" in response.text
-    assert "larpharvester" in response.text
+    assert "ColdTrail" in response.text
 
 
 def test_dashboard_with_data(client, seeded):
@@ -550,10 +550,10 @@ def test_tools_run_rejects_unknown_tool(client):
 
 
 def test_tools_run_harvest_persists(client, settings, monkeypatch):
-    import larpharvester.web.app as app_module
+    import coldtrail.web.app as app_module
 
     async def fake_harvest(source, target, *, settings, limit, store=None, **kwargs):
-        from larpharvester.models import CheckResult, Post, Profile
+        from coldtrail.models import CheckResult, Post, Profile
 
         profile = Profile(
             source=source,
@@ -742,7 +742,7 @@ def test_run_page_has_one_click_pivot_forms(client, seeded):
 
 
 def test_rate_limit_on_pivot(settings, monkeypatch):
-    import larpharvester.web.app as app_module
+    import coldtrail.web.app as app_module
 
     monkeypatch.setattr(app_module, "RATE_LIMIT", 1)
     monkeypatch.setattr(app_module, "run_pivot", _fake_pivot)
@@ -771,9 +771,9 @@ def test_tools_page_lists_external_tools(client):
 
 
 def test_tools_external_runs_and_saves(client, settings, monkeypatch):
-    import larpharvester.web.app as app_module
-    from larpharvester.integrations import Parsed, ToolResult
-    from larpharvester.models import Entity
+    import coldtrail.web.app as app_module
+    from coldtrail.integrations import Parsed, ToolResult
+    from coldtrail.models import Entity
 
     def fake_run_tool(tool, target, **kwargs):
         return ToolResult(
@@ -828,7 +828,7 @@ def test_tools_ingest_upload(client, settings):
 
 
 def test_evidence_download_and_api(client, settings):
-    from larpharvester.evidence import add_evidence
+    from coldtrail.evidence import add_evidence
 
     with Store(settings.db_path) as store:
         run_id = store.start_run("pivot", "alice")
@@ -870,8 +870,8 @@ def test_pivot_form_unchecked_avatar_hash_is_false(client, monkeypatch):
 
 
 def test_tools_external_unchecked_save_does_not_persist(client, settings, monkeypatch):
-    import larpharvester.web.app as app_module
-    from larpharvester.integrations import Parsed, ToolResult
+    import coldtrail.web.app as app_module
+    from coldtrail.integrations import Parsed, ToolResult
 
     def fake_run_tool(tool, target, **kwargs):
         return ToolResult(

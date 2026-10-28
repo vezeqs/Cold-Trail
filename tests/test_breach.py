@@ -9,10 +9,10 @@ import respx
 from httpx import Response
 from typer.testing import CliRunner
 
-from larpharvester.breach import hibp_breaches, pwned_password, sha1_prefix
-from larpharvester.cli import app
-from larpharvester.config import Settings
-from larpharvester.http import Fetcher
+from coldtrail.breach import hibp_breaches, pwned_password, sha1_prefix
+from coldtrail.cli import app
+from coldtrail.config import Settings
+from coldtrail.http import Fetcher
 
 runner = CliRunner()
 

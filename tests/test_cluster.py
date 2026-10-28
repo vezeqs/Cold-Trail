@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from larpharvester.correlate import build_clusters, correlate, score_pair
-from larpharvester.models import Link, Profile
+from coldtrail.correlate import build_clusters, correlate, score_pair
+from coldtrail.models import Link, Profile
 
 
 def profile(source: str, username: str, **kwargs) -> Profile:

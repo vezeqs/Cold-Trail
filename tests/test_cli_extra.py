@@ -4,10 +4,10 @@ import json
 
 from typer.testing import CliRunner
 
-from larpharvester.cli import app
-from larpharvester.models import Cluster, Entity, Link, Post, Profile
-from larpharvester.report import encrypt_bytes
-from larpharvester.store import Store
+from coldtrail.cli import app
+from coldtrail.models import Cluster, Entity, Link, Post, Profile
+from coldtrail.report import encrypt_bytes
+from coldtrail.store import Store
 
 runner = CliRunner()
 
@@ -78,7 +78,7 @@ def test_export_formats(tmp_path):
         ("csv", "source,username"),
         ("graphml", "<graphml"),
         ("gexf", "<gexf"),
-        ("dot", "graph larpharvester"),
+        ("dot", "graph coldtrail"),
         ("html", "Dossier: alice"),
     ):
         out = tmp_path / f"export.{fmt}"
@@ -139,7 +139,7 @@ def test_decrypt(tmp_path, monkeypatch):
     source = tmp_path / "secret.bin"
     source.write_bytes(encrypt_bytes(b"hello", "pw"))
     target = tmp_path / "out.txt"
-    monkeypatch.setenv("LARPHARVESTER_PASSPHRASE", "pw")
+    monkeypatch.setenv("COLDTRAIL_PASSPHRASE", "pw")
     invoke(["--db", str(tmp_path / "t.db"), "decrypt", str(source), str(target)])
     assert target.read_bytes() == b"hello"
 
@@ -154,7 +154,7 @@ def test_source_test_with_fake(tmp_path, monkeypatch):
         supports_posts = False
 
         async def check(self, fetcher, target):
-            from larpharvester.models import CheckResult
+            from coldtrail.models import CheckResult
 
             return CheckResult(
                 self.name,
@@ -165,7 +165,7 @@ def test_source_test_with_fake(tmp_path, monkeypatch):
                 ),
             )
 
-    monkeypatch.setattr("larpharvester.cli.osint.SOURCES", {"fake": FakeSource()})
+    monkeypatch.setattr("coldtrail.cli.osint.SOURCES", {"fake": FakeSource()})
     result = invoke(["--db", str(tmp_path / "t.db"), "source", "test", "fake", "alice", "--json"])
     assert json.loads(result.output)["status"] == "found"
 
@@ -178,7 +178,7 @@ def test_sources_all(tmp_path):
 def test_export_encrypted_roundtrip(tmp_path, monkeypatch):
     db = seed(tmp_path)
     out = tmp_path / "enc.bin"
-    monkeypatch.setenv("LARPHARVESTER_PASSPHRASE", "pw")
+    monkeypatch.setenv("COLDTRAIL_PASSPHRASE", "pw")
     invoke(["--db", str(db), "export", "1", "--encrypt", "-o", str(out)])
     decrypted = tmp_path / "dec.json"
     invoke(["--db", str(db), "decrypt", str(out), str(decrypted)])

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from larpharvester.dorks import dork_queries, dorks, reverse_image_links
-from larpharvester.variants import email_variants, variants
+from coldtrail.dorks import dork_queries, dorks, reverse_image_links
+from coldtrail.variants import email_variants, variants
 
 
 def test_handle_variants_include_common_patterns():

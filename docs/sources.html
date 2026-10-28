@@ -3,29 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Source and integration coverage — larpharvester</title>
-  <meta name="description" content="Full coverage list for larpharvester: 50 curated sources, 432 declarative web sources, external OSINT tool integrations, import formats, and how to add your own source.">
+  <title>Source and integration coverage — ColdTrail</title>
+  <meta name="description" content="Full coverage list for ColdTrail: 50 curated sources, 432 declarative web sources, external OSINT tool integrations, import formats, and how to add your own source.">
   <meta name="keywords" content="OSINT sources, username enumeration sites, email OSINT APIs, Sherlock corpus, Maigret, Instaloader, SpiderFoot, Maltego, source coverage">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <meta name="theme-color" content="#0b0f14">
-  <link rel="canonical" href="https://slopmanufacturer.github.io/larpharvester/sources.html">
-  <link rel="sitemap" type="application/xml" href="https://slopmanufacturer.github.io/larpharvester/sitemap.xml">
+  <link rel="canonical" href="https://slopmanufacturer.github.io/coldtrail/sources.html">
+  <link rel="sitemap" type="application/xml" href="https://slopmanufacturer.github.io/coldtrail/sitemap.xml">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <meta property="og:type" content="article">
-  <meta property="og:site_name" content="larpharvester">
-  <meta property="og:title" content="Source and integration coverage — larpharvester">
+  <meta property="og:site_name" content="ColdTrail">
+  <meta property="og:title" content="Source and integration coverage — ColdTrail">
   <meta property="og:description" content="482 sources, 50 curated sources, 432 declarative sites, and integrations for the most-used OSINT tools.">
-  <meta property="og:url" content="https://slopmanufacturer.github.io/larpharvester/sources.html">
-  <meta property="og:image" content="https://slopmanufacturer.github.io/larpharvester/og.png">
+  <meta property="og:url" content="https://slopmanufacturer.github.io/coldtrail/sources.html">
+  <meta property="og:image" content="https://slopmanufacturer.github.io/coldtrail/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     "itemListElement": [
-      {"@type": "ListItem", "position": 1, "name": "Overview", "item": "https://slopmanufacturer.github.io/larpharvester/"},
-      {"@type": "ListItem", "position": 2, "name": "Coverage", "item": "https://slopmanufacturer.github.io/larpharvester/sources.html"}
+      {"@type": "ListItem", "position": 1, "name": "Overview", "item": "https://slopmanufacturer.github.io/coldtrail/"},
+      {"@type": "ListItem", "position": 2, "name": "Coverage", "item": "https://slopmanufacturer.github.io/coldtrail/sources.html"}
     ]
   }
   </script>
@@ -34,12 +34,12 @@
   <a class="skip" href="#main">Skip to content</a>
   <header class="site">
     <nav class="nav" aria-label="Primary">
-      <a class="brand" href="./">larp<span>harvester</span></a>
+      <a class="brand" href="./">Cold<span>Trail</span></a>
       <div class="nav-links">
         <a href="./">Overview</a>
         <a href="quickstart.html">Quickstart</a>
         <a href="sources.html" aria-current="page">Coverage</a>
-        <a href="https://github.com/slopmanufacturer/larpharvester">GitHub</a>
+        <a href="https://github.com/slopmanufacturer/coldtrail">GitHub</a>
       </div>
     </nav>
   </header>
@@ -91,12 +91,12 @@
       <p class="sub">
         Generated from the <a href="https://github.com/sherlock-project/sherlock">Sherlock</a> dataset
         (MIT) by <code>scripts/build_sites.py --fetch</code>, with the upstream ref and SHA-256 stamped
-        into <code>src/larpharvester/data/sites.toml</code>. Entries that collide with a curated source
+        into <code>src/coldtrail/data/sites.toml</code>. Entries that collide with a curated source
         are skipped. Enable with <code>--web</code> or the web UI's “web” scope.
       </p>
-      <pre><code>uv run larpharvester pivot alice --web
-uv run larpharvester sources -q social
-uv run larpharvester sources --group dev</code></pre>
+      <pre><code>uv run coldtrail pivot alice --web
+uv run coldtrail sources -q social
+uv run coldtrail sources --group dev</code></pre>
     </section>
 
     <section aria-labelledby="tools">
@@ -123,16 +123,16 @@ uv run larpharvester sources --group dev</code></pre>
           <tr><td>SpiderFoot / Maltego</td><td>Import</td><td>JSON/CSV</td><td>entities, profiles, links</td></tr>
         </tbody>
       </table>
-      <pre><code>uv run larpharvester integrations
-uv run larpharvester run maigret alice --json
-uv run larpharvester ingest maltego.csv --format auto</code></pre>
+      <pre><code>uv run coldtrail integrations
+uv run coldtrail run maigret alice --json
+uv run coldtrail ingest maltego.csv --format auto</code></pre>
     </section>
 
     <section aria-labelledby="add">
       <h2 id="add">Add your own source</h2>
-      <p class="sub">Subclass <code>Source</code>, decorate with <code>@register</code>, and import the module. Or ship a plugin through the <code>larpharvester.sources</code> entry-point group.</p>
-      <pre><code>from larpharvester.models import CheckResult, Profile
-from larpharvester.sources import Source, register
+      <p class="sub">Subclass <code>Source</code>, decorate with <code>@register</code>, and import the module. Or ship a plugin through the <code>coldtrail.sources</code> entry-point group.</p>
+      <pre><code>from coldtrail.models import CheckResult, Profile
+from coldtrail.sources import Source, register
 
 @register
 class Example(Source):
@@ -155,14 +155,14 @@ class Example(Source):
             display_name=data.get("name"),
         ))</code></pre>
       <p class="sub">Then record a replayable contract fixture so upstream drift fails loudly:</p>
-      <pre><code>uv run larpharvester source verify --record -s example
-uv run larpharvester source verify -s example</code></pre>
+      <pre><code>uv run coldtrail source verify --record -s example
+uv run coldtrail source verify -s example</code></pre>
     </section>
   </main>
 
   <footer class="site">
     <div class="footer-inner">
-      <span>© 2026 larpharvester contributors · MIT</span>
+      <span>© 2026 ColdTrail contributors · MIT</span>
       <span><a href="./">Overview</a> · <a href="quickstart.html">Quickstart</a> · <a href="sitemap.xml">Sitemap</a></span>
     </div>
   </footer>

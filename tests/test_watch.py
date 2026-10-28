@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from larpharvester.alerts import Alerter
-from larpharvester.config import Settings
-from larpharvester.models import Post, Profile
-from larpharvester.sources.base import Source
-from larpharvester.store import Store
-from larpharvester.watch import watch
+from coldtrail.alerts import Alerter
+from coldtrail.config import Settings
+from coldtrail.models import Post, Profile
+from coldtrail.sources.base import Source
+from coldtrail.store import Store
+from coldtrail.watch import watch
 
 
 class FakeSource(Source):
@@ -54,9 +54,9 @@ class RecordingAlerter(Alerter):
 @pytest.fixture
 def fake_sources(monkeypatch):
     registry = {"fake": FakeSource()}
-    monkeypatch.setattr("larpharvester.pivot.SOURCES", registry)
-    monkeypatch.setattr("larpharvester.watch.SOURCES", registry)
-    monkeypatch.setattr("larpharvester.harvest.SOURCES", registry)
+    monkeypatch.setattr("coldtrail.pivot.SOURCES", registry)
+    monkeypatch.setattr("coldtrail.watch.SOURCES", registry)
+    monkeypatch.setattr("coldtrail.harvest.SOURCES", registry)
     return registry
 
 

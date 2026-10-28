@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from larpharvester.analysis import (
+from coldtrail.analysis import (
     detect_lang,
     entities_from_posts,
     extract_entities,
@@ -9,7 +9,7 @@ from larpharvester.analysis import (
     style_similarity,
     stylometry,
 )
-from larpharvester.models import Post
+from coldtrail.models import Post
 
 
 def test_extracts_common_entity_kinds():

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}New pivot · ColdTrail{% endblock %}
+{% block content %}
+<h1>New pivot</h1>
+<p class="muted">Probe a username or email across public sources, correlate the hits, and store the run.</p>
+
+<form method="post" action="/pivot" class="stack">
+  <label>
+    Target
+    <input type="text" name="target" placeholder="username or email" required maxlength="320" autofocus>
+  </label>
+
+  <label>
+    Source scope
+    <select name="scope" id="scope">
+      <option value="curated">Curated sources ({{ curated_groups | join(", ") }})</option>
+      <option value="web">Curated + 460-site web corpus ({{ source_count }} total)</option>
+      <option value="custom">Custom source list</option>
+    </select>
+  </label>
+
+  <label id="custom-wrap" class="hidden">
+    Sources
+    <input type="text" name="sources" placeholder="github, reddit, social, web, all">
+    <span class="hint">Comma or space separated source names, groups, or <code>all</code>.</span>
+  </label>
+
+  <label>
+    Expansion depth (hops when Expand is checked)
+    <select name="depth">
+      <option value="1" selected>1 hop (default)</option>
+      <option value="2">2 hops (email ↔ username ↔ email)</option>
+      <option value="3">3 hops</option>
+    </select>
+  </label>
+
+  <fieldset>
+    <legend>Options</legend>
+    <label class="check"><input type="checkbox" name="expand" value="true"> Expand: follow linked handles / emails across hops</label>
+    <label class="check"><input type="checkbox" name="variants" value="true"> Probe generated handle/email variants</label>
+    <label class="check"><input type="checkbox" name="avatar_hash" value="true" checked> Perceptual avatar hashing</label>
+  </fieldset>
+
+  <button type="submit">Run pivot</button>
+</form>
+{% endblock %}

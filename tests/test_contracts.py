@@ -11,16 +11,16 @@ import pytest
 import respx
 from typer.testing import CliRunner
 
-from larpharvester.cli import app
-from larpharvester.config import Settings
-from larpharvester.contracts import (
+from coldtrail.cli import app
+from coldtrail.config import Settings
+from coldtrail.contracts import (
     CONTRACTS,
     record_contract,
     validate_result,
     verify_contract,
 )
-from larpharvester.models import CheckResult
-from larpharvester.sources import CURATED
+from coldtrail.models import CheckResult
+from coldtrail.sources import CURATED
 
 runner = CliRunner()
 

@@ -3,29 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Quickstart — larpharvester OSINT toolkit</title>
-  <meta name="description" content="Install larpharvester, run your first username or email pivot, open the TUI or web UI, configure optional API keys, and learn the common OSINT workflows.">
-  <meta name="keywords" content="larpharvester quickstart, install OSINT tool, username pivot tutorial, email OSINT, uv install">
+  <title>Quickstart — ColdTrail OSINT toolkit</title>
+  <meta name="description" content="Install ColdTrail, run your first username or email pivot, open the TUI or web UI, configure optional API keys, and learn the common OSINT workflows.">
+  <meta name="keywords" content="ColdTrail quickstart, install OSINT tool, username pivot tutorial, email OSINT, uv install">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <meta name="theme-color" content="#0b0f14">
-  <link rel="canonical" href="https://slopmanufacturer.github.io/larpharvester/quickstart.html">
-  <link rel="sitemap" type="application/xml" href="https://slopmanufacturer.github.io/larpharvester/sitemap.xml">
+  <link rel="canonical" href="https://slopmanufacturer.github.io/coldtrail/quickstart.html">
+  <link rel="sitemap" type="application/xml" href="https://slopmanufacturer.github.io/coldtrail/sitemap.xml">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <meta property="og:type" content="article">
-  <meta property="og:site_name" content="larpharvester">
-  <meta property="og:title" content="Quickstart — larpharvester OSINT toolkit">
+  <meta property="og:site_name" content="ColdTrail">
+  <meta property="og:title" content="Quickstart — ColdTrail OSINT toolkit">
   <meta property="og:description" content="Install, pivot, harvest, and export in a few commands.">
-  <meta property="og:url" content="https://slopmanufacturer.github.io/larpharvester/quickstart.html">
-  <meta property="og:image" content="https://slopmanufacturer.github.io/larpharvester/og.png">
+  <meta property="og:url" content="https://slopmanufacturer.github.io/coldtrail/quickstart.html">
+  <meta property="og:image" content="https://slopmanufacturer.github.io/coldtrail/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     "itemListElement": [
-      {"@type": "ListItem", "position": 1, "name": "Overview", "item": "https://slopmanufacturer.github.io/larpharvester/"},
-      {"@type": "ListItem", "position": 2, "name": "Quickstart", "item": "https://slopmanufacturer.github.io/larpharvester/quickstart.html"}
+      {"@type": "ListItem", "position": 1, "name": "Overview", "item": "https://slopmanufacturer.github.io/coldtrail/"},
+      {"@type": "ListItem", "position": 2, "name": "Quickstart", "item": "https://slopmanufacturer.github.io/coldtrail/quickstart.html"}
     ]
   }
   </script>
@@ -34,12 +34,12 @@
   <a class="skip" href="#main">Skip to content</a>
   <header class="site">
     <nav class="nav" aria-label="Primary">
-      <a class="brand" href="./">larp<span>harvester</span></a>
+      <a class="brand" href="./">Cold<span>Trail</span></a>
       <div class="nav-links">
         <a href="./">Overview</a>
         <a href="quickstart.html" aria-current="page">Quickstart</a>
         <a href="sources.html">Coverage</a>
-        <a href="https://github.com/slopmanufacturer/larpharvester">GitHub</a>
+        <a href="https://github.com/slopmanufacturer/coldtrail">GitHub</a>
       </div>
     </nav>
   </header>
@@ -54,29 +54,29 @@
     <section aria-labelledby="install">
       <h2 id="install">1. Install</h2>
       <p class="sub">Requires Python 3.11+ and <a href="https://docs.astral.sh/uv/">uv</a>. No API keys are needed to start.</p>
-      <pre><code>git clone https://github.com/slopmanufacturer/larpharvester
-cd larpharvester
+      <pre><code>git clone https://github.com/slopmanufacturer/coldtrail
+cd coldtrail
 uv sync
-uv run larpharvester doctor</code></pre>
+uv run coldtrail doctor</code></pre>
     </section>
 
     <section aria-labelledby="pivot">
       <h2 id="pivot">2. Run a pivot</h2>
       <p class="sub">Curated sources first. Add <code>--web</code> for the 432-site declarative corpus, or <code>--expand</code> to follow structured links.</p>
       <pre><code># Username across curated API sources
-uv run larpharvester pivot alice
+uv run coldtrail pivot alice
 
 # Email, then follow linked handles from Gravatar/Keybase/EmailRep
-uv run larpharvester pivot alice@example.com --expand
+uv run coldtrail pivot alice@example.com --expand
 
 # Multi-hop: email -&gt; username -&gt; email
-uv run larpharvester pivot alice@example.com --expand --depth 2
+uv run coldtrail pivot alice@example.com --expand --depth 2
 
 # Generated handle variants (_official, leet, dotted, ...)
-uv run larpharvester pivot alice --variants
+uv run coldtrail pivot alice --variants
 
 # Everything, including the web corpus
-uv run larpharvester pivot alice --web --json</code></pre>
+uv run coldtrail pivot alice --web --json</code></pre>
       <p class="sub">Results are saved as a run. Query it with <code>runs</code>, <code>profiles</code>, <code>links</code>, <code>clusters</code>, and <code>entities</code>.</p>
     </section>
 
@@ -85,11 +85,11 @@ uv run larpharvester pivot alice --web --json</code></pre>
       <div class="grid">
         <article class="card">
           <h3>Web UI</h3>
-          <p><code>uv run larpharvester serve --open</code><br>Binds <code>127.0.0.1:8765</code>. Add <code>--token</code> before exposing it.</p>
+          <p><code>uv run coldtrail serve --open</code><br>Binds <code>127.0.0.1:8765</code>. Add <code>--token</code> before exposing it.</p>
         </article>
         <article class="card">
           <h3>Terminal UI</h3>
-          <p><code>uv run larpharvester tui</code><br><code>p</code> pivot the focused row, <code>h</code> harvest, <code>d</code> diff the two latest runs.</p>
+          <p><code>uv run coldtrail tui</code><br><code>p</code> pivot the focused row, <code>h</code> harvest, <code>d</code> diff the two latest runs.</p>
         </article>
         <article class="card">
           <h3>JSON API</h3>
@@ -100,7 +100,7 @@ uv run larpharvester pivot alice --web --json</code></pre>
 
     <section aria-labelledby="keys">
       <h2 id="keys">4. Optional API keys</h2>
-      <p class="sub">Set environment variables or put them in <code>~/.config/larpharvester/config.toml</code>.</p>
+      <p class="sub">Set environment variables or put them in <code>~/.config/coldtrail/config.toml</code>.</p>
       <table>
         <thead><tr><th>Variable</th><th>Unlocks</th></tr></thead>
         <tbody>
@@ -117,45 +117,45 @@ uv run larpharvester pivot alice --web --json</code></pre>
     <section aria-labelledby="workflows">
       <h2 id="workflows">Common workflows</h2>
       <pre><code># Batch pivots
-uv run larpharvester batch alice bob carol -s social
-uv run larpharvester batch -f targets.txt --json
+uv run coldtrail batch alice bob carol -s social
+uv run coldtrail batch -f targets.txt --json
 
 # Harvest posts, then only new ones next time
-uv run larpharvester harvest alice -s reddit -n 200 --incremental
+uv run coldtrail harvest alice -s reddit -n 200 --incremental
 
 # Follow graph (Bluesky, Mastodon, GitHub)
-uv run larpharvester graph alice -s bluesky
+uv run coldtrail graph alice -s bluesky
 
 # Compare two runs
-uv run larpharvester diff 3 4
+uv run coldtrail diff 3 4
 
 # Re-correlate stored profiles
-uv run larpharvester recluster --run 3
+uv run coldtrail recluster --run 3
 
 # Cases and evidence
-uv run larpharvester case new operation-blue
-uv run larpharvester case add operation-blue --run 3
-uv run larpharvester evidence add photo.jpg --run 3
-uv run larpharvester case export operation-blue --format stix -o case.json
+uv run coldtrail case new operation-blue
+uv run coldtrail case add operation-blue --run 3
+uv run coldtrail evidence add photo.jpg --run 3
+uv run coldtrail case export operation-blue --format stix -o case.json
 
 # Infrastructure and identity
-uv run larpharvester domain example.com --deep
-uv run larpharvester ip 1.1.1.1 --deep
-uv run larpharvester ct example.com
-uv run larpharvester phone +351912345678
-uv run larpharvester breach alice@example.com --all
+uv run coldtrail domain example.com --deep
+uv run coldtrail ip 1.1.1.1 --deep
+uv run coldtrail ct example.com
+uv run coldtrail phone +351912345678
+uv run coldtrail breach alice@example.com --all
 
 # Export
-uv run larpharvester export 3 --format html -o dossier.html
-uv run larpharvester export 3 --format stix -o bundle.json</code></pre>
+uv run coldtrail export 3 --format html -o dossier.html
+uv run coldtrail export 3 --format stix -o bundle.json</code></pre>
     </section>
 
     <section aria-labelledby="tools">
       <h2 id="tools">External tools</h2>
-      <pre><code>uv run larpharvester integrations          # what is installed, with hints
-uv run larpharvester run maigret alice --json
-uv run larpharvester run instaloader alice --json
-uv run larpharvester ingest spiderfoot.json --format auto</code></pre>
+      <pre><code>uv run coldtrail integrations          # what is installed, with hints
+uv run coldtrail run maigret alice --json
+uv run coldtrail run instaloader alice --json
+uv run coldtrail ingest spiderfoot.json --format auto</code></pre>
       <p class="sub">See the <a href="sources.html">coverage page</a> for the full tool and source list.</p>
     </section>
 
@@ -168,7 +168,7 @@ uv run larpharvester ingest spiderfoot.json --format auto</code></pre>
           <tr><td>Many <code>blocked</code> results</td><td>Expected for bot-walled sites. Try <code>--proxy</code> / <code>--tor</code>, or use the matching external tool.</td></tr>
           <tr><td>Rate limited</td><td>Lower <code>--concurrency</code>, raise pacing via config, or set the provider API key.</td></tr>
           <tr><td>False positive</td><td>Use <code>--json</code> and inspect <code>detail</code>; record a contract fixture with <code>source verify --record</code>.</td></tr>
-          <tr><td>Web UI exposed</td><td>Always set <code>--token</code> and <code>LARPHARVESTER_TRUST_PROXY=1</code> behind a proxy.</td></tr>
+          <tr><td>Web UI exposed</td><td>Always set <code>--token</code> and <code>COLDTRAIL_TRUST_PROXY=1</code> behind a proxy.</td></tr>
         </tbody>
       </table>
     </section>
@@ -176,7 +176,7 @@ uv run larpharvester ingest spiderfoot.json --format auto</code></pre>
 
   <footer class="site">
     <div class="footer-inner">
-      <span>© 2026 larpharvester contributors · MIT</span>
+      <span>© 2026 ColdTrail contributors · MIT</span>
       <span><a href="./">Overview</a> · <a href="sources.html">Coverage</a> · <a href="sitemap.xml">Sitemap</a></span>
     </div>
   </footer>

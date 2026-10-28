@@ -1,23 +1,23 @@
 services:
-  larpharvester:
+  coldtrail:
     build: .
-    image: larpharvester:0.6.0
-    container_name: larpharvester
+    image: coldtrail:0.8.0
+    container_name: coldtrail
     restart: unless-stopped
     ports:
       - "127.0.0.1:8765:8765"
     volumes:
-      - larpharvester-data:/data
+      - coldtrail-data:/data
     environment:
-      LARPHARVESTER_DB: /data/larpharvester.db
+      COLDTRAIL_DB: /data/coldtrail.db
       # Strongly recommended when publishing the port or sharing the host.
-      LARPHARVESTER_WEB_TOKEN: ${LARPHARVESTER_WEB_TOKEN:-}
+      COLDTRAIL_WEB_TOKEN: ${COLDTRAIL_WEB_TOKEN:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       HIBP_API_KEY: ${HIBP_API_KEY:-}
       EMAILREP_API_KEY: ${EMAILREP_API_KEY:-}
       SHODAN_API_KEY: ${SHODAN_API_KEY:-}
       # Route through the tor sidecar (enable with: --profile tor).
-      LARPHARVESTER_PROXY: ${LARPHARVESTER_PROXY:-}
+      COLDTRAIL_PROXY: ${COLDTRAIL_PROXY:-}
     healthcheck:
       test:
         - CMD
@@ -31,11 +31,11 @@ services:
 
   tor:
     image: dperson/torproxy:latest
-    container_name: larpharvester-tor
+    container_name: coldtrail-tor
     restart: unless-stopped
     profiles: ["tor"]
     expose:
       - "9050"
 
 volumes:
-  larpharvester-data:
+  coldtrail-data:

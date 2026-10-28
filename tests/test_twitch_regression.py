@@ -8,12 +8,12 @@ import pytest
 import respx
 from typer.testing import CliRunner
 
-from larpharvester.cli import app
-from larpharvester.config import Settings
-from larpharvester.correlate import correlate, is_boilerplate_bio, score_pair
-from larpharvester.http import Fetcher
-from larpharvester.models import Profile
-from larpharvester.sources import SOURCES
+from coldtrail.cli import app
+from coldtrail.config import Settings
+from coldtrail.correlate import correlate, is_boilerplate_bio, score_pair
+from coldtrail.http import Fetcher
+from coldtrail.models import Profile
+from coldtrail.sources import SOURCES
 
 runner = CliRunner()
 
@@ -121,8 +121,8 @@ def test_short_handle_only_bio_is_not_a_mention():
 def test_pivot_json_includes_profiles_and_entities(tmp_path, monkeypatch):
     import json
 
-    import larpharvester.cli.collect as collect_module
-    from larpharvester.models import CheckResult, PivotReport
+    import coldtrail.cli.collect as collect_module
+    from coldtrail.models import CheckResult, PivotReport
 
     profile = Profile(
         source="github",

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from larpharvester.correlate import correlate, score_pair
-from larpharvester.models import Profile
+from coldtrail.correlate import correlate, score_pair
+from coldtrail.models import Profile
 
 
 def profile(source: str, username: str, **kwargs) -> Profile:
@@ -131,7 +131,7 @@ def test_avatar_exif_camera_serial_signal():
 
 
 def test_calibrate_probability_is_monotonic_and_bounded():
-    from larpharvester.correlate import calibrate_probability
+    from coldtrail.correlate import calibrate_probability
 
     assert calibrate_probability(0.5) == 0.5
     assert calibrate_probability(0.0) < 0.5

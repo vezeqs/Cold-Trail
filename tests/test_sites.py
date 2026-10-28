@@ -6,13 +6,13 @@ import httpx
 import pytest
 import respx
 
-import larpharvester
-from larpharvester.config import Settings
-from larpharvester.http import Fetcher
-from larpharvester.sites import SiteDef, load_sites, slugify
-from larpharvester.sources.declarative import DeclarativeSource, parse_meta
+import coldtrail
+from coldtrail.config import Settings
+from coldtrail.http import Fetcher
+from coldtrail.sites import SiteDef, load_sites, slugify
+from coldtrail.sources.declarative import DeclarativeSource, parse_meta
 
-DATA = Path(larpharvester.__file__).parent / "data" / "sites.toml"
+DATA = Path(coldtrail.__file__).parent / "data" / "sites.toml"
 
 
 def make_site(**kwargs) -> SiteDef:
@@ -131,7 +131,7 @@ async def test_url_probe_is_used_for_request(settings):
 
 @respx.mock
 async def test_challenge_and_generic_pages_are_not_profiles(settings):
-    from larpharvester.http import BlockedError
+    from coldtrail.http import BlockedError
 
     site = make_site(name="APClips", url="https://apclips.com/{username}")
     source = DeclarativeSource(site)

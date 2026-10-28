@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Runs · ColdTrail{% endblock %}
+{% block content %}
+<h1>Runs <span class="muted">({{ total }})</span></h1>
+
+{% if runs %}
+<table>
+  <thead><tr><th>#</th><th>Kind</th><th>Target</th><th>Started</th><th>Finished</th><th>Status</th></tr></thead>
+  <tbody>
+    {% for run in runs %}
+    <tr>
+      <td><a href="/runs/{{ run.id }}">{{ run.id }}</a></td>
+      <td>{{ run.kind }}</td>
+      <td class="mono">{{ run.target }}</td>
+      <td>{{ run.started_at | ts }}</td>
+      <td>{{ run.finished_at | ts }}</td>
+      <td><span class="badge status-{{ run.status }}">{{ run.status }}</span></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No runs yet.</p>
+{% endif %}
+
+{% if pages > 1 %}
+<nav class="pager">
+  {% if page > 1 %}<a href="/runs?page={{ page - 1 }}&per_page={{ per_page }}">← previous</a>{% endif %}
+  <span class="muted">page {{ page }} / {{ pages }}</span>
+  {% if page < pages %}<a href="/runs?page={{ page + 1 }}&per_page={{ per_page }}">next →</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from larpharvester.models import Cluster, Edge, Entity, Post, Profile
-from larpharvester.store import Store
+from coldtrail.models import Cluster, Edge, Entity, Post, Profile
+from coldtrail.store import Store
 
 
 @pytest.fixture
@@ -139,7 +139,7 @@ def test_prune(store):
 
 def test_check_stats(store):
     run_id = store.start_run("pivot", "alice")
-    from larpharvester.models import CheckResult
+    from coldtrail.models import CheckResult
 
     store.save_checks(
         run_id,

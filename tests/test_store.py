@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from larpharvester.models import CheckResult, Link, Post, Profile
-from larpharvester.store import Store
+from coldtrail.models import CheckResult, Link, Post, Profile
+from coldtrail.store import Store
 
 
 @pytest.fixture

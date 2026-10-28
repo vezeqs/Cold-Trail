@@ -5,9 +5,9 @@ import json
 import pytest
 from typer.testing import CliRunner
 
-from larpharvester.cli import app
-from larpharvester.models import Post, Profile
-from larpharvester.sources.base import Source
+from coldtrail.cli import app
+from coldtrail.models import Post, Profile
+from coldtrail.sources.base import Source
 
 runner = CliRunner()
 
@@ -64,16 +64,16 @@ class FakeEmailSource(Source):
 @pytest.fixture
 def fake_sources(monkeypatch):
     fake = {"fake": FakeSource()}
-    monkeypatch.setattr("larpharvester.pivot.SOURCES", fake)
-    monkeypatch.setattr("larpharvester.harvest.SOURCES", fake)
-    monkeypatch.setattr("larpharvester.cli.collect.SOURCES", fake)
+    monkeypatch.setattr("coldtrail.pivot.SOURCES", fake)
+    monkeypatch.setattr("coldtrail.harvest.SOURCES", fake)
+    monkeypatch.setattr("coldtrail.cli.collect.SOURCES", fake)
     return fake
 
 
 def test_version():
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
-    assert "larpharvester" in result.output
+    assert "coldtrail" in result.output
 
 
 def test_sources_json():
@@ -117,7 +117,7 @@ def test_pivot_unknown_source_fails(tmp_path, fake_sources):
 
 
 def test_pivot_email_without_expand_uses_email_sources(tmp_path, monkeypatch):
-    monkeypatch.setattr("larpharvester.pivot.SOURCES", {"fake-email": FakeEmailSource()})
+    monkeypatch.setattr("coldtrail.pivot.SOURCES", {"fake-email": FakeEmailSource()})
     result = runner.invoke(
         app,
         [
@@ -179,7 +179,7 @@ def test_export_missing_run_exits_nonzero(tmp_path):
 
 
 def test_pivot_hides_non_matching_checks_by_default(tmp_path, monkeypatch):
-    from larpharvester.sources.base import Source
+    from coldtrail.sources.base import Source
 
     class Found(Source):
         name = "found-src"
@@ -201,8 +201,8 @@ def test_pivot_hides_non_matching_checks_by_default(tmp_path, monkeypatch):
             return self.missing(target, "no such user")
 
     fake = {"found-src": Found(), "missing-src": Missing()}
-    monkeypatch.setattr("larpharvester.pivot.SOURCES", fake)
-    monkeypatch.setattr("larpharvester.cli.collect.SOURCES", fake)
+    monkeypatch.setattr("coldtrail.pivot.SOURCES", fake)
+    monkeypatch.setattr("coldtrail.cli.collect.SOURCES", fake)
 
     base = ["--db", str(tmp_path / "t.db"), "pivot", "alice"]
     default = runner.invoke(app, base)
@@ -225,4 +225,4 @@ def test_sources_query_filter():
 def test_menu_exits_cleanly():
     result = runner.invoke(app, ["menu"], input="0\n")
     assert result.exit_code == 0, result.output
-    assert "larpharvester menu" in result.output
+    assert "ColdTrail menu" in result.output

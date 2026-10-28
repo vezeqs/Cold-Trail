@@ -4,8 +4,8 @@ import httpx
 import pytest
 import respx
 
-from larpharvester.config import Settings
-from larpharvester.domain import (
+from coldtrail.config import Settings
+from coldtrail.domain import (
     arpa_name,
     crtsh,
     dns,
@@ -15,9 +15,9 @@ from larpharvester.domain import (
     reverse_ip,
     shodan_host,
 )
-from larpharvester.http import Fetcher
-from larpharvester.phone import lookup as phone_lookup
-from larpharvester.wayback import cdx, snapshot
+from coldtrail.http import Fetcher
+from coldtrail.phone import lookup as phone_lookup
+from coldtrail.wayback import cdx, snapshot
 
 
 def test_phone_lookup():

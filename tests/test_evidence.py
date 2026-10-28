@@ -7,10 +7,10 @@ import json
 import pytest
 from typer.testing import CliRunner
 
-from larpharvester.cli import app
-from larpharvester.config import Settings
-from larpharvester.evidence import add_evidence, evidence_path, verify_evidence
-from larpharvester.store import Store
+from coldtrail.cli import app
+from coldtrail.config import Settings
+from coldtrail.evidence import add_evidence, evidence_path, verify_evidence
+from coldtrail.store import Store
 
 runner = CliRunner()
 

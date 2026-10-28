@@ -1,6 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="larpharvester">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="ColdTrail">
   <rect width="64" height="64" rx="14" fill="#0b0f14"/>
-  <path d="M18 44V20h6v18h12v6H18z" fill="#4ade80"/>
-  <circle cx="45" cy="22" r="6" fill="#38bdf8"/>
-  <path d="M39 44c0-6 3-10 8-10s8 4 8 10" stroke="#38bdf8" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M14 48c8 0 8-10 16-10s8-10 16-10 6-6 6-6" stroke="#38bdf8" stroke-width="4"
+        fill="none" stroke-linecap="round" stroke-dasharray="1 9"/>
+  <circle cx="46" cy="18" r="7" fill="none" stroke="#4ade80" stroke-width="4"/>
+  <circle cx="46" cy="18" r="2.5" fill="#4ade80"/>
 </svg>

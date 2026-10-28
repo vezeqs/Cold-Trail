@@ -5,11 +5,11 @@ from __future__ import annotations
 import pytest
 from textual.widgets import DataTable, Input
 
-import larpharvester.tui.app as tui_app
-from larpharvester.config import Settings
-from larpharvester.models import CheckResult, PivotReport, Post, Profile
-from larpharvester.store import Store
-from larpharvester.tui import LarpharvesterTUI
+import coldtrail.tui.app as tui_app
+from coldtrail.config import Settings
+from coldtrail.models import CheckResult, PivotReport, Post, Profile
+from coldtrail.store import Store
+from coldtrail.tui import ColdTrailTUI
 
 
 @pytest.fixture
@@ -73,7 +73,7 @@ async def _fake_pivot(target, *, settings, store=None, **kwargs):
 
 
 async def test_tui_dashboard_and_browse(settings, seeded):
-    app = LarpharvesterTUI(settings)
+    app = ColdTrailTUI(settings)
     async with app.run_test() as pilot:
         await pilot.pause()
         dashboard = app.query_one("#dash-runs", DataTable)
@@ -88,7 +88,7 @@ async def test_tui_dashboard_and_browse(settings, seeded):
 
 
 async def test_tui_search(settings, seeded):
-    app = LarpharvesterTUI(settings)
+    app = ColdTrailTUI(settings)
     async with app.run_test() as pilot:
         await pilot.pause()
         app.run_search("crypto")
@@ -102,7 +102,7 @@ async def test_tui_search(settings, seeded):
 
 async def test_tui_pivot_worker_persists(settings, seeded, monkeypatch):
     monkeypatch.setattr(tui_app, "run_pivot", _fake_pivot)
-    app = LarpharvesterTUI(settings)
+    app = ColdTrailTUI(settings)
     async with app.run_test() as pilot:
         await pilot.pause()
         app.query_one("#target", Input).value = "bob"
@@ -122,7 +122,7 @@ async def test_tui_pivot_worker_reports_failure(settings, seeded, monkeypatch):
         raise RuntimeError("boom")
 
     monkeypatch.setattr(tui_app, "run_pivot", exploding_pivot)
-    app = LarpharvesterTUI(settings)
+    app = ColdTrailTUI(settings)
     async with app.run_test() as pilot:
         await pilot.pause()
         app.query_one("#target", Input).value = "bob"
@@ -135,7 +135,7 @@ async def test_tui_pivot_worker_reports_failure(settings, seeded, monkeypatch):
 
 
 async def test_tui_pivot_requires_target(settings):
-    app = LarpharvesterTUI(settings)
+    app = ColdTrailTUI(settings)
     async with app.run_test() as pilot:
         await pilot.pause()
         app.start_pivot()
@@ -144,7 +144,7 @@ async def test_tui_pivot_requires_target(settings):
 
 
 async def test_tui_custom_scope_requires_sources(settings):
-    app = LarpharvesterTUI(settings)
+    app = ColdTrailTUI(settings)
     async with app.run_test() as pilot:
         await pilot.pause()
         from textual.widgets import Select
@@ -186,7 +186,7 @@ async def test_tui_streams_rows_as_checks_finish(settings, seeded, monkeypatch):
         )
 
     monkeypatch.setattr(tui_app, "run_pivot", streaming_pivot)
-    app = LarpharvesterTUI(settings)
+    app = ColdTrailTUI(settings)
     async with app.run_test() as pilot:
         await pilot.pause()
         app.query_one("#target", Input).value = "bob"
@@ -201,7 +201,7 @@ async def test_tui_streams_rows_as_checks_finish(settings, seeded, monkeypatch):
 async def test_tui_tools_phone(settings):
     from textual.widgets import Select
 
-    app = LarpharvesterTUI(settings)
+    app = ColdTrailTUI(settings)
     async with app.run_test() as pilot:
         await pilot.pause()
         app.query_one("#tool-select", Select).value = "phone"
@@ -215,7 +215,7 @@ async def test_tui_tools_phone(settings):
 
 
 async def test_tui_tools_requires_target(settings):
-    app = LarpharvesterTUI(settings)
+    app = ColdTrailTUI(settings)
     async with app.run_test() as pilot:
         await pilot.pause()
         app.start_tool()
@@ -224,7 +224,7 @@ async def test_tui_tools_requires_target(settings):
 
 
 async def test_tui_cases_create_and_list(settings):
-    app = LarpharvesterTUI(settings)
+    app = ColdTrailTUI(settings)
     async with app.run_test() as pilot:
         await pilot.pause()
         app.query_one("#case-name", Input).value = "op-aurora"
@@ -239,7 +239,7 @@ async def test_tui_annotations_render(settings):
     with Store(settings.db_path) as store:
         store.add_tag("profile", "github:alice", "primary")
         store.add_note("profile", "github:alice", "shared avatar")
-    app = LarpharvesterTUI(settings)
+    app = ColdTrailTUI(settings)
     async with app.run_test() as pilot:
         await pilot.pause()
         annotations = app.query_one("#annotations-table", DataTable)
@@ -251,7 +251,7 @@ async def test_tui_annotations_render(settings):
 
 async def test_tui_action_pivot_row(settings, seeded, monkeypatch):
     monkeypatch.setattr(tui_app, "run_pivot", _fake_pivot)
-    app = LarpharvesterTUI(settings)
+    app = ColdTrailTUI(settings)
     async with app.run_test() as pilot:
         await pilot.pause()
         browse = app.query_one("#browse-runs", DataTable)
@@ -268,7 +268,7 @@ async def test_tui_action_pivot_row(settings, seeded, monkeypatch):
 
 
 async def test_tui_action_harvest_row(settings, seeded, monkeypatch):
-    from larpharvester.models import CheckResult
+    from coldtrail.models import CheckResult
 
     async def fake_harvest(
         source_name, username, *, settings, limit, store=None, run_id=None, fetcher=None, **kwargs
@@ -276,7 +276,7 @@ async def test_tui_action_harvest_row(settings, seeded, monkeypatch):
         return CheckResult(source_name, username, "not_found"), []
 
     monkeypatch.setattr(tui_app, "run_harvest", fake_harvest)
-    app = LarpharvesterTUI(settings)
+    app = ColdTrailTUI(settings)
     async with app.run_test() as pilot:
         await pilot.pause()
         browse = app.query_one("#browse-runs", DataTable)
@@ -306,7 +306,7 @@ async def test_tui_action_diff_runs(settings):
             ],
         )
         store.finish_run(second)
-    app = LarpharvesterTUI(settings)
+    app = ColdTrailTUI(settings)
     async with app.run_test() as pilot:
         await pilot.pause()
         await pilot.press("d")
@@ -319,7 +319,7 @@ async def test_tui_action_diff_runs(settings):
 async def test_tui_number_shortcuts_switch_tabs(settings):
     from textual.widgets import TabbedContent
 
-    app = LarpharvesterTUI(settings)
+    app = ColdTrailTUI(settings)
     async with app.run_test() as pilot:
         await pilot.pause()
         tabs = app.query_one(TabbedContent)

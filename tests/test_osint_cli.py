@@ -6,9 +6,9 @@ import httpx
 import respx
 from typer.testing import CliRunner
 
-from larpharvester.cli import app
-from larpharvester.models import Post, Profile
-from larpharvester.store import Store
+from coldtrail.cli import app
+from coldtrail.models import Post, Profile
+from coldtrail.store import Store
 
 runner = CliRunner()
 

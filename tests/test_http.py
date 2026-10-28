@@ -4,9 +4,9 @@ import httpx
 import pytest
 import respx
 
-from larpharvester.config import Settings
-from larpharvester.http import BlockedError, BudgetExceeded, Fetcher, FetchError
-from larpharvester.store import Store
+from coldtrail.config import Settings
+from coldtrail.http import BlockedError, BudgetExceeded, Fetcher, FetchError
+from coldtrail.store import Store
 
 
 @pytest.fixture
@@ -150,7 +150,7 @@ async def test_connect_errors_are_not_retried(settings):
 @respx.mock
 async def test_retries_parameter_controls_attempts(settings):
     monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr("larpharvester.http.BACKOFF", 0)
+    monkeypatch.setattr("coldtrail.http.BACKOFF", 0)
     route = respx.get("https://flaky.example/x")
     route.side_effect = [httpx.Response(500), httpx.Response(200, text="ok")]
     async with Fetcher(settings) as fetcher:
@@ -166,8 +166,8 @@ async def test_retries_parameter_controls_attempts(settings):
 
 @respx.mock
 async def test_declarative_probe_times_out_once(settings):
-    from larpharvester.sites import SiteDef
-    from larpharvester.sources.declarative import DeclarativeSource
+    from coldtrail.sites import SiteDef
+    from coldtrail.sources.declarative import DeclarativeSource
 
     site = SiteDef(name="Slow", url="https://slow.example/{username}")
     route = respx.get("https://slow.example/alice")

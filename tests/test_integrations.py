@@ -9,10 +9,10 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-import larpharvester.integrations as integrations_mod
-from larpharvester.cli import app
-from larpharvester.config import Settings
-from larpharvester.integrations import (
+import coldtrail.integrations as integrations_mod
+from coldtrail.cli import app
+from coldtrail.config import Settings
+from coldtrail.integrations import (
     TOOLS,
     ToolError,
     ToolUnavailable,
@@ -27,7 +27,7 @@ from larpharvester.integrations import (
     persist_tool_result,
     run_tool,
 )
-from larpharvester.store import Store
+from coldtrail.store import Store
 
 runner = CliRunner()
 
@@ -334,7 +334,7 @@ def test_list_tools_reports_installed_flag(monkeypatch):
 
 
 def test_validate_target_rejects_option_like_values():
-    from larpharvester.integrations import validate_target
+    from coldtrail.integrations import validate_target
 
     for bad in ("--timeout=999", "-oN", "", "a\nb", "a\x00b"):
         with pytest.raises(ToolError):

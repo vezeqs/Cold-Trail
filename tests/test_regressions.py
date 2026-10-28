@@ -7,13 +7,13 @@ import zlib
 
 import pytest
 
-from larpharvester.models import CheckResult, Edge, Entity, Post, Profile
-from larpharvester.pivot import (
+from coldtrail.models import CheckResult, Edge, Entity, Post, Profile
+from coldtrail.pivot import (
     _username_from_url,
     discovered_usernames,
     select_sources,
 )
-from larpharvester.store import Store
+from coldtrail.store import Store
 
 
 @pytest.fixture

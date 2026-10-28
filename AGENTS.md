@@ -1,16 +1,16 @@
 # AGENTS.md
 
-Operating guide for contributors and coding agents working on `larpharvester`.
+Operating guide for contributors and coding agents working on ColdTrail.
 
 ## Project
 
-`larpharvester` is a production OSINT CLI with three interfaces over one
+ColdTrail is a production OSINT CLI with three interfaces over one
 SQLite store:
 
-- **CLI** (Typer + Rich) — `larpharvester <command>` (42 commands)
-- **TUI** (Textual) — `larpharvester tui` (Dashboard / Pivot / Browse / Search / Tools / Cases;
+- **CLI** (Typer + Rich) — `coldtrail <command>` (42 commands)
+- **TUI** (Textual) — `coldtrail tui` (Dashboard / Pivot / Browse / Search / Tools / Cases;
   `p` pivots the focused row, `h` harvests it, `d` diffs the two latest runs)
-- **Local web UI + JSON API** (FastAPI/uvicorn) — `larpharvester serve` (pages, JSON API,
+- **Local web UI + JSON API** (FastAPI/uvicorn) — `coldtrail serve` (pages, JSON API,
   SSE-streamed pivot jobs, interactive identity graph, OSINT workbench, run diffing,
   case dossiers, optional bearer/cookie auth, rate limiting)
 
@@ -26,24 +26,24 @@ uv run pytest tests/test_web.py -q
 uv run pytest tests/test_tui.py -q
 uv run ruff check .            # lint
 uv run ruff format --check .   # formatting
-uv run larpharvester --help
-uv run larpharvester tui                          # interactive terminal UI
-uv run larpharvester serve --port 8765 --open     # local web UI
-uv run larpharvester batch -f targets.txt          # multi-target pivots
-uv run larpharvester recluster --run 3             # re-correlate stored profiles (persists)
-uv run larpharvester diff 3 4                      # compare two runs
-uv run larpharvester source verify -s github       # replay contract fixtures offline
-uv run larpharvester source verify --record -s github  # record fresh fixtures
-uv run larpharvester ct example.com                # certificate-transparency search
-uv run larpharvester export 3 --format stix -o bundle.json
+uv run coldtrail --help
+uv run coldtrail tui                          # interactive terminal UI
+uv run coldtrail serve --port 8765 --open     # local web UI
+uv run coldtrail batch -f targets.txt          # multi-target pivots
+uv run coldtrail recluster --run 3             # re-correlate stored profiles (persists)
+uv run coldtrail diff 3 4                      # compare two runs
+uv run coldtrail source verify -s github       # replay contract fixtures offline
+uv run coldtrail source verify --record -s github  # record fresh fixtures
+uv run coldtrail ct example.com                # certificate-transparency search
+uv run coldtrail export 3 --format stix -o bundle.json
 python scripts/build_sites.py --fetch             # regenerate declarative corpus (pinned ref)
 ```
 
 ## Layout
 
 ```
-src/larpharvester/
-├── cli/            Typer commands (entry point: larpharvester.cli:app)
+src/coldtrail/
+├── cli/            Typer commands (entry point: coldtrail.cli:app)
 │   ├── _app.py       app, global callback (settings/audit/source sync), renderers
 │   ├── collect.py    pivot, harvest, graph, watch
 │   ├── query.py      profiles, posts, links, clusters, entities, runs, edges, search, timeline, history, diff
@@ -61,7 +61,7 @@ src/larpharvester/
 │   ├── app.py        create_app(settings) -> FastAPI (pages, JSON API, jobs, SSE, graph, tools, evidence)
 │   ├── templates/    Jinja2 templates (autoescape on; help.html, run.html evidence)
 │   └── static/       style.css, app.js (scope toggle, SSE stream, canvas graph, source filter)
-├── store/          Store composed from mixins (public API: from larpharvester.store import Store)
+├── store/          Store composed from mixins (public API: from coldtrail.store import Store)
 │   ├── schema.py     DDL, FTS definitions, column migrations, SCHEMA_VERSION (5)
 │   ├── base.py       connection, PRAGMA setup, user_version gate, row helpers
 │   ├── runs.py       runs, count_runs
@@ -99,8 +99,8 @@ tests/fixtures/contracts/ (recorded source fixtures)
 - **Never hit the network in tests.** Sources: `respx`. Web: `fastapi.testclient.TestClient`.
   TUI: `App.run_test()` pilot (headless). Pivot/harvest workers are monkeypatched.
 - Patching `SOURCES` must target where it is *used*, not where it is defined:
-  `larpharvester.pivot.SOURCES`, `larpharvester.harvest.SOURCES`,
-  `larpharvester.cli.collect.SOURCES`, `larpharvester.cli.osint.SOURCES`.
+  `coldtrail.pivot.SOURCES`, `coldtrail.harvest.SOURCES`,
+  `coldtrail.cli.collect.SOURCES`, `coldtrail.cli.osint.SOURCES`.
 - Web tests seed a real SQLite file in `tmp_path` and build the app with
   `create_app(settings)`; do not use the default DB path.
 - Async pivot jobs in the web app: poll `/api/jobs/{id}` until `done`/`error`
@@ -117,14 +117,14 @@ tests/fixtures/contracts/ (recorded source fixtures)
   live-investigation regressions in `tests/test_investigation_regressions.py`
   and `tests/test_twitch_regression.py`.
 - **Contract fixtures** (`tests/fixtures/contracts/*.json`) are recorded real exchanges.
-  Re-record with `larpharvester source verify --record -s <source>` and commit the JSON.
+  Re-record with `coldtrail source verify --record -s <source>` and commit the JSON.
   Fixtures embed decompressed bodies; raw rows in SQLite are zlib-compressed, so always
   decompress when writing a recorder (see `contracts.record_contract`).
 
 ## Architecture rules
 
-- **Public APIs are stable:** `from larpharvester.store import Store`,
-  `from larpharvester.cli import app`, entry point `larpharvester.cli:app`.
+- **Public APIs are stable:** `from coldtrail.store import Store`,
+  `from coldtrail.cli import app`, entry point `coldtrail.cli:app`.
 - **Persistence goes through `pivot.persist_pivot(store, report)`** — CLI, TUI,
   and web all use it. Don't duplicate run-saving logic.
 - **SQLite connections are thread-bound.** Each thread/request opens its own
@@ -144,14 +144,14 @@ tests/fixtures/contracts/ (recorded source fixtures)
   and renders JSON; harvest/graph runs are persisted. Pwned Passwords input is never
   echoed back to the page.
 - **Optional auth:** when `settings.web_token` is set, the `_auth` middleware requires
-  `Authorization: Bearer`, `X-API-Key`, or the `larp_token` cookie; `/healthz`,
+  `Authorization: Bearer`, `X-API-Key`, or the `coldtrail_token` cookie; `/healthz`,
   `/api/health`, `/login`, and `/static` stay public. HTML requests redirect to
   `/login`, API requests get 401. Keep `/healthz` public for container probes.
 - **Rate limiting:** `POST /pivot`, `POST /api/pivot`, and `POST /tools/run` share a
   per-client sliding window (`RATE_LIMIT`/`RATE_WINDOW`, default 20/min) → HTTP 429.
 - **Case dossiers:** `_case_payload(store, case)` merges all runs in a case (deduped
   profiles/posts/links/clusters/entities/edges) for `/cases/{name}/export`.
-- **Run diff:** `correlate.diff_runs(store, a, b)` powers `larpharvester diff`,
+- **Run diff:** `correlate.diff_runs(store, a, b)` powers `coldtrail diff`,
   `GET /diff`, `GET /api/diff`, and the TUI `d` binding.
 - **Untrusted data:** harvested URLs may be malicious. Templates use the
   `| url` Jinja filter (http/https only); `report.py` blocks
@@ -229,7 +229,7 @@ Export formats: `json`, `jsonl`, `csv` (`&table=`), `graphml`, `gexf`, `dot`,
 - `asyncio.create_task` must run on the event loop: web endpoints that start
   jobs are `async def`, not `def` (sync endpoints run in a threadpool).
 - `Store.close()` before rendering templates is fine (data is materialized).
-- `larpharvester --db PATH <cmd>` — global options come *before* the subcommand.
+- `coldtrail --db PATH <cmd>` — global options come *before* the subcommand.
 - **False-positive traps in HTML sources:** Substack serves a search page
   (`Search "x" on Substack`) for unknown handles — treat it as `not_found`.
   TikTok embeds `webapp.user-detail.statusCode` in SIGI; 10221/10202/10222 mean

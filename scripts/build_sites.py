@@ -1,4 +1,4 @@
-"""Generate src/larpharvester/data/sites.toml from the Sherlock project dataset.
+"""Generate src/coldtrail/data/sites.toml from the Sherlock project dataset.
 
 Usage:
   python scripts/build_sites.py path/to/data.json
@@ -19,7 +19,7 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / "src" / "larpharvester" / "data" / "sites.toml"
+OUT = ROOT / "src" / "coldtrail" / "data" / "sites.toml"
 DEFAULT_SOURCE = Path("/tmp/sherlock.json")
 
 # Pinned upstream dataset. Bump --ref to update deliberately, then commit sites.toml.

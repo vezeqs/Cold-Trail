@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from larpharvester.report import (
+from coldtrail.report import (
     decrypt_bytes,
     encrypt_bytes,
     redact_payload,

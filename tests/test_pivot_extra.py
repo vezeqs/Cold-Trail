@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from larpharvester.config import Settings
-from larpharvester.models import Profile
-from larpharvester.pivot import entities_for_profiles, pivot, select_sources
-from larpharvester.sources.base import Source
-from larpharvester.store import Store
-from larpharvester.variants import variants
+from coldtrail.config import Settings
+from coldtrail.models import Profile
+from coldtrail.pivot import entities_for_profiles, pivot, select_sources
+from coldtrail.sources.base import Source
+from coldtrail.store import Store
+from coldtrail.variants import variants
 
 
 class CountingSource(Source):
@@ -68,7 +68,7 @@ def settings(tmp_path):
 
 async def test_variants_probe_every_generated_handle(settings, monkeypatch):
     source = CountingSource()
-    monkeypatch.setattr("larpharvester.pivot.SOURCES", {source.name: source})
+    monkeypatch.setattr("coldtrail.pivot.SOURCES", {source.name: source})
     report = await pivot("alice", settings=settings, use_variants=True, avatar_hash=False)
     expected = variants("alice")
     assert source.calls == len(expected)
@@ -78,7 +78,7 @@ async def test_variants_probe_every_generated_handle(settings, monkeypatch):
 
 async def test_negative_probe_cache_prevents_repeat(settings, monkeypatch, tmp_path):
     source = MissingSource()
-    monkeypatch.setattr("larpharvester.pivot.SOURCES", {source.name: source})
+    monkeypatch.setattr("coldtrail.pivot.SOURCES", {source.name: source})
     with Store(settings.db_path) as store:
         first = await pivot("alice", settings=settings, avatar_hash=False, store=store)
         second = await pivot("alice", settings=settings, avatar_hash=False, store=store)
@@ -92,14 +92,14 @@ async def test_coverage_counts_every_status(settings, monkeypatch):
         "counting": CountingSource(),
         "missing": MissingSource(),
     }
-    monkeypatch.setattr("larpharvester.pivot.SOURCES", sources)
+    monkeypatch.setattr("coldtrail.pivot.SOURCES", sources)
     report = await pivot("alice", settings=settings, avatar_hash=False)
     assert report.coverage == {"found": 1, "not_found": 1}
 
 
 async def test_clusters_are_attached_to_report(settings, monkeypatch):
     sources = {"avatar": AvatarSource()}
-    monkeypatch.setattr("larpharvester.pivot.SOURCES", sources)
+    monkeypatch.setattr("coldtrail.pivot.SOURCES", sources)
     report = await pivot("alice", settings=settings, avatar_hash=False)
     assert report.clusters == []
 
@@ -109,7 +109,7 @@ async def test_two_sources_with_same_avatar_form_cluster(settings, monkeypatch):
         name = "avatar2"
 
     monkeypatch.setattr(
-        "larpharvester.pivot.SOURCES", {"avatar": AvatarSource(), "avatar2": AvatarTwo()}
+        "coldtrail.pivot.SOURCES", {"avatar": AvatarSource(), "avatar2": AvatarTwo()}
     )
     report = await pivot("alice", settings=settings, avatar_hash=False)
     assert len(report.clusters) == 1
@@ -126,9 +126,7 @@ def test_select_sources_excludes_web_by_default(monkeypatch):
             return self.missing(target)
 
     curated = CountingSource()
-    monkeypatch.setattr(
-        "larpharvester.pivot.SOURCES", {"counting": curated, "web.test": WebSource()}
-    )
+    monkeypatch.setattr("coldtrail.pivot.SOURCES", {"counting": curated, "web.test": WebSource()})
     assert [source.name for source in select_sources(None, "username")] == ["counting"]
     assert {source.name for source in select_sources(None, "username", include_web=True)} == {
         "counting",
@@ -138,7 +136,7 @@ def test_select_sources_excludes_web_by_default(monkeypatch):
 
 def test_select_sources_expands_groups(monkeypatch):
     monkeypatch.setattr(
-        "larpharvester.pivot.SOURCES", {"counting": CountingSource(), "missing": MissingSource()}
+        "coldtrail.pivot.SOURCES", {"counting": CountingSource(), "missing": MissingSource()}
     )
     assert {source.name for source in select_sources(["social"], "username")} == {
         "counting",
@@ -147,7 +145,7 @@ def test_select_sources_expands_groups(monkeypatch):
 
 
 def test_select_sources_rejects_unknown(monkeypatch):
-    monkeypatch.setattr("larpharvester.pivot.SOURCES", {"counting": CountingSource()})
+    monkeypatch.setattr("coldtrail.pivot.SOURCES", {"counting": CountingSource()})
     with pytest.raises(ValueError):
         select_sources(["nope"], "username")
 
@@ -163,7 +161,7 @@ def test_select_sources_all_filters_by_kind(monkeypatch):
             return self.missing(target)
 
     monkeypatch.setattr(
-        "larpharvester.pivot.SOURCES",
+        "coldtrail.pivot.SOURCES",
         {"counting": CountingSource(), "emailfake": EmailFake()},
     )
     assert [source.name for source in select_sources(["all"], "username")] == ["counting"]

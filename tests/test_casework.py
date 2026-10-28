@@ -6,12 +6,12 @@ import json
 
 from typer.testing import CliRunner
 
-from larpharvester.casework import merge_case_payload
-from larpharvester.cli import app
-from larpharvester.config import Settings
-from larpharvester.evidence import add_evidence
-from larpharvester.models import Profile
-from larpharvester.store import Store
+from coldtrail.casework import merge_case_payload
+from coldtrail.cli import app
+from coldtrail.config import Settings
+from coldtrail.evidence import add_evidence
+from coldtrail.models import Profile
+from coldtrail.store import Store
 
 runner = CliRunner()
 

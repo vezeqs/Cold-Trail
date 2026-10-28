@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from larpharvester.config import Settings
-from larpharvester.models import Profile
-from larpharvester.pivot import discovered_usernames, pivot
-from larpharvester.sources.base import Source
+from coldtrail.config import Settings
+from coldtrail.models import Profile
+from coldtrail.pivot import discovered_usernames, pivot
+from coldtrail.sources.base import Source
 
 
 class EmailSource(Source):
@@ -47,7 +47,7 @@ class UserSource(Source):
 @pytest.fixture
 def sources(monkeypatch):
     registry = {"email-src": EmailSource(), "user-src": UserSource()}
-    monkeypatch.setattr("larpharvester.pivot.SOURCES", registry)
+    monkeypatch.setattr("coldtrail.pivot.SOURCES", registry)
     return registry
 
 
@@ -102,7 +102,7 @@ async def test_username_pivot_expands_into_email_sources(sources, tmp_path):
             result.profile.extra["email"] = "alice@example.com"
             return result
 
-    import larpharvester.pivot as pivot_mod
+    import coldtrail.pivot as pivot_mod
 
     pivot_mod.SOURCES["user-src"] = StructuredEmail()
     try:
@@ -124,7 +124,7 @@ async def test_bio_emails_do_not_drive_expansion(sources, tmp_path):
             result.profile.bio = "reach me at alice@example.com"
             return result
 
-    import larpharvester.pivot as pivot_mod
+    import coldtrail.pivot as pivot_mod
 
     pivot_mod.SOURCES["user-src"] = EmailBio()
     try:

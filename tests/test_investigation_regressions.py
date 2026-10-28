@@ -4,9 +4,9 @@ links, and generated bios creating mentions."""
 
 from __future__ import annotations
 
-from larpharvester.correlate import correlate, score_pair
-from larpharvester.models import CheckResult, Profile
-from larpharvester.pivot import discovered_emails, discovered_usernames
+from coldtrail.correlate import correlate, score_pair
+from coldtrail.models import CheckResult, Profile
+from coldtrail.pivot import discovered_emails, discovered_usernames
 
 
 def _result(source: str, username: str, extra: dict, bio: str | None = None) -> CheckResult:
@@ -128,7 +128,7 @@ def test_generated_package_list_bio_does_not_mention_handles():
 
 
 def test_libravatar_username_is_the_full_email():
-    from larpharvester.sources import SOURCES
+    from coldtrail.sources import SOURCES
 
     assert SOURCES["libravatar"].kind == "email"
     # Source-level contract: username must not be a bare local part.
@@ -136,7 +136,7 @@ def test_libravatar_username_is_the_full_email():
 
 
 def test_packagist_profile_has_no_generated_bio():
-    from larpharvester.sources.packagist import Packagist
+    from coldtrail.sources.packagist import Packagist
 
     source = Packagist()
     assert source.supports_posts is False
@@ -157,7 +157,7 @@ def test_web_profiles_do_not_feed_text_correlation():
 
 
 def test_web_profile_entities_are_empty():
-    from larpharvester.pivot import profile_entities
+    from coldtrail.pivot import profile_entities
 
     profile = _profile(
         "web.about-me",
@@ -169,8 +169,8 @@ def test_web_profile_entities_are_empty():
 
 
 def test_declarative_generic_title_is_not_a_profile():
-    from larpharvester.sites import SiteDef
-    from larpharvester.sources.declarative import DeclarativeSource, _generic_title
+    from coldtrail.sites import SiteDef
+    from coldtrail.sources.declarative import DeclarativeSource, _generic_title
 
     site = SiteDef(
         name="APClips",
