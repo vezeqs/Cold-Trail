@@ -18,7 +18,11 @@ def settings(tmp_path):
 
 @respx.mock
 async def test_opensanctions(settings):
-    respx.get("https://api.opensanctions.org/search/default").mock(
+    settings.opensanctions_api_key = "key"
+    respx.get(
+        "https://api.opensanctions.org/search/default",
+        headers={"Authorization": "ApiKey key"},
+    ).mock(
         return_value=httpx.Response(
             200,
             json={
