@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import parse_qs, unquote, urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 
@@ -73,11 +73,15 @@ async def duckduckgo(fetcher: Fetcher, query: str, limit: int) -> list[dict[str,
         link = node.select_one("a.result__a")
         if link is None or not link.get("href"):
             continue
+        href = str(link["href"])
+        query = parse_qs(urlsplit(href).query)
+        if query.get("uddg"):
+            href = unquote(query["uddg"][0])
         snippet = node.select_one(".result__snippet")
         results.append(
             _result(
                 link.get_text(" ", strip=True),
-                urljoin("https://duckduckgo.com", str(link["href"])),
+                urljoin("https://duckduckgo.com", href),
                 snippet.get_text(" ", strip=True) if snippet else "",
             )
         )

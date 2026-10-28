@@ -52,6 +52,7 @@ class Settings:
     searxng_url: str | None = None
     opencorporates_api_key: str | None = None
     companies_house_api_key: str | None = None
+    opensanctions_api_key: str | None = None
     mastodon_instances: tuple[str, ...] = DEFAULT_INSTANCES
     proxy: str | None = None
     tor: bool = False
@@ -139,3 +140,4 @@ class Settings:
         self.companies_house_api_key = (
             env.get("COMPANIES_HOUSE_API_KEY") or self.companies_house_api_key
         )
+        self.opensanctions_api_key = env.get("OPENSANCTIONS_API_KEY") or self.opensanctions_api_key

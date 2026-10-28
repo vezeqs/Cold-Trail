@@ -72,7 +72,7 @@ async def test_duckduckgo_html(settings):
     respx.get("https://html.duckduckgo.com/html/").mock(
         return_value=httpx.Response(
             200,
-            text='<div class="result"><a class="result__a" href="https://ddg.example">DDG</a>'
+            text='<div class="result"><a class="result__a" href="https://duckduckgo.com/l/?uddg=https%3A%2F%2Ftarget.example%2Fx">DDG</a>'
             '<a class="result__snippet">snip</a></div>',
             headers={"content-type": "text/html"},
         )
@@ -80,4 +80,4 @@ async def test_duckduckgo_html(settings):
     async with Fetcher(settings) as fetcher:
         provider, results = await search(fetcher, "q", settings)
     assert provider == "duckduckgo"
-    assert results == [{"title": "DDG", "url": "https://ddg.example", "snippet": "snip"}]
+    assert results == [{"title": "DDG", "url": "https://target.example/x", "snippet": "snip"}]

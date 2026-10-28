@@ -1093,13 +1093,20 @@ def _gitleaks_build(target: str, extra: list[str], workdir: Path) -> list[str]:
         "--report-format",
         "json",
         "--report-path",
-        "-",
+        str(workdir / "gitleaks.json"),
         *extra,
     ]
 
 
 def _gitleaks_parse(stdout: str, target: str, workdir: Path) -> Parsed:
     data = _first_json(stdout)
+    if data is None:
+        report = workdir / "gitleaks.json"
+        if report.is_file():
+            try:
+                data = json.loads(report.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                data = None
     entities: list[Entity] = []
     if isinstance(data, list):
         for item in data:

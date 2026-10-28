@@ -14,9 +14,11 @@ def _item(provider: str, name: Any, **extra: Any) -> dict[str, Any]:
     return {"provider": provider, "name": str(name or ""), **extra}
 
 
-async def opensanctions(fetcher: Fetcher, query: str, limit: int) -> list[dict[str, Any]]:
+async def opensanctions(fetcher: Fetcher, query: str, limit: int, key: str) -> list[dict[str, Any]]:
     status, data = await fetcher.get_json(
-        "https://api.opensanctions.org/search/default", params={"q": query, "limit": limit}
+        "https://api.opensanctions.org/search/default",
+        params={"q": query, "limit": limit},
+        headers={"Authorization": f"ApiKey {key}"},
     )
     if status != 200 or not isinstance(data, dict):
         return []
@@ -92,8 +94,22 @@ async def company_search(
     limit: int = 10,
 ) -> list[dict[str, Any]]:
     provider = provider.casefold()
-    if provider in {"auto", "opensanctions"}:
-        return await opensanctions(fetcher, query, limit)
+    if provider == "auto":
+        if settings.opensanctions_api_key:
+            provider = "opensanctions"
+        elif settings.opencorporates_api_key:
+            provider = "opencorporates"
+        elif settings.companies_house_api_key:
+            provider = "companies-house"
+        else:
+            raise ValueError(
+                "no company provider configured; set OPENSANCTIONS_API_KEY, "
+                "OPENCORPORATES_API_KEY, or COMPANIES_HOUSE_API_KEY"
+            )
+    if provider == "opensanctions":
+        if not settings.opensanctions_api_key:
+            raise ValueError("OPENSANCTIONS_API_KEY is not configured")
+        return await opensanctions(fetcher, query, limit, settings.opensanctions_api_key)
     if provider == "opencorporates":
         if not settings.opencorporates_api_key:
             raise ValueError("OPENCORPORATES_API_KEY is not configured")
@@ -103,7 +119,9 @@ async def company_search(
             raise ValueError("COMPANIES_HOUSE_API_KEY is not configured")
         return await companies_house(fetcher, query, limit, settings.companies_house_api_key)
     if provider == "all":
-        results = await opensanctions(fetcher, query, limit)
+        results: list[dict[str, Any]] = []
+        if settings.opensanctions_api_key:
+            results += await opensanctions(fetcher, query, limit, settings.opensanctions_api_key)
         if settings.opencorporates_api_key:
             results += await opencorporates(fetcher, query, limit, settings.opencorporates_api_key)
         if settings.companies_house_api_key:
