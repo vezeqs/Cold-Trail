@@ -1,0 +1,54 @@
+name: Feature request
+description: Suggest a source, integration, workflow, or improvement
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ColdTrail is privacy-first and local-first. Features that add telemetry, hidden
+        network calls, or weaken source coverage are unlikely to be accepted.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What investigation or workflow is painful today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should ColdTrail do? Include commands, source names, or API details.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - New source
+        - External tool integration
+        - Pivot / harvest / correlation
+        - CLI
+        - TUI
+        - Web UI / API
+        - Export / evidence / cases
+        - Privacy / security
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Existing tools, workarounds, or upstream APIs.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: This feature does not add telemetry or hidden network calls.
+          required: true
+        - label: This request uses public data and lawful scope.
+          required: true

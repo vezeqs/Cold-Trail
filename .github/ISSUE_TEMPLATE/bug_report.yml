@@ -1,0 +1,65 @@
+name: Bug report
+description: Report a reproducible bug in ColdTrail
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please remove secrets, tokens, and personal data from logs.
+        For security vulnerabilities, use SECURITY.md instead of a public issue.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what actually happened?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: Exact commands, target type, and options. Use a placeholder target if needed.
+      placeholder: |
+        uv run coldtrail pivot example --web --no-save --json
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: ColdTrail version
+      description: Output of `uv run coldtrail --version`
+      placeholder: coldtrail 0.9.0
+    validations:
+      required: true
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Interface
+      options:
+        - CLI
+        - TUI
+        - Web UI / JSON API
+        - Library/import
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python / OS
+      placeholder: Python 3.12 on Debian 12
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: Errors, status codes, and source names. Redact emails, tokens, and PII.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I removed secrets and personal data from this report.
+          required: true
+        - label: This is not a security vulnerability (those go through SECURITY.md).
+          required: true
