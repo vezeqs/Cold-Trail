@@ -47,6 +47,11 @@ class Settings:
     shodan_api_key: str | None = None
     hunter_api_key: str | None = None
     x_bearer_token: str | None = None
+    serper_api_key: str | None = None
+    brave_api_key: str | None = None
+    searxng_url: str | None = None
+    opencorporates_api_key: str | None = None
+    companies_house_api_key: str | None = None
     mastodon_instances: tuple[str, ...] = DEFAULT_INSTANCES
     proxy: str | None = None
     tor: bool = False
@@ -125,3 +130,12 @@ class Settings:
         self.shodan_api_key = env.get("SHODAN_API_KEY") or self.shodan_api_key
         self.hunter_api_key = env.get("HUNTER_API_KEY") or self.hunter_api_key
         self.x_bearer_token = env.get("X_BEARER_TOKEN") or self.x_bearer_token
+        self.serper_api_key = env.get("SERPER_API_KEY") or self.serper_api_key
+        self.brave_api_key = env.get("BRAVE_API_KEY") or self.brave_api_key
+        self.searxng_url = env.get("SEARXNG_URL") or self.searxng_url
+        self.opencorporates_api_key = (
+            env.get("OPENCORPORATES_API_KEY") or self.opencorporates_api_key
+        )
+        self.companies_house_api_key = (
+            env.get("COMPANIES_HOUSE_API_KEY") or self.companies_house_api_key
+        )
