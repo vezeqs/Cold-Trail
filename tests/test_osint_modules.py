@@ -151,6 +151,18 @@ async def test_reverse_ip_without_key(settings):
 
 
 @respx.mock
+async def test_reverse_ip_filters_wildcard_dns_noise(settings):
+    noisy = "\n".join(
+        ["0." + "0" * 60 + ".invox.ipv64.de"] * 20 + ["0.invox.ipv64.de"] * 5 + ["real.example.com"]
+    )
+    respx.get("https://api.hackertarget.com/reverseiplookup/").mock(
+        return_value=httpx.Response(200, text=noisy)
+    )
+    async with Fetcher(settings) as fetcher:
+        assert await reverse_ip(fetcher, "1.1.1.1") == ["real.example.com"]
+
+
+@respx.mock
 async def test_reverse_ip_with_shodan(settings):
     respx.get("https://api.shodan.io/dns/reverse").mock(
         return_value=httpx.Response(200, json={"1.2.3.4": ["a.example.com"]})

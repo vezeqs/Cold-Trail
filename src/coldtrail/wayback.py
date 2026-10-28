@@ -17,6 +17,8 @@ async def cdx(fetcher: Fetcher, url: str, limit: int = 50) -> list[dict[str, Any
             "collapse": "digest",
             "fl": "timestamp,original,statuscode,mimetype,digest,length",
         },
+        # The Wayback CDX API is routinely slower than a normal source probe.
+        timeout=max(fetcher.settings.timeout, 30.0),
     )
     if status != 200 or not isinstance(data, list) or len(data) < 2:
         return []

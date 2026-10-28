@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
+import re
 import ssl
 import struct
 from typing import Any
@@ -269,6 +270,63 @@ async def ptr(fetcher: Fetcher, address: str) -> list[str]:
     return await dns(fetcher, name, "PTR")
 
 
+HOSTNAME_RE = re.compile(
+    r"^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)(?:\.(?!-)[a-z0-9-]{1,63}(?<!-))*$",
+    re.IGNORECASE,
+)
+WILDCARD_SUFFIXES = (
+    "ipv64.de",
+    "ipv64.net",
+    "nip.io",
+    "sslip.io",
+    "xip.io",
+    "localtest.me",
+    "lvh.me",
+    "traefik.me",
+    "vcap.me",
+)
+
+
+def _valid_hostname(value: str) -> bool:
+    return bool(HOSTNAME_RE.fullmatch(value.strip().rstrip(".")))
+
+
+def _wildcard_label(label: str) -> bool:
+    """Detect the padded/zero-prefixed labels emitted by wildcard DNS services."""
+    return label.startswith("0") or (label.isdigit() and len(label) >= 6)
+
+
+def _clean_reverse_hostnames(values: list[str]) -> list[str]:
+    """Drop malformed names and wildcard-DNS noise from reverse-IP results.
+
+    Free reverse-IP APIs often return hundreds of synthetic ``0.000…`` names
+    from dynamic-DNS wildcards. Those are not useful attribution evidence.
+    """
+    hosts = [value.strip().casefold().rstrip(".") for value in values if value.strip()]
+    hosts = [
+        host
+        for host in hosts
+        if _valid_hostname(host)
+        and not any(_wildcard_label(label) for label in host.split(".")[:-1])
+        and not any(host == suffix or host.endswith(f".{suffix}") for suffix in WILDCARD_SUFFIXES)
+    ]
+    # Group before deduplication: wildcard APIs emit the same padded name many
+    # times, and deduping first hides the noise ratio.
+    groups: dict[str, list[str]] = {}
+    for host in hosts:
+        groups.setdefault(".".join(host.split(".")[-2:]), []).append(host)
+    noisy: set[str] = set()
+    for suffix, members in groups.items():
+        if len(members) < 10:
+            continue
+        padded = sum(
+            1 for host in members if any(_wildcard_label(label) for label in host.split(".")[:-2])
+        )
+        if padded / len(members) >= 0.5:
+            noisy.add(suffix)
+    return dedupe([host for host in hosts if ".".join(host.split(".")[-2:]) not in noisy])[:200]
+
+
 async def reverse_ip(fetcher: Fetcher, address: str, key: str | None = None) -> list[str]:
     if key:
         try:
@@ -280,7 +338,7 @@ async def reverse_ip(fetcher: Fetcher, address: str, key: str | None = None) -> 
         except FetchError:
             return []
         if status == 200 and isinstance(data, dict):
-            return dedupe([str(value) for value in data.get(address, [])])
+            return _clean_reverse_hostnames([str(value) for value in data.get(address, [])])[:200]
         return []
     try:
         status, text = await fetcher.get_text(
@@ -293,7 +351,9 @@ async def reverse_ip(fetcher: Fetcher, address: str, key: str | None = None) -> 
     low = text.casefold()[:200]
     if "error" in low or "exceeded" in low or "quota" in low:
         return []
-    return dedupe([line.strip() for line in text.splitlines() if line.strip()])[:200]
+    return _clean_reverse_hostnames([line.strip() for line in text.splitlines() if line.strip()])[
+        :200
+    ]
 
 
 async def asn_lookup(fetcher: Fetcher, address: str) -> dict[str, Any] | None:
