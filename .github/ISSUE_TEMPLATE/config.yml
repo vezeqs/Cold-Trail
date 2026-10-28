@@ -1,11 +1,11 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security vulnerability
-    url: https://github.com/slopmanufacturer/Cold-Trail/blob/master/SECURITY.md
+    url: https://github.com/vezeqs/Cold-Trail/blob/master/SECURITY.md
     about: Report vulnerabilities privately; do not open a public issue.
   - name: Privacy design
-    url: https://slopmanufacturer.github.io/Cold-Trail/privacy.html
+    url: https://vezeqs.github.io/Cold-Trail/privacy.html
     about: Read the privacy guarantees and limits before filing a privacy issue.
   - name: Questions and usage help
-    url: https://github.com/slopmanufacturer/Cold-Trail/discussions
+    url: https://github.com/vezeqs/Cold-Trail/discussions
     about: Ask usage questions in Discussions instead of the issue tracker.

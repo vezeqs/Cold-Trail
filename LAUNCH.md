@@ -23,13 +23,13 @@ uv run coldtrail doctor --offline
 ## Repository setup
 
 ```bash
-gh repo create slopmanufacturer/Cold-Trail --public --source=. --remote=origin --push
+gh repo create vezeqs/Cold-Trail --public --source=. --remote=origin --push
 gh repo edit \
   --description "ColdTrail: local-first OSINT toolkit for username/email pivots, identity correlation, and evidence export." \
-  --homepage "https://slopmanufacturer.github.io/Cold-Trail/" \
+  --homepage "https://vezeqs.github.io/Cold-Trail/" \
   --add-topic osint --add-topic threat-intelligence --add-topic username-enumeration \
   --add-topic email-osint --add-topic digital-forensics --add-topic python
-gh api -X POST repos/slopmanufacturer/Cold-Trail/pages -f build_type=workflow
+gh api -X POST repos/vezeqs/Cold-Trail/pages -f build_type=workflow
 ```
 
 - [ ] GitHub Pages workflow succeeds; `/`, `/quickstart.html`, `/sources.html`,
@@ -47,8 +47,8 @@ uv build
 uv publish
 # Docker
 docker build -t coldtrail:0.9.0 .
-docker tag coldtrail:0.9.0 ghcr.io/slopmanufacturer/Cold-Trail:0.9.0
-docker push ghcr.io/slopmanufacturer/Cold-Trail:0.9.0
+docker tag coldtrail:0.9.0 ghcr.io/vezeqs/Cold-Trail:0.9.0
+docker push ghcr.io/vezeqs/Cold-Trail:0.9.0
 ```
 
 - [ ] `uvx coldtrail --version` and `pipx install coldtrail` work from a clean environment.

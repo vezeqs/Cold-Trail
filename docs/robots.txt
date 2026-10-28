@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://slopmanufacturer.github.io/Cold-Trail/sitemap.xml
+Sitemap: https://vezeqs.github.io/Cold-Trail/sitemap.xml

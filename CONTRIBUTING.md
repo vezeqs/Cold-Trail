@@ -6,7 +6,7 @@ privacy, and reproducible tests matter more than feature volume.
 ## Setup
 
 ```bash
-git clone https://github.com/slopmanufacturer/Cold-Trail
+git clone https://github.com/vezeqs/Cold-Trail
 cd Cold-Trail
 uv sync
 uv run coldtrail doctor --offline

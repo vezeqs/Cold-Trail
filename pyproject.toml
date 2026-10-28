@@ -45,10 +45,10 @@ dependencies = [
 coldtrail = "coldtrail.cli:app"
 
 [project.urls]
-Homepage = "https://slopmanufacturer.github.io/Cold-Trail/"
-Repository = "https://github.com/slopmanufacturer/Cold-Trail"
-Changelog = "https://github.com/slopmanufacturer/Cold-Trail/blob/master/CHANGELOG.md"
-Security = "https://github.com/slopmanufacturer/Cold-Trail/blob/master/SECURITY.md"
+Homepage = "https://vezeqs.github.io/Cold-Trail/"
+Repository = "https://github.com/vezeqs/Cold-Trail"
+Changelog = "https://github.com/vezeqs/Cold-Trail/blob/master/CHANGELOG.md"
+Security = "https://github.com/vezeqs/Cold-Trail/blob/master/SECURITY.md"
 
 [dependency-groups]
 dev = [
