@@ -46,6 +46,14 @@ class StoreBase:
 
     def _migrate(self) -> None:
         current_version = self.conn.execute("PRAGMA user_version").fetchone()[0]
+        if current_version >= SCHEMA_VERSION:
+            trigger = self.conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='posts_au'"
+            ).fetchone()
+            if trigger is None:
+                self.conn.execute(POSTS_AU_TRIGGER)
+                self.conn.commit()
+            return
         self.conn.executescript(SCHEMA)
         self._rebuild_entities()
         for table, columns in COLUMNS.items():

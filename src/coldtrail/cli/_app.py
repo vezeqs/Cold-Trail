@@ -96,6 +96,13 @@ def main(
     respect_robots: Annotated[
         bool, typer.Option("--respect-robots", help="Honour robots.txt")
     ] = False,
+    allow_private_targets: Annotated[
+        bool,
+        typer.Option(
+            "--allow-private-targets",
+            help="Allow private/loopback targets (authorized internal recon only)",
+        ),
+    ] = False,
     replay: Annotated[
         bool, typer.Option("--replay", help="Serve responses from stored raw captures")
     ] = False,
@@ -127,6 +134,8 @@ def main(
         settings.retention_days = retention_days
     if respect_robots:
         settings.respect_robots = True
+    if allow_private_targets:
+        settings.allow_private_targets = True
     if replay:
         settings.replay = True
     ctx.obj = settings

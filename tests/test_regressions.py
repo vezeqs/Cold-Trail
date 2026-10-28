@@ -305,5 +305,5 @@ def test_raw_get_tolerates_corrupt_body(store):
             "INSERT INTO raw (url, status, body, fetched_at, run_id) VALUES (?, ?, ?, ?, NULL)",
             ("https://example.test/raw", 500, b"junk", "2024-01-02T00:00:00Z"),
         )
-    # Most recent row is corrupt -> None rather than raising
-    assert store.raw_get("https://example.test/raw") is None
+    # Most recent row is corrupt -> fall back to the previous valid capture
+    assert store.raw_get("https://example.test/raw")["body"] == b"fine"

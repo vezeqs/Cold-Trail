@@ -7,6 +7,7 @@ from typing import Any
 from PIL import Image
 
 from .models import Profile
+from .security import is_public_host
 
 MAX_AVATAR_BYTES = 2_000_000
 HASH_SIZE = 8
@@ -132,6 +133,12 @@ async def hash_avatars(fetcher, profiles: list[Profile]) -> int:
     urls = list(dict.fromkeys(profile.avatar for profile in targets))
 
     async def worker(url: str) -> tuple[str, str | None, dict[str, Any]]:
+        if not fetcher.settings.allow_private_targets:
+            from urllib.parse import urlsplit
+
+            host = urlsplit(url).hostname
+            if not host or not is_public_host(host, resolve=False):
+                return url, None, {}
         try:
             response = await fetcher.get(url)
         except Exception:

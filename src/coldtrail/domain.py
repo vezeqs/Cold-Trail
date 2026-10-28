@@ -9,6 +9,7 @@ import struct
 from typing import Any
 
 from .http import Fetcher, FetchError
+from .security import is_public_host
 from .utils import dedupe, sensitive_cache_key
 
 RDAP = "https://rdap.org/domain"
@@ -220,6 +221,12 @@ async def check_subdomain_takeover(
 async def lookup_domain(fetcher: Fetcher, domain: str, *, deep: bool = False) -> dict[str, Any]:
     domain = domain.strip().casefold().removeprefix("http://").removeprefix("https://")
     domain = domain.split("/")[0]
+    if not fetcher.settings.allow_private_targets and not is_public_host(domain, resolve=False):
+        return {
+            "domain": domain,
+            "error": "private, loopback, or link-local target blocked; "
+            "use --allow-private-targets for authorized internal recon",
+        }
     values = await asyncio.gather(
         *(dns(fetcher, domain, record_type) for record_type in RECORD_TYPES)
     )

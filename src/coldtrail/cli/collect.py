@@ -57,7 +57,7 @@ def pivot(
     variants: Annotated[
         bool, typer.Option("--variants", help="Probe generated handle/email variants")
     ] = False,
-    web: Annotated[bool, typer.Option("--web", help="Include the 478-site web corpus")] = False,
+    web: Annotated[bool, typer.Option("--web", help="Include the 482-site web corpus")] = False,
     all_sources: Annotated[bool, typer.Option("--all", help="Every registered source")] = False,
     avatar_hash: Annotated[
         bool | None,
@@ -223,18 +223,21 @@ def batch(
     store = Store(settings.db_path) if save else None
     try:
         for target in items:
-            report = asyncio.run(
-                run_pivot(
-                    target,
-                    settings=settings,
-                    sources=names,
-                    expand=expand,
-                    depth=depth,
-                    include_web=web,
-                    use_cache=save and settings.negative_cache_ttl > 0,
-                    store=store,
+            try:
+                report = asyncio.run(
+                    run_pivot(
+                        target,
+                        settings=settings,
+                        sources=names,
+                        expand=expand,
+                        depth=depth,
+                        include_web=web,
+                        use_cache=save and settings.negative_cache_ttl > 0,
+                        store=store,
+                    )
                 )
-            )
+            except ValueError as exc:
+                raise typer.BadParameter(str(exc)) from exc
             if store is not None:
                 persist_pivot(store, report)
             if not json_out:

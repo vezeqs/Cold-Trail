@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ..http import Fetcher
 from ..models import CheckResult, Profile
+from ..security import is_public_host
 from .base import Source, register
 
 
@@ -21,6 +22,8 @@ class Nostr(Source):
         name = name or "_"
         if not domain or "." not in domain:
             return self.missing(target, "NIP-05 needs name@domain (or a domain for _@domain)")
+        if not fetcher.settings.allow_private_targets and not is_public_host(domain, resolve=False):
+            return self.blocked(target, "private/loopback NIP-05 domain blocked")
         status, data = await fetcher.get_json(
             f"https://{domain}/.well-known/nostr.json", params={"name": name}
         )

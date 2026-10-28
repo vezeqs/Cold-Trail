@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 DEFAULT_INSTANCES = ("mastodon.social", "fosstodon.org", "infosec.exchange")
-DEFAULT_UA = "coldtrail/0.8 (OSINT research; public data only)"
+DEFAULT_UA = "coldtrail/0.9 (OSINT research; public data only)"
 
 
 def _default_db() -> Path:
@@ -60,6 +60,7 @@ class Settings:
     replay: bool = False
     web_token: str | None = None
     trust_proxy: bool = False
+    allow_private_targets: bool = False
     sites_path: Path = field(
         default_factory=lambda: Path(__file__).resolve().parent / "data" / "sites.toml"
     )
@@ -116,6 +117,8 @@ class Settings:
             self.web_token = value
         if value := env.get("COLDTRAIL_TRUST_PROXY"):
             self.trust_proxy = value.lower() in ("1", "true", "yes")
+        if value := env.get("COLDTRAIL_ALLOW_PRIVATE_TARGETS"):
+            self.allow_private_targets = value.lower() in ("1", "true", "yes")
         self.github_token = env.get("GITHUB_TOKEN") or self.github_token
         self.hibp_api_key = env.get("HIBP_API_KEY") or self.hibp_api_key
         self.emailrep_api_key = env.get("EMAILREP_API_KEY") or self.emailrep_api_key
