@@ -468,6 +468,7 @@ def ip_cmd(
     ctx: typer.Context,
     address: Annotated[str, typer.Argument(help="IPv4 address")],
     asn: Annotated[bool, typer.Option("--asn", help="Include RIPE ASN & IP RDAP")] = False,
+    limit: Annotated[int, typer.Option("-n", "--limit", min=1, max=500)] = 50,
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """PTR record, reverse-IP hostnames, Shodan, and optional ASN/RDAP data for an address."""
@@ -475,10 +476,11 @@ def ip_cmd(
 
     async def collect():
         async with Fetcher(settings) as fetcher:
+            hostnames = await reverse_ip(fetcher, address, settings.shodan_api_key)
             out = {
                 "address": address,
                 "ptr": await ptr(fetcher, address),
-                "hostnames": await reverse_ip(fetcher, address, settings.shodan_api_key),
+                "hostnames": hostnames[:limit],
                 "shodan": await shodan_host(fetcher, address, settings.shodan_api_key),
             }
             if asn:
