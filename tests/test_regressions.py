@@ -307,3 +307,47 @@ def test_raw_get_tolerates_corrupt_body(store):
         )
     # Most recent row is corrupt -> fall back to the previous valid capture
     assert store.raw_get("https://example.test/raw")["body"] == b"fine"
+
+
+# -- corpus size in user-facing help matches the loaded web group -----------------
+
+
+def test_pivot_web_help_states_real_corpus_size():
+    """The --web help must name the web-group size, not the curated+web total.
+
+    A stale hardcoded number (482) shipped while the corpus was 432 sites;
+    derive the invariant instead of trusting the string.
+    """
+    from coldtrail.cli.collect import WEB_CORPUS_COUNT
+    from coldtrail.sources import SOURCES
+
+    web_count = sum(1 for source in SOURCES.values() if source.group == "web")
+    assert WEB_CORPUS_COUNT == web_count > 0
+    # The help text embeds exactly that number.
+    from typer.testing import CliRunner
+
+    from coldtrail.cli import app
+
+    result = CliRunner(env={"COLUMNS": "200", "TERM": "dumb"}).invoke(app, ["pivot", "--help"])
+    assert result.exit_code == 0
+    flat = " ".join(result.output.split())
+    assert f"{web_count}-site web corpus" in flat
+    assert f"{len(SOURCES)}-site web corpus" not in flat
+
+
+def test_pivot_page_states_real_corpus_size(tmp_path):
+    """The /pivot page must not hardcode a stale web-corpus number."""
+    from fastapi.testclient import TestClient
+
+    from coldtrail.config import Settings
+    from coldtrail.sources import SOURCES
+    from coldtrail.web import create_app
+
+    web_count = sum(1 for source in SOURCES.values() if source.group == "web")
+    settings = Settings.load()
+    settings.db_path = tmp_path / "pivot-page.db"
+    client = TestClient(create_app(settings))
+    response = client.get("/pivot")
+    assert response.status_code == 200
+    assert f"{web_count}-site web corpus" in response.text
+    assert "482-site web corpus" not in response.text

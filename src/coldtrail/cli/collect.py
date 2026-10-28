@@ -35,6 +35,8 @@ from ._app import (
     console,
 )
 
+WEB_CORPUS_COUNT = sum(1 for source in SOURCES.values() if source.group == "web")
+
 
 @app.command(rich_help_panel="Collect")
 def pivot(
@@ -57,7 +59,10 @@ def pivot(
     variants: Annotated[
         bool, typer.Option("--variants", help="Probe generated handle/email variants")
     ] = False,
-    web: Annotated[bool, typer.Option("--web", help="Include the 482-site web corpus")] = False,
+    web: Annotated[
+        bool,
+        typer.Option("--web", help=f"Include the {WEB_CORPUS_COUNT}-site web corpus"),
+    ] = False,
     all_sources: Annotated[bool, typer.Option("--all", help="Every registered source")] = False,
     avatar_hash: Annotated[
         bool | None,
