@@ -4,12 +4,15 @@ from urllib.parse import quote, urlsplit
 
 from ..http import Fetcher, FetchError
 from ..models import CheckResult, Edge, Post, Profile
+from ..security import is_public_host
 from ..utils import is_after, strip_html
 from .base import Source, register
 
 
 async def _webfinger_instance(fetcher: Fetcher, user: str, domain: str) -> str | None:
     """Resolve the real ActivityPub host for user@custom-domain via WebFinger."""
+    if not fetcher.settings.allow_private_targets and not is_public_host(domain, resolve=False):
+        return None
     try:
         status, data = await fetcher.get_json(
             f"https://{domain}/.well-known/webfinger",
@@ -51,6 +54,10 @@ class Mastodon(Source):
                     if instance not in instances:
                         instances.append(instance)
         for instance in instances:
+            if not fetcher.settings.allow_private_targets and not is_public_host(
+                instance, resolve=False
+            ):
+                continue
             status, data = await fetcher.get_json(
                 f"https://{instance}/api/v1/accounts/lookup", params={"acct": handle}
             )

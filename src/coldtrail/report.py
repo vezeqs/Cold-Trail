@@ -8,6 +8,7 @@ import json
 import os
 import uuid
 from typing import Any
+from urllib.parse import urlsplit
 from xml.sax.saxutils import escape
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -484,10 +485,15 @@ def to_html(payload: dict[str, Any], redacted: bool = False) -> str:
     def link(url: str, text: str | None = None) -> str:
         if not url:
             return ""
-        safe = escape(url, {'"': "&quot;", "'": "&#x27;"})
-        if safe.casefold().startswith(("javascript:", "data:", "vbscript:")):
-            return escape(url)
-        return f'<a href="{safe}" rel="noreferrer">{escape(text or url)}</a>'
+        raw = url.strip()
+        try:
+            parsed = urlsplit(raw)
+        except ValueError:
+            return escape(raw)
+        if parsed.scheme.casefold() not in ("http", "https") or not parsed.netloc:
+            return escape(raw)
+        safe = escape(raw, {'"': "&quot;", "'": "&#x27;"})
+        return f'<a href="{safe}" rel="noreferrer">{escape(text or raw)}</a>'
 
     cluster_rows = [
         [

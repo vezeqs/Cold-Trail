@@ -67,7 +67,13 @@ def run(
     """Run an installed external OSINT tool and import its findings."""
     settings = _settings(ctx)
     try:
-        result = run_tool(tool, target, timeout=timeout, extra_args=extra)
+        result = run_tool(
+            tool,
+            target,
+            timeout=timeout,
+            extra_args=extra,
+            allow_private=settings.allow_private_targets,
+        )
     except ToolUnavailable as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc

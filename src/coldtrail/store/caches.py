@@ -103,14 +103,14 @@ class CachesMixin:
             )
 
     def raw_get(self, url: str) -> dict[str, Any] | None:
-        row = self.conn.execute(
-            "SELECT * FROM raw WHERE url = ? ORDER BY id DESC LIMIT 1", (url,)
-        ).fetchone()
-        if row is None:
-            return None
-        item = dict(row)
-        try:
-            item["body"] = zlib.decompress(item["body"])
-        except zlib.error:
-            return None
-        return item
+        rows = self.conn.execute(
+            "SELECT * FROM raw WHERE url = ? ORDER BY id DESC", (url,)
+        ).fetchall()
+        for row in rows:
+            item = dict(row)
+            try:
+                item["body"] = zlib.decompress(item["body"])
+            except zlib.error:
+                continue
+            return item
+        return None

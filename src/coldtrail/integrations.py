@@ -34,6 +34,7 @@ from urllib.parse import urlsplit
 from .analysis import extract_entities
 from .evidence import add_evidence
 from .models import CheckResult, Entity, Link, Post, Profile
+from .security import ensure_public_target
 from .sites import slugify
 from .store import Store
 
@@ -1183,6 +1184,8 @@ def run_tool(
     *,
     timeout: float = 180.0,
     extra_args: list[str] | None = None,
+    allow_private: bool = True,
+    allow_file_paths: bool = True,
 ) -> ToolResult:
     """Execute a registered tool safely (argument vector, no shell) and parse output."""
     spec = TOOLS.get(name)
@@ -1191,10 +1194,20 @@ def run_tool(
     if spec.runner_only:
         raise ToolError(f"{name} is import-only; use `coldtrail ingest --format {name}`")
     target = validate_target(target)
+    if spec.input_kind == "file":
+        if not allow_file_paths:
+            raise ToolError(
+                "file targets are CLI-only; the web workbench does not read local paths"
+            )
+        if not Path(target).is_file():
+            raise ToolError(f"not a file: {target}")
+    elif spec.input_kind in {"domain", "ip/domain", "url"} and not allow_private:
+        try:
+            ensure_public_target(target)
+        except ValueError as exc:
+            raise ToolError(str(exc)) from exc
     if not shutil.which(spec.binary):
         raise ToolUnavailable(f"{spec.binary} is not installed. Install with: {spec.install}")
-    if spec.input_kind == "file" and not Path(target).is_file():
-        raise ToolError(f"not a file: {target}")
     extra = [str(item) for item in (extra_args or [])]
     with tempfile.TemporaryDirectory(prefix="coldtrail-tool-") as temp:
         workdir = Path(temp)

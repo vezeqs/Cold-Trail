@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import hmac
+import html
 import json
 import logging
 import re
@@ -78,6 +79,7 @@ from ..report import (
     to_markdown,
     to_stix,
 )
+from ..security import ensure_public_target
 from ..sources import GROUPS, SOURCES
 from ..store import Store
 from ..wayback import cdx
@@ -332,7 +334,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title="ColdTrail",
         version=__version__,
-        docs_url="/api/docs",
+        docs_url=None,
         redoc_url=None,
         openapi_url="/api/openapi.json",
     )
@@ -941,7 +943,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         error: str | None = None
         payload: dict[str, Any] | None = None
         try:
-            result = await asyncio.to_thread(run_tool, tool, target)
+            result = await asyncio.to_thread(
+                run_tool,
+                tool,
+                target,
+                allow_private=settings.allow_private_targets,
+                allow_file_paths=False,
+            )
             run_id = None
             if save:
                 with _open() as store:
@@ -1035,6 +1043,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         result: Any = None
         run_id: int | None = None
 
+        if tool in ("domain", "ip") and not settings.allow_private_targets:
+            try:
+                ensure_public_target(cleaned)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
         if tool == "domain":
             async with Fetcher(settings) as fetcher:
                 result = await lookup_domain(fetcher, cleaned, deep=deep)
@@ -1351,8 +1364,33 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # -- JSON API ------------------------------------------------------------
 
-    @app.get("/api/health")
+    @app.get("/api/docs", response_class=HTMLResponse)
+    def api_docs():
+        rows: list[str] = []
+        for path, operations in sorted(app.openapi().get("paths", {}).items()):
+            for method, operation in operations.items():
+                if method not in {"get", "post", "put", "patch", "delete"}:
+                    continue
+                rows.append(
+                    "<tr>"
+                    f"<td>{method.upper()}</td>"
+                    f"<td><code>{html.escape(path)}</code></td>"
+                    f"<td>{html.escape(str(operation.get('summary') or ''))}</td>"
+                    "</tr>"
+                )
+        return HTMLResponse(
+            '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width, initial-scale=1">'
+            "<title>ColdTrail API</title></head><body>"
+            "<h1>ColdTrail API</h1>"
+            '<p>Machine-readable spec: <a href="/api/openapi.json">/api/openapi.json</a></p>'
+            '<table border="1" cellpadding="6" cellspacing="0">'
+            "<thead><tr><th>Method</th><th>Path</th><th>Summary</th></tr></thead>"
+            f"<tbody>{''.join(rows)}</tbody></table></body></html>"
+        )
+
     @app.get("/healthz")
+    @app.get("/api/health")
     def api_health():
         healthy = True
         detail = "ok"

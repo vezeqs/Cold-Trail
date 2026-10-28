@@ -3,7 +3,7 @@ from __future__ import annotations
 from .analysis import enrich_profile
 from .avatars import hash_avatars
 from .config import Settings
-from .http import BlockedError, Fetcher, shared_fetcher
+from .http import BlockedError, Fetcher, FetchError, shared_fetcher
 from .models import CheckResult, Edge, Post
 from .pivot import _check, profile_entities
 from .sources import SOURCES, Source
@@ -41,7 +41,7 @@ async def harvest(
             await _enrich_profile(active_fetcher, result)
             try:
                 posts = await source.posts(active_fetcher, username, limit, since=since)
-            except BlockedError:
+            except (BlockedError, FetchError):
                 posts = []
     return result, posts
 
@@ -65,6 +65,6 @@ async def collect_follows(
             await _enrich_profile(active_fetcher, result)
             try:
                 edges = await source.follows(active_fetcher, username, limit)
-            except BlockedError:
+            except (BlockedError, FetchError):
                 edges = []
     return result, edges
