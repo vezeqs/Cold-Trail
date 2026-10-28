@@ -330,7 +330,7 @@ def test_pivot_web_help_states_real_corpus_size():
 
     result = CliRunner(env={"COLUMNS": "200", "TERM": "dumb"}).invoke(app, ["pivot", "--help"])
     assert result.exit_code == 0
-    flat = " ".join(result.output.split())
+    flat = " ".join(result.output.replace("│", " ").split())
     assert f"{web_count}-site web corpus" in flat
     assert f"{len(SOURCES)}-site web corpus" not in flat
 
