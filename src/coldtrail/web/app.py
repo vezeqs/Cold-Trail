@@ -360,6 +360,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         groups=sorted(GROUPS),
         curated_groups=[group for group in GROUPS if group != "web"],
         source_count=len(SOURCES),
+        web_count=sum(1 for source in SOURCES.values() if source.group == "web"),
     )
 
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

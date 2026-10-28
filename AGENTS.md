@@ -156,8 +156,11 @@ tests/fixtures/contracts/ (recorded source fixtures)
 - **Untrusted data:** harvested URLs may be malicious. Templates use the
   `| url` Jinja filter (http/https only); `report.py` blocks
   `javascript:`/`data:`/`vbscript:` hrefs. Keep it that way.
-- **CSP:** `default-src 'self'; img-src 'self' data: https:; script-src 'self'`.
-  Only external static assets (`static/app.js`); no inline scripts.
+- **CSP:** `default-src 'self'; img-src 'self' data:; script-src 'self'` (plus
+  `base-uri 'none'`, `form-action 'self'`, `object-src 'none'`,
+  `frame-ancestors 'none'`). `img-src` deliberately excludes remote origins —
+  no remote image loads. Only local static assets (`static/app.js`); no inline
+  scripts.
 - **Source failures stay isolated:** `pivot._check` converts exceptions into
   `error`/`blocked` results. A broken source must never sink a pivot.
 - **`Fetcher` sets `Accept` per call** (`get_json` → JSON, `get_text` → HTML).

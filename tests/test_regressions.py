@@ -307,3 +307,86 @@ def test_raw_get_tolerates_corrupt_body(store):
         )
     # Most recent row is corrupt -> fall back to the previous valid capture
     assert store.raw_get("https://example.test/raw")["body"] == b"fine"
+
+
+# -- corpus size in user-facing help matches the loaded web group -----------------
+
+
+def test_pivot_web_help_states_real_corpus_size():
+    """The --web help must name the web-group size, not the curated+web total.
+
+    A stale hardcoded number (482) shipped while the corpus was 432 sites;
+    derive the invariant instead of trusting the string.
+    """
+    from coldtrail.cli.collect import WEB_CORPUS_COUNT
+    from coldtrail.sources import SOURCES
+
+    web_count = sum(1 for source in SOURCES.values() if source.group == "web")
+    assert WEB_CORPUS_COUNT == web_count > 0
+    # The help text embeds exactly that number.
+    from typer.testing import CliRunner
+
+    from coldtrail.cli import app
+
+    result = CliRunner(env={"COLUMNS": "200", "TERM": "dumb"}).invoke(app, ["pivot", "--help"])
+    assert result.exit_code == 0
+    flat = " ".join(result.output.replace("│", " ").split())
+    assert f"{web_count}-site web corpus" in flat
+    assert f"{len(SOURCES)}-site web corpus" not in flat
+
+
+def test_pivot_page_states_real_corpus_size(tmp_path):
+    """The /pivot page must not hardcode a stale web-corpus number."""
+    from fastapi.testclient import TestClient
+
+    from coldtrail.config import Settings
+    from coldtrail.sources import SOURCES
+    from coldtrail.web import create_app
+
+    web_count = sum(1 for source in SOURCES.values() if source.group == "web")
+    settings = Settings.load()
+    settings.db_path = tmp_path / "pivot-page.db"
+    client = TestClient(create_app(settings))
+    response = client.get("/pivot")
+    assert response.status_code == 200
+    assert f"{web_count}-site web corpus" in response.text
+    assert "482-site web corpus" not in response.text
+
+
+# -- docs site primary nav is identical across pages ----------------------------
+
+
+def test_docs_pages_share_primary_nav():
+    """Every docs page must expose the same primary navigation links.
+
+    sources.html shipped without the Comparison and Privacy nav links; assert
+    the link set is uniform so a page cannot silently drop routes again.
+    """
+    import re
+    from pathlib import Path
+
+    docs = Path(__file__).resolve().parent.parent / "docs"
+    pages = ["index.html", "quickstart.html", "sources.html", "comparison.html", "privacy.html"]
+    navs = {}
+    for name in pages:
+        html = (docs / name).read_text(encoding="utf-8")
+        block = re.search(r'<div class="nav-links">(.*?)</div>', html, re.S)
+        assert block, f"{name} missing nav-links div"
+        navs[name] = re.findall(r'href="([^"]+)"', block.group(1))
+    reference = navs["index.html"]
+    for name, links in navs.items():
+        assert links == reference, f"{name} nav differs: {links} != {reference}"
+
+
+def test_docs_sitemap_lists_main_pages():
+    """sitemap.xml must cover every indexable docs page (404 is noindex)."""
+    import re
+    from pathlib import Path
+
+    docs = Path(__file__).resolve().parent.parent / "docs"
+    sitemap = (docs / "sitemap.xml").read_text(encoding="utf-8")
+    listed = set(re.findall(r"<loc>https://vezeqs\.github\.io/Cold-Trail/([^<]*)</loc>", sitemap))
+    expected = {"", "quickstart.html", "sources.html", "comparison.html", "privacy.html"}
+    assert listed == expected
+    # 404 must stay out of the index
+    assert "noindex" in (docs / "404.html").read_text(encoding="utf-8")

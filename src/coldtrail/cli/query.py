@@ -230,12 +230,19 @@ def search(
 def timeline(
     ctx: typer.Context,
     run: Annotated[int | None, typer.Option("--run")] = None,
+    since: Annotated[str | None, typer.Option("--since", help="ISO lower bound")] = None,
+    until: Annotated[str | None, typer.Option("--until", help="ISO upper bound")] = None,
     limit: Annotated[int, typer.Option("-n", "--limit", min=1)] = 500,
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Cross-source chronological timeline."""
     with Store(_settings(ctx).db_path) as store:
-        rows = store.timeline(run_id=run, limit=limit)
+        rows = store.timeline(run_id=run, limit=None)
+    if since:
+        rows = [row for row in rows if (row["created_at"] or "") >= since]
+    if until:
+        rows = [row for row in rows if (row["created_at"] or "") <= until]
+    rows = rows[:limit]
     if json_out:
         _print_json(rows)
         return

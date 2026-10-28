@@ -23,6 +23,7 @@ def case_new(
     ctx: typer.Context,
     name: Annotated[str, typer.Argument()],
     notes: Annotated[str | None, typer.Option("--notes")] = None,
+    json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Create a case."""
     with Store(_settings(ctx).db_path) as store:
@@ -31,6 +32,9 @@ def case_new(
         except Exception as exc:
             typer.echo(f"could not create case: {exc}", err=True)
             raise typer.Exit(code=1) from exc
+    if json_out:
+        _print_json({"id": case_id, "name": name, "notes": notes})
+        return
     console.print(f"created case #{case_id} {name}")
 
 
@@ -64,6 +68,7 @@ def case_add(
     ctx: typer.Context,
     name: Annotated[str, typer.Argument()],
     run_id: Annotated[int, typer.Argument()],
+    json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Attach a run to a case."""
     with Store(_settings(ctx).db_path) as store:
@@ -72,6 +77,9 @@ def case_add(
             typer.echo(f"no such case: {name}", err=True)
             raise typer.Exit(code=1)
         store.add_to_case(case["id"], run_id)
+    if json_out:
+        _print_json({"case": name, "case_id": case["id"], "run_id": run_id})
+        return
     console.print(f"attached run #{run_id} to {name}")
 
 
