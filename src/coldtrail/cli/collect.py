@@ -15,6 +15,7 @@ from ..config import Settings
 from ..correlate import recluster_rows
 from ..harvest import collect_follows
 from ..harvest import harvest as run_harvest
+from ..http import Fetcher
 from ..models import PivotReport
 from ..pivot import entities_for_profiles, persist_pivot
 from ..pivot import pivot as run_pivot
@@ -211,8 +212,12 @@ def batch(
     web: Annotated[bool, typer.Option("--web")] = False,
     json_out: Annotated[bool, typer.Option("--json")] = False,
     save: Annotated[bool, typer.Option("--save/--no-save")] = True,
+    jobs: Annotated[
+        int,
+        typer.Option("-j", "--jobs", min=1, max=32, help="Targets to pivot concurrently"),
+    ] = 1,
 ) -> None:
-    """Pivot multiple targets in sequence and correlate each."""
+    """Pivot multiple targets, optionally concurrently, and correlate each."""
     settings = _settings(ctx)
     items: list[str] = list(targets or [])
     if file is not None:
@@ -224,30 +229,45 @@ def batch(
         raise typer.BadParameter("provide at least one target argument or --file")
 
     names = list(source) if source else None
-    reports: list[dict] = []
     store = Store(settings.db_path) if save else None
-    try:
-        for target in items:
-            try:
-                report = asyncio.run(
-                    run_pivot(
-                        target,
-                        settings=settings,
-                        sources=names,
-                        expand=expand,
-                        depth=depth,
-                        include_web=web,
-                        use_cache=save and settings.negative_cache_ttl > 0,
-                        store=store,
-                    )
+
+    async def run_batch() -> list[dict]:
+        semaphore = asyncio.Semaphore(jobs)
+        reports: list[dict | None] = [None] * len(items)
+
+        async def one(index: int, target: str) -> None:
+            async with semaphore:
+                report = await run_pivot(
+                    target,
+                    settings=settings,
+                    sources=names,
+                    expand=expand,
+                    depth=depth,
+                    include_web=web,
+                    use_cache=save and settings.negative_cache_ttl > 0,
+                    store=store,
+                    fetcher=fetcher,
                 )
-            except ValueError as exc:
-                raise typer.BadParameter(str(exc)) from exc
             if store is not None:
                 persist_pivot(store, report)
+            reports[index] = _report_payload(report)
             if not json_out:
                 _render_pivot(report)
-            reports.append(_report_payload(report))
+
+        async with Fetcher(settings) as fetcher:
+            results = await asyncio.gather(
+                *(one(index, target) for index, target in enumerate(items)),
+                return_exceptions=True,
+            )
+        for result in results:
+            if isinstance(result, ValueError):
+                raise typer.BadParameter(str(result)) from result
+            if isinstance(result, BaseException):
+                raise result
+        return [report for report in reports if report is not None]
+
+    try:
+        reports = asyncio.run(run_batch())
     finally:
         if store is not None:
             store.close()
