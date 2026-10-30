@@ -124,6 +124,9 @@ tests/fixtures/contracts/ (recorded source fixtures)
   Re-record with `coldtrail source verify --record -s <source>` and commit the JSON.
   Fixtures embed decompressed bodies; raw rows in SQLite are zlib-compressed, so always
   decompress when writing a recorder (see `contracts.record_contract`).
+  `tests/test_contracts.py::test_committed_fixtures_verify` replays every committed
+  fixture offline; sources that need API keys or block non-browser clients still lack
+  fixtures.
 
 ## Architecture rules
 

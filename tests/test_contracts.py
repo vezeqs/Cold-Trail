@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import base64
 import json
+from pathlib import Path
 
 import httpx
 import pytest
@@ -71,6 +72,14 @@ def settings(tmp_path) -> Settings:
 def test_every_curated_source_has_a_contract():
     missing = set(CURATED) - set(CONTRACTS)
     assert not missing, f"curated sources without contracts: {sorted(missing)}"
+
+
+async def test_committed_fixtures_verify(settings):
+    fixtures = sorted((Path(__file__).resolve().parent / "fixtures" / "contracts").glob("*.json"))
+    assert len(fixtures) >= 30, f"only {len(fixtures)} fixtures recorded"
+    for path in fixtures:
+        problems = await verify_contract(path.stem, settings)
+        assert not problems, f"{path.name}: {problems}"
     for name, contract in CONTRACTS.items():
         assert contract.target, f"{name} has no contract target"
         assert contract.status in ("found", "not_found")

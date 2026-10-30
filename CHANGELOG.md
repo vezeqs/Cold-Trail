@@ -20,6 +20,8 @@ All notable changes to this project are documented here. The format follows
   span the whole batch.
 - **CI gates.** Coverage floor (73%), mypy over core/store, Python 3.14 in the
   matrix, wheel install smoke test, Bandit, pip-audit, CodeQL, and Dependabot.
+- **More contract fixtures.** 19 additional curated sources now have recorded
+  fixtures (30 total), and a test replays every committed fixture offline.
 
 ### Changed
 

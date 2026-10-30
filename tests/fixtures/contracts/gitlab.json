@@ -1,0 +1,37 @@
+{
+  "source": "gitlab",
+  "target": "gitlab-bot",
+  "observed_status": "found",
+  "profile": {
+    "username": "gitlab-bot",
+    "url": "https://gitlab.com/gitlab-bot",
+    "display_name": "\ud83e\udd16 GitLab Bot \ud83e\udd16",
+    "followers": null,
+    "extra_keys": [
+      "gpg_keys",
+      "id",
+      "location",
+      "organization",
+      "public_email",
+      "ssh_keys",
+      "state"
+    ]
+  },
+  "exchanges": [
+    {
+      "url": "https://gitlab.com/api/v4/users?username=gitlab-bot",
+      "status": 200,
+      "body_b64": "W3siaWQiOjE3ODYxNTIsInVzZXJuYW1lIjoiZ2l0bGFiLWJvdCIsInB1YmxpY19lbWFpbCI6IiIsIm5hbWUiOiLwn6SWIEdpdExhYiBCb3Qg8J+kliIsInN0YXRlIjoiYWN0aXZlIiwibG9ja2VkIjpmYWxzZSwiYXZhdGFyX3VybCI6Imh0dHBzOi8vZ2l0bGFiLmNvbS91cGxvYWRzLy0vc3lzdGVtL3VzZXIvYXZhdGFyLzE3ODYxNTIvYXZhdGFyLnBuZz92PTE3OTMzMjMwNjMiLCJ3ZWJfdXJsIjoiaHR0cHM6Ly9naXRsYWIuY29tL2dpdGxhYi1ib3QifV0="
+    },
+    {
+      "url": "https://gitlab.com/api/v4/users/1786152/keys",
+      "status": 200,
+      "body_b64": "W10="
+    },
+    {
+      "url": "https://gitlab.com/api/v4/users/1786152/gpg_keys",
+      "status": 200,
+      "body_b64": "W10="
+    }
+  ]
+}

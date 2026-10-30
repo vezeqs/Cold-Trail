@@ -1,0 +1,25 @@
+{
+  "source": "chesscom",
+  "target": "hikaru",
+  "observed_status": "found",
+  "profile": {
+    "username": "hikaru",
+    "url": "https://www.chess.com/member/Hikaru",
+    "display_name": "Hikaru Nakamura",
+    "followers": 1421438,
+    "extra_keys": [
+      "country",
+      "last_online",
+      "location",
+      "player_id",
+      "title"
+    ]
+  },
+  "exchanges": [
+    {
+      "url": "https://api.chess.com/pub/player/hikaru",
+      "status": 200,
+      "body_b64": "eyJhdmF0YXIiOiJodHRwczovL2ltYWdlcy5jaGVzc2NvbWZpbGVzLmNvbS91cGxvYWRzL3YxL3VzZXIvMTU0NDg0MjIuODhjMDEwYzEuMjAweDIwMG8uM2M1NjE5ZjU0NDFlLnBuZyIsInBsYXllcl9pZCI6MTU0NDg0MjIsIkBpZCI6Imh0dHBzOi8vYXBpLmNoZXNzLmNvbS9wdWIvcGxheWVyL2hpa2FydSIsInVybCI6Imh0dHBzOi8vd3d3LmNoZXNzLmNvbS9tZW1iZXIvSGlrYXJ1IiwibmFtZSI6Ikhpa2FydSBOYWthbXVyYSIsInVzZXJuYW1lIjoiaGlrYXJ1IiwidGl0bGUiOiJHTSIsImZvbGxvd2VycyI6MTQyMTQzOCwiY291bnRyeSI6Imh0dHBzOi8vYXBpLmNoZXNzLmNvbS9wdWIvY291bnRyeS9VUyIsImxvY2F0aW9uIjoiRmxvcmlkYSIsImxhc3Rfb25saW5lIjoxNzkzMzA2MzkyLCJqb2luZWQiOjEzODkwNDMyNTgsInN0YXR1cyI6InByZW1pdW0iLCJpc19zdHJlYW1lciI6dHJ1ZSwidHdpdGNoX3VybCI6Imh0dHBzOi8vdHdpdGNoLnR2L2dtaGlrYXJ1IiwidmVyaWZpZWQiOmZhbHNlLCJsZWFndWUiOiJMZWdlbmQiLCJzdHJlYW1pbmdfcGxhdGZvcm1zIjpbeyJ0eXBlIjoidHdpdGNoIiwiY2hhbm5lbF91cmwiOiJodHRwczovL3R3aXRjaC50di9nbWhpa2FydSJ9XX0="
+    }
+  ]
+}

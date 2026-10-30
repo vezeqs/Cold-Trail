@@ -1,0 +1,25 @@
+{
+  "source": "stackoverflow",
+  "target": "jon-skeet",
+  "observed_status": "found",
+  "profile": {
+    "username": "jon-skeet",
+    "url": "https://stackoverflow.com/users/8326129/jon-skeet",
+    "display_name": "jon-skeet",
+    "followers": null,
+    "extra_keys": [
+      "account_id",
+      "badges",
+      "location",
+      "reputation",
+      "user_id"
+    ]
+  },
+  "exchanges": [
+    {
+      "url": "https://api.stackexchange.com/2.3/users?filter=default&inname=jon-skeet&pagesize=100&site=stackoverflow&sort=name",
+      "status": 200,
+      "body_b64": "eyJpdGVtcyI6W3siYmFkZ2VfY291bnRzIjp7ImJyb256ZSI6MCwic2lsdmVyIjowLCJnb2xkIjowfSwiYWNjb3VudF9pZCI6MTEzNTY3MTgsImlzX2VtcGxveWVlIjpmYWxzZSwibGFzdF9hY2Nlc3NfZGF0ZSI6MTUwMDM4ODg1OCwicmVwdXRhdGlvbl9jaGFuZ2VfeWVhciI6MCwicmVwdXRhdGlvbl9jaGFuZ2VfcXVhcnRlciI6MCwicmVwdXRhdGlvbl9jaGFuZ2VfbW9udGgiOjAsInJlcHV0YXRpb25fY2hhbmdlX3dlZWsiOjAsInJlcHV0YXRpb25fY2hhbmdlX2RheSI6MCwicmVwdXRhdGlvbiI6MSwiY3JlYXRpb25fZGF0ZSI6MTUwMDM4ODg1OCwidXNlcl90eXBlIjoicmVnaXN0ZXJlZCIsInVzZXJfaWQiOjgzMjYxMjksImxpbmsiOiJodHRwczovL3N0YWNrb3ZlcmZsb3cuY29tL3VzZXJzLzgzMjYxMjkvam9uLXNrZWV0IiwicHJvZmlsZV9pbWFnZSI6Imh0dHBzOi8vd3d3LmdyYXZhdGFyLmNvbS9hdmF0YXIvN2M5ODU1OWU4MWI0MzIxYmUwNWJiNTcxNTgwOWU1N2U/cz0yNTYmZD1pZGVudGljb24mcj1QRyZmPXkmc28tdmVyc2lvbj0yIiwiZGlzcGxheV9uYW1lIjoiam9uLXNrZWV0In1dLCJoYXNfbW9yZSI6ZmFsc2UsInF1b3RhX21heCI6MzAwLCJxdW90YV9yZW1haW5pbmciOjI5OX0="
+    }
+  ]
+}

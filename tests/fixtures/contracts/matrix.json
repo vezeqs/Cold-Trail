@@ -1,0 +1,23 @@
+{
+  "source": "matrix",
+  "target": "@alice:matrix.org",
+  "observed_status": "found",
+  "profile": {
+    "username": "alice",
+    "url": "https://matrix.to/#/@alice:matrix.org",
+    "display_name": "alice wl",
+    "followers": null,
+    "extra_keys": [
+      "avatar_mxc",
+      "homeserver",
+      "mxid"
+    ]
+  },
+  "exchanges": [
+    {
+      "url": "https://matrix-client.matrix.org/_matrix/client/v3/profile/%40alice%3Amatrix.org",
+      "status": 200,
+      "body_b64": "eyJkaXNwbGF5bmFtZSI6ImFsaWNlIHdsIn0="
+    }
+  ]
+}

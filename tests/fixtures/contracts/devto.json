@@ -1,0 +1,24 @@
+{
+  "source": "devto",
+  "target": "ben",
+  "observed_status": "found",
+  "profile": {
+    "username": "ben",
+    "url": "https://dev.to/ben",
+    "display_name": "Ben Halpern",
+    "followers": null,
+    "extra_keys": [
+      "github_username",
+      "id",
+      "location",
+      "twitter_username"
+    ]
+  },
+  "exchanges": [
+    {
+      "url": "https://dev.to/api/users/by_username?url=ben",
+      "status": 200,
+      "body_b64": "eyJ0eXBlX29mIjoidXNlciIsImlkIjoxLCJ1c2VybmFtZSI6ImJlbiIsIm5hbWUiOiJCZW4gSGFscGVybiIsInR3aXR0ZXJfdXNlcm5hbWUiOiJiZW5kaGFscGVybiIsImdpdGh1Yl91c2VybmFtZSI6ImJlbmhhbHBlcm4iLCJzdW1tYXJ5IjoiQSBDYW5hZGlhbiBzb2Z0d2FyZSBkZXZlbG9wZXIgd2hvIHRoaW5rcyBoZeKAmXMgZnVubnkuIiwibG9jYXRpb24iOiJOWSIsIndlYnNpdGVfdXJsIjoiaHR0cDovL2JlbmhhbHBlcm4uY29tIiwiam9pbmVkX2F0IjoiRGVjIDI3LCAyMDE1IiwicHJvZmlsZV9pbWFnZSI6Imh0dHBzOi8vbWVkaWEyLmRldi50by9keW5hbWljL2ltYWdlL3dpZHRoPTMyMCxoZWlnaHQ9MzIwLGZpdD1jb3ZlcixncmF2aXR5PWF1dG8sZm9ybWF0PWF1dG8vaHR0cHMlM0ElMkYlMkZkZXYtdG8tdXBsb2Fkcy5zMy51cy1lYXN0LTIuYW1hem9uYXdzLmNvbSUyRnVwbG9hZHMlMkZ1c2VyJTJGcHJvZmlsZV9pbWFnZSUyRjElMkZiYWJiOTZkMC05Y2QyLTQ5YmMtYTQxMi0yZGM0Y2FmOTRjMmEucG5nIn0="
+    }
+  ]
+}
