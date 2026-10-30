@@ -259,6 +259,21 @@ def test_api_search(client, seeded):
     assert client.get("/api/search").status_code == 422
 
 
+def test_api_search_scopes(client, seeded):
+    profiles = client.get("/api/search?q=alice&scope=profiles").json()
+    assert profiles["scope"] == "profiles"
+    assert profiles["results"][0]["username"] == "alice"
+    entities = client.get("/api/search?q=a%40example.com&scope=entities").json()
+    assert entities["results"][0]["value"] == "a@example.com"
+    combined = client.get("/api/search?q=alice&scope=all").json()
+    assert set(combined["results"]) == {"posts", "profiles", "entities"}
+
+
+def test_search_page_scopes(client, seeded):
+    assert "Profiles" in client.get("/search?q=alice&scope=all").text
+    assert client.get("/search?q=crypto&prefix=true&source=github").status_code == 200
+
+
 def test_api_sources(client):
     payload = client.get("/api/sources?group=social").json()
     assert payload

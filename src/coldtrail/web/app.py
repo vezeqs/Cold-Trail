@@ -747,19 +747,53 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         request: Request,
         q: str = "",
         limit: Annotated[int, Query(ge=1, le=500)] = 100,
+        scope: str = "posts",
+        prefix: bool = False,
+        source: str = "",
+        username: str = "",
     ):
-        rows: list[dict[str, Any]] = []
+        scope = scope if scope in {"posts", "profiles", "entities", "all"} else "posts"
+        results: Any = [] if scope != "all" else {"posts": [], "profiles": [], "entities": []}
         error: str | None = None
         if q.strip():
             with _open() as store:
                 try:
-                    rows = store.search(q, limit=limit)
+                    if scope == "profiles":
+                        results = store.search_profiles(q, limit=limit)
+                    elif scope == "entities":
+                        results = store.search_entities(q, limit=limit)
+                    elif scope == "all":
+                        results = store.search_all(
+                            q,
+                            limit=limit,
+                            prefix=prefix,
+                            source=source or None,
+                            username=username or None,
+                        )
+                    else:
+                        results = store.search(
+                            q,
+                            limit=limit,
+                            prefix=prefix,
+                            source=source or None,
+                            username=username or None,
+                        )
                 except Exception as exc:  # FTS syntax problems must not 500
                     error = f"invalid query: {exc}"
         return _render(
             request,
             "search.html",
-            {"q": q, "rows": rows, "limit": limit, "error": error, "active": "search"},
+            {
+                "q": q,
+                "results": results,
+                "scope": scope,
+                "limit": limit,
+                "prefix": prefix,
+                "source": source,
+                "username": username,
+                "error": error,
+                "active": "search",
+            },
         )
 
     @app.get("/sources", response_class=HTMLResponse)
@@ -1440,9 +1474,34 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def api_search(
         q: Annotated[str, Query(min_length=1)],
         limit: Annotated[int, Query(ge=1, le=500)] = 100,
+        scope: str = "posts",
+        prefix: bool = False,
+        source: str = "",
+        username: str = "",
     ):
+        scope = scope if scope in {"posts", "profiles", "entities", "all"} else "posts"
         with _open() as store:
-            return {"query": q, "results": store.search(q, limit=limit)}
+            if scope == "profiles":
+                results: Any = store.search_profiles(q, limit=limit)
+            elif scope == "entities":
+                results = store.search_entities(q, limit=limit)
+            elif scope == "all":
+                results = store.search_all(
+                    q,
+                    limit=limit,
+                    prefix=prefix,
+                    source=source or None,
+                    username=username or None,
+                )
+            else:
+                results = store.search(
+                    q,
+                    limit=limit,
+                    prefix=prefix,
+                    source=source or None,
+                    username=username or None,
+                )
+        return {"query": q, "scope": scope, "results": results}
 
     @app.get("/api/sources")
     def api_sources(group: str = ""):

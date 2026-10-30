@@ -50,6 +50,25 @@ def test_timeline_since_and_until(tmp_path):
     assert [row["post_id"] for row in rows] == ["p2"]
 
 
+def test_search_scopes(tmp_path):
+    db = _seed(tmp_path)
+    posts = runner.invoke(app, ["--db", str(db), "search", "one", "--json"])
+    assert posts.exit_code == 0, posts.output
+    assert json.loads(posts.output)[0]["snippet"]
+
+    profiles = runner.invoke(
+        app, ["--db", str(db), "search", "alice", "--scope", "profiles", "--json"]
+    )
+    assert profiles.exit_code == 0, profiles.output
+    assert json.loads(profiles.output)[0]["username"] == "alice"
+
+    everything = runner.invoke(
+        app, ["--db", str(db), "search", "alice", "--scope", "all", "--json"]
+    )
+    assert everything.exit_code == 0, everything.output
+    assert set(json.loads(everything.output)) == {"posts", "profiles", "entities"}
+
+
 def test_ip_limit_is_applied(tmp_path, monkeypatch):
     async def fake_reverse(fetcher, address, key=None):
         return ["a.example", "b.example", "c.example"]

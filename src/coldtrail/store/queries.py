@@ -8,6 +8,11 @@ from typing import Any
 from ..utils import epoch_seconds
 
 
+def _like_pattern(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
 class QueriesMixin:
     conn: Any
     _profile_row: Any
@@ -217,7 +222,15 @@ class QueriesMixin:
         ).fetchall()
         return [dict(row) for row in rows]
 
-    def search(self, query: str, limit: int = 50) -> list[dict[str, Any]]:
+    def search(
+        self,
+        query: str,
+        limit: int = 50,
+        *,
+        prefix: bool = False,
+        source: str | None = None,
+        username: str | None = None,
+    ) -> list[dict[str, Any]]:
         # Sanitize query tokens: keep only alphanumeric and basic terms, escape quotes
         tokens = [
             token.replace('"', '""')
@@ -226,21 +239,67 @@ class QueriesMixin:
         ]
         if not tokens:
             return []
-        match = " AND ".join(f'"{token}"' for token in tokens)
+        terms = [f'"{token}"*' if prefix else f'"{token}"' for token in tokens]
+        clauses = ["posts_fts MATCH ?"]
+        params: list[Any] = [" AND ".join(terms)]
+        if source:
+            clauses.append("p.source = ?")
+            params.append(source)
+        if username:
+            clauses.append("p.username = ? COLLATE NOCASE")
+            params.append(username)
+        params.append(limit)
         try:
             rows = self.conn.execute(
-                """SELECT p.*, bm25(posts_fts) AS rank
-                   FROM posts_fts JOIN posts p ON p.id = posts_fts.rowid
-                   WHERE posts_fts MATCH ? ORDER BY rank LIMIT ?""",
-                (match, limit),
+                f"""SELECT p.*, bm25(posts_fts) AS rank,
+                           snippet(posts_fts, 0, '', '', '…', 12) AS snippet
+                    FROM posts_fts JOIN posts p ON p.id = posts_fts.rowid
+                    WHERE {' AND '.join(clauses)} ORDER BY rank LIMIT ?""",
+                params,
             ).fetchall()
         except sqlite3.OperationalError:
             return []
-        out = []
-        for row in rows:
-            item = self._post_row(row)
-            out.append(item)
-        return out
+        return [self._post_row(row) for row in rows]
+
+    def search_profiles(self, query: str, limit: int = 100) -> list[dict[str, Any]]:
+        pattern = _like_pattern(query.strip())
+        rows = self.conn.execute(
+            """SELECT * FROM profiles
+               WHERE username LIKE ? ESCAPE '\\'
+                  OR display_name LIKE ? ESCAPE '\\'
+                  OR bio LIKE ? ESCAPE '\\'
+                  OR website LIKE ? ESCAPE '\\'
+               ORDER BY id DESC LIMIT ?""",
+            (pattern, pattern, pattern, pattern, limit),
+        ).fetchall()
+        return [self._profile_row(row) for row in rows]
+
+    def search_entities(self, query: str, limit: int = 100) -> list[dict[str, Any]]:
+        pattern = _like_pattern(query.strip())
+        rows = self.conn.execute(
+            """SELECT * FROM entities
+               WHERE value LIKE ? ESCAPE '\\' OR context LIKE ? ESCAPE '\\'
+               ORDER BY id DESC LIMIT ?""",
+            (pattern, pattern, limit),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def search_all(
+        self,
+        query: str,
+        limit: int = 50,
+        *,
+        prefix: bool = False,
+        source: str | None = None,
+        username: str | None = None,
+    ) -> dict[str, list[dict[str, Any]]]:
+        return {
+            "posts": self.search(
+                query, limit=limit, prefix=prefix, source=source, username=username
+            ),
+            "profiles": self.search_profiles(query, limit=limit),
+            "entities": self.search_entities(query, limit=limit),
+        }
 
     def timeline(
         self,
