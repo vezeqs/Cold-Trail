@@ -237,12 +237,7 @@ def timeline(
 ) -> None:
     """Cross-source chronological timeline."""
     with Store(_settings(ctx).db_path) as store:
-        rows = store.timeline(run_id=run, limit=None)
-    if since:
-        rows = [row for row in rows if (row["created_at"] or "") >= since]
-    if until:
-        rows = [row for row in rows if (row["created_at"] or "") <= until]
-    rows = rows[:limit]
+        rows = store.timeline(run_id=run, limit=limit, since=since, until=until)
     if json_out:
         _print_json(rows)
         return

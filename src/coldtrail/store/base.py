@@ -7,6 +7,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from ..utils import parse_dt
 from .schema import COLUMNS, FTS, POSTS_AU_TRIGGER, SCHEMA, SCHEMA_VERSION
 
 
@@ -62,6 +63,10 @@ class StoreBase:
         self._rebuild_profiles()
         # Re-run the DDL so indexes attached to rebuilt tables are recreated.
         self.conn.executescript(SCHEMA)
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_posts_created_ts ON posts(created_ts)"
+        )
+        self._backfill_post_timestamps()
         self.conn.executescript(FTS)
         # Keep the update trigger narrow: tombstone/metrics updates must not churn FTS.
         self.conn.execute("DROP TRIGGER IF EXISTS posts_au")
@@ -176,6 +181,23 @@ class StoreBase:
         existing = {row["name"] for row in self.conn.execute(f"PRAGMA table_info({table})")}
         if column not in existing:
             self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+    def _backfill_post_timestamps(self) -> None:
+        """Normalize pre-v6 post timestamps into epoch seconds.
+
+        Timeline ordering used to compare raw source strings, so timestamps with
+        different UTC offsets sorted lexicographically instead of chronologically.
+        """
+        rows = self.conn.execute(
+            "SELECT id, created_at FROM posts WHERE created_ts IS NULL AND created_at IS NOT NULL"
+        ).fetchall()
+        updates = []
+        for row in rows:
+            parsed = parse_dt(row["created_at"])
+            if parsed is not None:
+                updates.append((int(parsed.timestamp()), row["id"]))
+        if updates:
+            self.conn.executemany("UPDATE posts SET created_ts = ? WHERE id = ?", updates)
 
     def close(self) -> None:
         self.conn.close()

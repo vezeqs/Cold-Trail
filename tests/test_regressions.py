@@ -390,3 +390,106 @@ def test_docs_sitemap_lists_main_pages():
     assert listed == expected
     # 404 must stay out of the index
     assert "noindex" in (docs / "404.html").read_text(encoding="utf-8")
+
+
+# -- timeline ordering and schema v6 ----------------------------------------
+
+
+def test_timeline_orders_by_instant_not_string(store):
+    run_id = store.start_run("harvest", "alice")
+    store.save_posts(
+        run_id,
+        [
+            # 10:00+02:00 is 08:00Z, earlier than 09:00Z even though it sorts later as text.
+            Post("github", "alice", "offset", "u1", "2024-01-01T10:00:00+02:00", "a"),
+            Post("github", "alice", "utc", "u2", "2024-01-01T09:00:00+00:00", "b"),
+        ],
+    )
+    assert [row["post_id"] for row in store.timeline(run_id=run_id)] == ["offset", "utc"]
+
+
+def test_timeline_limit_returns_newest_window(store):
+    run_id = store.start_run("harvest", "alice")
+    store.save_posts(
+        run_id,
+        [
+            Post("github", "alice", "p1", "u1", "2024-01-01T00:00:00Z", "one"),
+            Post("github", "alice", "p2", "u2", "2024-01-02T00:00:00Z", "two"),
+            Post("github", "alice", "p3", "u3", "2024-01-03T00:00:00Z", "three"),
+        ],
+    )
+    assert [row["post_id"] for row in store.timeline(limit=2)] == ["p2", "p3"]
+    assert [
+        row["post_id"]
+        for row in store.timeline(
+            since="2024-01-02T00:00:00Z", until="2024-01-02T23:59:59Z"
+        )
+    ] == ["p2"]
+
+
+def test_v5_posts_migrate_to_epoch_timestamps(tmp_path):
+    import sqlite3
+
+    path = tmp_path / "v5.db"
+    conn = sqlite3.connect(path)
+    conn.executescript(
+        """
+        CREATE TABLE runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind TEXT NOT NULL,
+            target TEXT NOT NULL,
+            started_at TEXT NOT NULL,
+            finished_at TEXT,
+            status TEXT NOT NULL DEFAULT 'running'
+        );
+        CREATE TABLE profiles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+            source TEXT NOT NULL,
+            username TEXT NOT NULL COLLATE NOCASE,
+            url TEXT NOT NULL,
+            display_name TEXT,
+            bio TEXT,
+            avatar TEXT,
+            avatar_hash TEXT,
+            website TEXT,
+            created_at TEXT,
+            followers INTEGER,
+            lang TEXT,
+            timezone TEXT,
+            extra_json TEXT NOT NULL DEFAULT '{}',
+            UNIQUE(run_id, source, username)
+        );
+        CREATE TABLE posts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+            source TEXT NOT NULL,
+            username TEXT NOT NULL,
+            post_id TEXT NOT NULL,
+            url TEXT NOT NULL,
+            created_at TEXT,
+            text TEXT,
+            metrics_json TEXT NOT NULL DEFAULT '{}',
+            fetched_at TEXT,
+            deleted_at TEXT,
+            UNIQUE(run_id, source, post_id)
+        );
+        PRAGMA user_version = 5;
+        """
+    )
+    conn.execute(
+        "INSERT INTO runs(kind, target, started_at) "
+        "VALUES ('harvest', 'alice', '2024-01-01T00:00:00Z')"
+    )
+    conn.execute(
+        "INSERT INTO posts(run_id, source, username, post_id, url, created_at) "
+        "VALUES (1, 'github', 'alice', 'p1', 'u', '2024-01-01T10:00:00+02:00')"
+    )
+    conn.commit()
+    conn.close()
+
+    with Store(path) as store:
+        assert store.conn.execute("PRAGMA user_version").fetchone()[0] == 6
+        row = store.conn.execute("SELECT created_ts FROM posts").fetchone()
+        assert row["created_ts"] == 1704096000
+        assert [post["post_id"] for post in store.timeline()] == ["p1"]

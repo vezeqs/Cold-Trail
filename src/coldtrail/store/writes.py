@@ -13,7 +13,7 @@ from ..models import (
     Profile,
     ProfileChange,
 )
-from ..utils import now_iso
+from ..utils import epoch_seconds, now_iso
 
 
 class WritesMixin:
@@ -65,11 +65,12 @@ class WritesMixin:
         with self.conn:
             self.conn.executemany(
                 """INSERT INTO posts
-                   (run_id, source, username, post_id, url, created_at, text, metrics_json,
-                    fetched_at, deleted_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+                   (run_id, source, username, post_id, url, created_at, created_ts, text,
+                    metrics_json, fetched_at, deleted_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
                    ON CONFLICT(run_id, source, post_id) DO UPDATE SET
-                     url=excluded.url, created_at=excluded.created_at, text=excluded.text,
+                     url=excluded.url, created_at=excluded.created_at,
+                     created_ts=excluded.created_ts, text=excluded.text,
                      metrics_json=excluded.metrics_json, fetched_at=excluded.fetched_at,
                      deleted_at=NULL""",
                 [
@@ -80,6 +81,7 @@ class WritesMixin:
                         p.post_id,
                         p.url,
                         p.created_at,
+                        epoch_seconds(p.created_at),
                         p.text,
                         json.dumps(p.metrics, ensure_ascii=False),
                         now_iso(),
@@ -106,8 +108,13 @@ class WritesMixin:
         ]
         params: list[Any] = [source, username, run_id]
         if since:
-            clauses.append("created_at >= ?")
-            params.append(since)
+            since_ts = epoch_seconds(since)
+            if since_ts is not None:
+                clauses.append("created_ts >= ?")
+                params.append(since_ts)
+            else:
+                clauses.append("created_at >= ?")
+                params.append(since)
         where = " AND ".join(clauses)
         rows = self.conn.execute(
             f"SELECT post_id FROM posts WHERE {where}",

@@ -5,6 +5,8 @@ import re
 import sqlite3
 from typing import Any
 
+from ..utils import epoch_seconds
+
 
 class QueriesMixin:
     conn: Any
@@ -57,6 +59,7 @@ class QueriesMixin:
         limit: int | None = 100,
         since: str | None = None,
         include_deleted: bool = True,
+        until: str | None = None,
     ) -> list[dict[str, Any]]:
         clauses: list[str] = []
         params: list[Any] = []
@@ -70,8 +73,21 @@ class QueriesMixin:
             clauses.append("source = ?")
             params.append(source)
         if since:
-            clauses.append("created_at >= ?")
-            params.append(since)
+            since_ts = epoch_seconds(since)
+            if since_ts is not None:
+                clauses.append("created_ts >= ?")
+                params.append(since_ts)
+            else:
+                clauses.append("created_at >= ?")
+                params.append(since)
+        if until:
+            until_ts = epoch_seconds(until)
+            if until_ts is not None:
+                clauses.append("created_ts <= ?")
+                params.append(until_ts)
+            else:
+                clauses.append("created_at <= ?")
+                params.append(until)
         if not include_deleted:
             clauses.append("deleted_at IS NULL")
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
@@ -226,6 +242,36 @@ class QueriesMixin:
             out.append(item)
         return out
 
-    def timeline(self, run_id: int | None = None, limit: int = 500) -> list[dict[str, Any]]:
-        rows = self.posts(run_id=run_id, limit=limit)
-        return sorted(rows, key=lambda row: row["created_at"] or "")
+    def timeline(
+        self,
+        run_id: int | None = None,
+        limit: int | None = 500,
+        since: str | None = None,
+        until: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return posts in chronological order, newest window first in SQL."""
+        clauses: list[str] = []
+        params: list[Any] = []
+        if run_id is not None:
+            clauses.append("run_id = ?")
+            params.append(run_id)
+        for value, operator in ((since, ">="), (until, "<=")):
+            if not value:
+                continue
+            stamp = epoch_seconds(value)
+            if stamp is not None:
+                clauses.append(f"created_ts {operator} ?")
+                params.append(stamp)
+            else:
+                clauses.append(f"created_at {operator} ?")
+                params.append(value)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        sql = (
+            f"SELECT * FROM posts {where} "
+            "ORDER BY created_ts IS NULL, created_ts DESC, id DESC"
+        )
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(limit)
+        rows = self.conn.execute(sql, params).fetchall()
+        return [self._post_row(row) for row in reversed(rows)]
