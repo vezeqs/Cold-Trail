@@ -1,0 +1,24 @@
+{
+  "source": "ens",
+  "target": "vitalik.eth",
+  "observed_status": "found",
+  "profile": {
+    "username": "vitalik.eth",
+    "url": "https://app.ens.domains/vitalik.eth",
+    "display_name": "vitalik.eth",
+    "followers": null,
+    "extra_keys": [
+      "address",
+      "ens_name",
+      "eth_address",
+      "resolver"
+    ]
+  },
+  "exchanges": [
+    {
+      "url": "https://api.ensideas.com/ens/resolve/vitalik.eth",
+      "status": 200,
+      "body_b64": "eyJhZGRyZXNzIjoiMHhkOGRBNkJGMjY5NjRhRjlEN2VFZDllMDNFNTM0MTVEMzdhQTk2MDQ1IiwibmFtZSI6InZpdGFsaWsuZXRoIiwiZGlzcGxheU5hbWUiOiJ2aXRhbGlrLmV0aCIsImF2YXRhciI6Imh0dHBzOi8vbWV0YWRhdGEuZW5zLmRvbWFpbnMvbWFpbm5ldC9hdmF0YXIvdml0YWxpay5ldGgifQ=="
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "source": "codeberg",
+  "target": "forgejo",
+  "observed_status": "found",
+  "profile": {
+    "username": "forgejo",
+    "url": "https://codeberg.org/forgejo",
+    "display_name": "Forgejo",
+    "followers": 636,
+    "extra_keys": [
+      "following",
+      "gpg_keys",
+      "id",
+      "language",
+      "location",
+      "ssh_keys",
+      "starred_repos",
+      "visibility"
+    ]
+  },
+  "exchanges": [
+    {
+      "url": "https://codeberg.org/api/v1/users/forgejo",
+      "status": 200,
+      "body_b64": "eyJpZCI6NzA0MjIsImxvZ2luIjoiZm9yZ2VqbyIsImxvZ2luX25hbWUiOiIiLCJzb3VyY2VfaWQiOjAsImZ1bGxfbmFtZSI6IkZvcmdlam8iLCJlbWFpbCI6ImZvcmdlam9Abm9yZXBseS5jb2RlYmVyZy5vcmciLCJhdmF0YXJfdXJsIjoiaHR0cHM6Ly9jb2RlYmVyZy5vcmcvYXZhdGFycy9kYWU4YWIxMjZhOTZmNmZiZDY5NDJjZjA4YWI5MjM4MiIsImh0bWxfdXJsIjoiaHR0cHM6Ly9jb2RlYmVyZy5vcmcvZm9yZ2VqbyIsImxhbmd1YWdlIjoiIiwiaXNfYWRtaW4iOmZhbHNlLCJsYXN0X2xvZ2luIjoiMDAwMS0wMS0wMVQwMDowMDowMFoiLCJjcmVhdGVkIjoiMjAyMi0xMS0wNlQwNzoxODoxMSswMTowMCIsInJlc3RyaWN0ZWQiOmZhbHNlLCJhY3RpdmUiOmZhbHNlLCJwcm9oaWJpdF9sb2dpbiI6ZmFsc2UsImxvY2F0aW9uIjoiIiwicHJvbm91bnMiOiIiLCJ3ZWJzaXRlIjoiaHR0cHM6Ly9mb3JnZWpvLm9yZyIsImRlc2NyaXB0aW9uIjoiQmV5b25kIGNvZGluZy4gV2UgZm9yZ2UuIiwidmlzaWJpbGl0eSI6InB1YmxpYyIsImZvbGxvd2Vyc19jb3VudCI6NjM2LCJmb2xsb3dpbmdfY291bnQiOjAsInN0YXJyZWRfcmVwb3NfY291bnQiOjAsInVzZXJuYW1lIjoiZm9yZ2VqbyJ9Cg=="
+    },
+    {
+      "url": "https://codeberg.org/api/v1/users/forgejo/keys",
+      "status": 401,
+      "body_b64": "eyJtZXNzYWdlIjoidG9rZW4gaXMgcmVxdWlyZWQiLCJ1cmwiOiJodHRwczovL2NvZGViZXJnLm9yZy9hcGkvc3dhZ2dlciJ9Cg=="
+    },
+    {
+      "url": "https://codeberg.org/api/v1/users/forgejo/gpg_keys",
+      "status": 401,
+      "body_b64": "eyJtZXNzYWdlIjoidG9rZW4gaXMgcmVxdWlyZWQiLCJ1cmwiOiJodHRwczovL2NvZGViZXJnLm9yZy9hcGkvc3dhZ2dlciJ9Cg=="
+    }
+  ]
+}

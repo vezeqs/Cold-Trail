@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 7
 
 POSTS_AU_TRIGGER = """CREATE TRIGGER posts_au AFTER UPDATE OF text, username, source ON posts BEGIN
     INSERT INTO posts_fts(posts_fts, rowid, text, username, source)
@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS posts (
     post_id TEXT NOT NULL,
     url TEXT NOT NULL,
     created_at TEXT,
+    created_ts INTEGER,
     text TEXT,
     metrics_json TEXT NOT NULL DEFAULT '{}',
     fetched_at TEXT,
@@ -164,6 +165,14 @@ CREATE TABLE IF NOT EXISTS probe_cache (
     PRIMARY KEY (source, target)
 );
 
+CREATE TABLE IF NOT EXISTS source_health (
+    source TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    detail TEXT,
+    latency_ms INTEGER,
+    checked_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS audit (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     at TEXT NOT NULL,
@@ -258,6 +267,7 @@ COLUMNS = {
     "posts": {
         "fetched_at": "TEXT",
         "deleted_at": "TEXT",
+        "created_ts": "INTEGER",
     },
     "http_cache": {
         "final_url": "TEXT",

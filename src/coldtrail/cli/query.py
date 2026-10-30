@@ -204,25 +204,79 @@ def search(
     ctx: typer.Context,
     query: Annotated[str, typer.Argument(help="FTS query")],
     limit: Annotated[int, typer.Option("-n", "--limit", min=1)] = 50,
+    scope: Annotated[
+        str, typer.Option("--scope", help="posts, profiles, entities, or all")
+    ] = "posts",
+    prefix: Annotated[bool, typer.Option("--prefix", help="Match token prefixes")] = False,
+    source: Annotated[str | None, typer.Option("--source", help="Filter posts by source")] = None,
+    username: Annotated[
+        str | None, typer.Option("--username", help="Filter posts by username")
+    ] = None,
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    """Full-text search over stored posts."""
+    """Full-text search over stored posts, profiles, and entities."""
+    scope = scope.casefold()
+    if scope not in {"posts", "profiles", "entities", "all"}:
+        raise typer.BadParameter("scope must be posts, profiles, entities, or all")
     with Store(_settings(ctx).db_path) as store:
-        rows = store.search(query, limit=limit)
+        if scope == "profiles":
+            results: object = store.search_profiles(query, limit=limit)
+        elif scope == "entities":
+            results = store.search_entities(query, limit=limit)
+        elif scope == "all":
+            results = store.search_all(
+                query, limit=limit, prefix=prefix, source=source, username=username
+            )
+        else:
+            results = store.search(
+                query, limit=limit, prefix=prefix, source=source, username=username
+            )
     if json_out:
-        _print_json(rows)
+        _print_json(results)
         return
-    table = Table(title=f"Search: {query} ({len(rows)})")
-    for column in ("When", "Source", "Username", "Text", "URL"):
-        table.add_column(column, overflow="fold")
-    for row in rows:
-        table.add_row(
-            (row["created_at"] or "")[:19],
-            row["source"],
-            row["username"],
-            _truncate(row["text"] or "", 100),
-            row["url"],
-        )
+    if scope == "all":
+        for name, rows in results.items():
+            if rows:
+                _render_search_rows(name, rows)
+        return
+    _render_search_rows(scope, results)
+
+
+def _render_search_rows(scope: str, rows: list[dict]) -> None:
+    table = Table(title=f"Search {scope} ({len(rows)})")
+    if scope == "profiles":
+        for column in ("Source", "Username", "Name", "Bio", "URL"):
+            table.add_column(column, overflow="fold")
+        for row in rows:
+            table.add_row(
+                row["source"],
+                row["username"],
+                row["display_name"] or "",
+                _truncate(row["bio"] or "", 100),
+                row["url"],
+            )
+    elif scope == "entities":
+        for column in ("Kind", "Value", "Context", "Source", "Username"):
+            table.add_column(column, overflow="fold")
+        for row in rows:
+            table.add_row(
+                row["kind"],
+                row["value"],
+                _truncate(row["context"] or "", 80),
+                row["source"],
+                row["username"],
+            )
+    else:
+        for column in ("When", "Source", "Username", "Match", "URL"):
+            table.add_column(column, overflow="fold")
+        for row in rows:
+            table.add_row(
+                (row["created_at"] or "")[:19],
+                row["source"],
+                row["username"],
+                _truncate(row.get("snippet") or row["text"] or "", 120),
+                row["url"],
+            )
     console.print(table)
 
 
@@ -237,12 +291,7 @@ def timeline(
 ) -> None:
     """Cross-source chronological timeline."""
     with Store(_settings(ctx).db_path) as store:
-        rows = store.timeline(run_id=run, limit=None)
-    if since:
-        rows = [row for row in rows if (row["created_at"] or "") >= since]
-    if until:
-        rows = [row for row in rows if (row["created_at"] or "") <= until]
-    rows = rows[:limit]
+        rows = store.timeline(run_id=run, limit=limit, since=since, until=until)
     if json_out:
         _print_json(rows)
         return

@@ -134,6 +134,11 @@ def parse_dt(value: object) -> datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
+def epoch_seconds(value: object) -> int | None:
+    parsed = parse_dt(value)
+    return int(parsed.timestamp()) if parsed is not None else None
+
+
 def days_between(left: object, right: object) -> float | None:
     a, b = parse_dt(left), parse_dt(right)
     if a is None or b is None:

@@ -85,6 +85,7 @@ def seeded(settings):
         store.save_clusters(run_id, [Cluster("github:alice", [profile], 0.7, ["same bio"])])
         store.save_entities(run_id, [Entity("github", "alice", "email", "a@example.com")])
         store.save_edges(run_id, [Edge("github", "alice", "bob")])
+        store.record_source_health("github", "found", None, 42)
         store.record_profile_history(run_id, [profile])
         store.add_tag("profile", "github:alice", "suspect")
         store.add_note("profile", "github:alice", "check the avatar")
@@ -259,11 +260,33 @@ def test_api_search(client, seeded):
     assert client.get("/api/search").status_code == 422
 
 
+def test_api_search_scopes(client, seeded):
+    profiles = client.get("/api/search?q=alice&scope=profiles").json()
+    assert profiles["scope"] == "profiles"
+    assert profiles["results"][0]["username"] == "alice"
+    entities = client.get("/api/search?q=a%40example.com&scope=entities").json()
+    assert entities["results"][0]["value"] == "a@example.com"
+    combined = client.get("/api/search?q=alice&scope=all").json()
+    assert set(combined["results"]) == {"posts", "profiles", "entities"}
+
+
+def test_search_page_scopes(client, seeded):
+    assert "Profiles" in client.get("/search?q=alice&scope=all").text
+    assert client.get("/search?q=crypto&prefix=true&source=github").status_code == 200
+
+
 def test_api_sources(client):
     payload = client.get("/api/sources?group=social").json()
     assert payload
     assert {row["group"] for row in payload} == {"social"}
     assert client.get("/api/sources").json()
+
+
+def test_source_health_surfaces(client, seeded):
+    payload = client.get("/api/sources?group=dev").json()
+    github = next(row for row in payload if row["name"] == "github")
+    assert github["health"]["status"] == "found"
+    assert "found" in client.get("/sources?group=dev").text
 
 
 # -- pivot jobs -------------------------------------------------------------

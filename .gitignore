@@ -14,5 +14,8 @@ exports/
 # tooling
 .pytest_cache/
 .ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
 .env
 tests/fixtures/contracts/_record.db*

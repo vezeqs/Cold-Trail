@@ -26,10 +26,10 @@ classifiers = [
 ]
 dependencies = [
     "beautifulsoup4>=4.12,<5",
-    "cryptography>=42,<47",
+    "cryptography>=50,<51",
     "defusedxml>=0.7,<1",
     "httpx[socks]>=0.27,<1",
-    "pillow>=10,<13",
+    "pillow>=13,<14",
     "phonenumbers>=8.13,<10",
     "pydantic>=2.7,<3",
     "rich>=13.7,<15",
@@ -52,8 +52,10 @@ Security = "https://github.com/vezeqs/Cold-Trail/blob/master/SECURITY.md"
 
 [dependency-groups]
 dev = [
-    "pytest>=8,<9",
+    "mypy>=2.4.1",
+    "pytest>=9,<10",
     "pytest-asyncio>=0.23,<2",
+    "pytest-cov>=7.1.0",
     "respx>=0.21,<1",
     "ruff>=0.5,<1",
 ]
@@ -67,7 +69,33 @@ packages = ["src/coldtrail"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["coldtrail"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 73
+
+[tool.mypy]
+python_version = "3.11"
+files = [
+    "src/coldtrail/models.py",
+    "src/coldtrail/utils.py",
+    "src/coldtrail/config.py",
+    "src/coldtrail/analysis.py",
+    "src/coldtrail/variants.py",
+    "src/coldtrail/phone.py",
+    "src/coldtrail/security.py",
+    "src/coldtrail/evidence.py",
+    "src/coldtrail/store",
+]
+ignore_missing_imports = true
+follow_imports = "silent"
+check_untyped_defs = false
 
 [tool.ruff]
 line-length = 100

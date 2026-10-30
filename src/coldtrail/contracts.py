@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import base64
 import json
+import time
 import zlib
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -21,9 +22,10 @@ import httpx
 import respx
 
 from .config import Settings
-from .http import Fetcher
+from .http import Fetcher, shared_fetcher
 from .sources import SOURCES
 from .store import Store
+from .utils import now_iso
 
 
 @dataclass(slots=True)
@@ -214,6 +216,30 @@ def validate_result(source_name: str, result: Any) -> list[str]:
                 if value in (None, "", []):
                     problems.append(f"{source_name}: required field {field_name!r} is empty")
     return problems
+
+
+async def probe_source_health(
+    source_name: str,
+    settings: Settings,
+    fetcher: Fetcher | None = None,
+) -> dict[str, Any]:
+    """Probe one source and return a health row (status, latency, detail)."""
+    contract = CONTRACTS.get(source_name)
+    target = contract.target if contract else ""
+    started = time.monotonic()
+    try:
+        async with shared_fetcher(settings, fetcher=fetcher) as active:
+            result = await SOURCES[source_name].check(active, target)
+        status, detail = result.status, result.detail
+    except Exception as exc:
+        status, detail = "error", f"{type(exc).__name__}: {exc}"
+    return {
+        "source": source_name,
+        "status": status,
+        "detail": detail,
+        "latency_ms": int((time.monotonic() - started) * 1000),
+        "checked_at": now_iso(),
+    }
 
 
 async def verify_live(source_name: str, settings: Settings, target: str | None = None) -> list[str]:

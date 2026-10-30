@@ -9,7 +9,8 @@ separate decisions. This file is the sequence to follow when you decide to ship.
 uv sync
 uv run ruff check .
 uv run ruff format --check .
-uv run pytest -q
+uv run mypy
+uv run pytest -q --cov=coldtrail
 uv build --wheel
 uv run coldtrail doctor --offline
 ```

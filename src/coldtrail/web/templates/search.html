@@ -2,10 +2,18 @@
 {% block title %}Search · ColdTrail{% endblock %}
 {% block content %}
 <h1>Search</h1>
-<p class="muted">Full-text search over harvested post text (FTS5).</p>
+<p class="muted">Full-text search over harvested posts (FTS5), plus profiles and extracted entities.</p>
 
 <form method="get" action="/search" class="inline-form">
   <input type="text" name="q" value="{{ q }}" placeholder="search terms" autofocus>
+  <select name="scope">
+    {% for option in ["posts", "profiles", "entities", "all"] %}
+    <option value="{{ option }}" {{ 'selected' if scope == option }}>{{ option }}</option>
+    {% endfor %}
+  </select>
+  <input type="text" name="source" value="{{ source }}" placeholder="source filter">
+  <input type="text" name="username" value="{{ username }}" placeholder="username filter">
+  <label><input type="checkbox" name="prefix" value="true" {{ 'checked' if prefix }}> prefix</label>
   <select name="limit">
     {% for option in [50, 100, 250, 500] %}
     <option value="{{ option }}" {{ 'selected' if limit == option }}>{{ option }} results</option>
@@ -18,25 +26,70 @@
 <p class="badge status-error">{{ error }}</p>
 {% endif %}
 
+{% set post_rows = results.posts if scope == 'all' else (results if scope == 'posts' else []) %}
+{% set profile_rows = results.profiles if scope == 'all' else (results if scope == 'profiles' else []) %}
+{% set entity_rows = results.entities if scope == 'all' else (results if scope == 'entities' else []) %}
+{% set total = (post_rows | length) + (profile_rows | length) + (entity_rows | length) %}
+
 {% if q %}
-<h2>{{ rows | length }} result{{ '' if rows | length == 1 else 's' }} for “{{ q }}”</h2>
-{% if rows %}
+<h2>{{ total }} result{{ '' if total == 1 else 's' }} for “{{ q }}”</h2>
+
+{% if post_rows %}
+<h3>Posts</h3>
 <table>
-  <thead><tr><th>When</th><th>Source</th><th>Username</th><th>Text</th><th>URL</th></tr></thead>
+  <thead><tr><th>When</th><th>Source</th><th>Username</th><th>Match</th><th>URL</th></tr></thead>
   <tbody>
-    {% for row in rows %}
+    {% for row in post_rows %}
     <tr>
       <td>{{ row.created_at | ts }}</td>
       <td>{{ row.source }}</td>
       <td class="mono">{{ row.username }}</td>
-      <td>{{ row.text | short(160) }}</td>
+      <td>{{ (row.snippet or row.text) | short(160) }}</td>
       <td class="mono"><a href="{{ row.url | url }}" target="_blank" rel="noopener">link</a></td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
-{% else %}
-<p class="muted">No matches. Search terms are ANDed; try fewer words.</p>
+{% endif %}
+
+{% if profile_rows %}
+<h3>Profiles</h3>
+<table>
+  <thead><tr><th>Source</th><th>Username</th><th>Name</th><th>Bio</th><th>URL</th></tr></thead>
+  <tbody>
+    {% for row in profile_rows %}
+    <tr>
+      <td>{{ row.source }}</td>
+      <td class="mono">{{ row.username }}</td>
+      <td>{{ row.display_name or '' }}</td>
+      <td>{{ row.bio | short(160) }}</td>
+      <td class="mono"><a href="{{ row.url | url }}" target="_blank" rel="noopener">link</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if entity_rows %}
+<h3>Entities</h3>
+<table>
+  <thead><tr><th>Kind</th><th>Value</th><th>Context</th><th>Source</th><th>Username</th></tr></thead>
+  <tbody>
+    {% for row in entity_rows %}
+    <tr>
+      <td>{{ row.kind }}</td>
+      <td class="mono">{{ row.value }}</td>
+      <td>{{ row.context | short(120) }}</td>
+      <td>{{ row.source }}</td>
+      <td class="mono">{{ row.username }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if total == 0 %}
+<p class="muted">No matches. Search terms are ANDed; try fewer words or enable prefix matching.</p>
 {% endif %}
 {% endif %}
 {% endblock %}

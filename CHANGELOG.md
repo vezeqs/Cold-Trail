@@ -4,6 +4,43 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Source health.** `coldtrail source health [--live]` records per-source
+  status, detail, and latency in a new `source_health` table (schema v7).
+  `/sources` and `/api/sources` surface the recorded health.
+- **Search scopes and snippets.** `coldtrail search --scope
+  posts|profiles|entities|all`, `--prefix`, `--source`, and `--username`.
+  Post results include an FTS5 snippet; the web search page and `/api/search`
+  accept the same parameters.
+- **Batch concurrency.** `coldtrail batch -j/--jobs N` pivots targets
+  concurrently with one shared `Fetcher`, so pacing, budget, and circuit state
+  span the whole batch.
+- **CI gates.** Coverage floor (73%), mypy over core/store, Python 3.14 in the
+  matrix, wheel install smoke test, Bandit, pip-audit, CodeQL, and Dependabot.
+- **More contract fixtures.** 19 additional curated sources now have recorded
+  fixtures (30 total), and a test replays every committed fixture offline.
+
+### Changed
+
+- Split the web app factory into `web/helpers.py`, `web/api_routes.py`, and
+  `web/case_routes.py`; `create_app()` remains the public composition root.
+- Timeline queries now order and paginate in SQL using a normalized
+  `posts.created_ts` epoch column (schema v6). `--limit` returns the newest
+  window in chronological order; `--since/--until` no longer load every post.
+- Container base images are pinned by digest.
+- Raised Pillow to 13.x, cryptography to 50.x, certifi, and pytest 9.x to clear
+  known CVEs.
+
+### Fixed
+
+- Timelines no longer sort ISO timestamps with different UTC offsets
+  lexicographically.
+- Search filters (`source:`, `username:`) and prefix matching now work, and
+  profile/entity scopes are searchable.
+
 ## [0.9.0] - 2026-10-27
 
 ### Privacy

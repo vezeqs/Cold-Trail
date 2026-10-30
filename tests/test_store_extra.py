@@ -38,6 +38,37 @@ def test_fts_search(store):
     assert store.search("omega") == []
 
 
+def test_search_snippets_filters_and_prefix(store):
+    run_id = store.start_run("harvest", "github:alice")
+    store.save_posts(
+        run_id,
+        [
+            Post(source="github", username="alice", post_id="1", url="u1", text="alpha beta"),
+            Post(source="gitlab", username="alice", post_id="2", url="u2", text="alphabet soup"),
+        ],
+    )
+    rows = store.search("alpha")
+    assert rows[0]["snippet"]
+    assert {row["post_id"] for row in store.search("alph", prefix=True)} == {"1", "2"}
+    assert [row["post_id"] for row in store.search("alpha", source="github")] == ["1"]
+    assert store.search("alpha", source="reddit") == []
+    assert [row["post_id"] for row in store.search("alpha", username="ALICE")] == ["1"]
+
+
+def test_search_profiles_entities_and_all(store):
+    run_id = store.start_run("pivot", "alice")
+    store.save_profiles(run_id, [profile(bio="alpha researcher")])
+    store.save_entities(
+        run_id, [Entity("github", "alice", "email", "alpha@example.com", "profile bio")]
+    )
+    assert [row["username"] for row in store.search_profiles("alpha")] == ["alice"]
+    assert [row["value"] for row in store.search_entities("alpha@example.com")] == [
+        "alpha@example.com"
+    ]
+    combined = store.search_all("alpha")
+    assert combined["profiles"] and combined["entities"]
+
+
 def test_profile_history(store):
     first = store.start_run("pivot", "alice")
     store.save_profiles(first, [profile(bio="first bio")])
@@ -156,3 +187,15 @@ def test_check_stats(store):
     stats = {(row["source"], row["status"]): row["count"] for row in store.check_stats()}
     assert stats[("github", "found")] == 1
     assert stats[("reddit", "blocked")] == 1
+
+
+def test_source_health_roundtrip(store):
+    store.record_source_health("github", "found", None, 120)
+    row = store.source_health_map()["github"]
+    assert row["status"] == "found"
+    assert row["latency_ms"] == 120
+    store.record_source_health("github", "blocked", "bot wall", 80)
+    row = store.source_health_map()["github"]
+    assert row["status"] == "blocked"
+    assert row["detail"] == "bot wall"
+    assert [item["source"] for item in store.source_health()] == ["github"]

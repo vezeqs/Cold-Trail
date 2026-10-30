@@ -7,7 +7,7 @@ Operating guide for contributors and coding agents working on ColdTrail.
 ColdTrail is a production OSINT CLI with three interfaces over one
 SQLite store:
 
-- **CLI** (Typer + Rich) — `coldtrail <command>` (42 commands)
+- **CLI** (Typer + Rich) — `coldtrail <command>` (46 top-level commands, 58 leaf commands)
 - **TUI** (Textual) — `coldtrail tui` (Dashboard / Pivot / Browse / Search / Tools / Cases;
   `p` pivots the focused row, `h` harvests it, `d` diffs the two latest runs)
 - **Local web UI + JSON API** (FastAPI/uvicorn) — `coldtrail serve` (pages, JSON API,
@@ -22,14 +22,17 @@ SQLite with FTS5.
 ```bash
 uv sync                        # install deps into .venv
 uv run pytest                  # full suite (no network; respx + TestClient + Textual pilot)
+uv run pytest --cov=coldtrail --cov-report=term-missing   # coverage (73% floor)
 uv run pytest tests/test_web.py -q
 uv run pytest tests/test_tui.py -q
 uv run ruff check .            # lint
 uv run ruff format --check .   # formatting
+uv run mypy                    # typed core + store gate
 uv run coldtrail --help
 uv run coldtrail tui                          # interactive terminal UI
 uv run coldtrail serve --port 8765 --open     # local web UI
-uv run coldtrail batch -f targets.txt          # multi-target pivots
+uv run coldtrail batch -f targets.txt -j 4     # multi-target pivots (concurrent)
+uv run coldtrail source health --live         # probe and record source status/latency
 uv run coldtrail recluster --run 3             # re-correlate stored profiles (persists)
 uv run coldtrail diff 3 4                      # compare two runs
 uv run coldtrail source verify -s github       # replay contract fixtures offline
@@ -58,11 +61,14 @@ src/coldtrail/
 │   └── interfaces.py tui, serve
 ├── tui/app.py      Textual app: Dashboard / Pivot / Browse / Search / Tools / Cases / Help
 ├── web/
-│   ├── app.py        create_app(settings) -> FastAPI (pages, JSON API, jobs, SSE, graph, tools, evidence)
+│   ├── app.py        create_app(settings) -> FastAPI (pages, jobs, SSE, tools, evidence)
+│   ├── helpers.py    constants, template filters, Job/PivotRequest, graph payload
+│   ├── api_routes.py JSON API registration (runs, graph, search, sources, health)
+│   ├── case_routes.py cases, tags, and notes registration
 │   ├── templates/    Jinja2 templates (autoescape on; help.html, run.html evidence)
 │   └── static/       style.css, app.js (scope toggle, SSE stream, canvas graph, source filter)
 ├── store/          Store composed from mixins (public API: from coldtrail.store import Store)
-│   ├── schema.py     DDL, FTS definitions, column migrations, SCHEMA_VERSION (5)
+│   ├── schema.py     DDL, FTS definitions, column migrations, SCHEMA_VERSION (7)
 │   ├── base.py       connection, PRAGMA setup, user_version gate, row helpers
 │   ├── runs.py       runs, count_runs
 │   ├── writes.py     checks/profiles/posts/links/clusters/entities/edges/history writes
@@ -86,7 +92,8 @@ src/coldtrail/
 ├── integrations.py external tool registry/runners/parsers + Maltego/SpiderFoot/theHarvester importers
 ├── evidence.py     content-addressed evidence store (SHA-256, dedupe, verify)
 ├── casework.py     merge_case_payload() shared by CLI and web case dossiers
-├── domain.py, phone.py, wayback.py, dorks.py, alerts.py, avatars.py, variants.py, sites.py
+├── domain.py, phone.py, wayback.py, dorks.py, alerts.py, avatars.py, variants.py,
+│                   sites.py, websearch.py, company.py, security.py
 ├── config.py       Settings (TOML + env)
 └── models.py       dataclasses
 
@@ -120,6 +127,9 @@ tests/fixtures/contracts/ (recorded source fixtures)
   Re-record with `coldtrail source verify --record -s <source>` and commit the JSON.
   Fixtures embed decompressed bodies; raw rows in SQLite are zlib-compressed, so always
   decompress when writing a recorder (see `contracts.record_contract`).
+  `tests/test_contracts.py::test_committed_fixtures_verify` replays every committed
+  fixture offline; sources that need API keys or block non-browser clients still lack
+  fixtures.
 
 ## Architecture rules
 
@@ -167,10 +177,26 @@ tests/fixtures/contracts/ (recorded source fixtures)
   Do not add a global `Accept: application/json`; GitHub returns a 410
   API-retirement page for HTML requests with it.
 - **Schema changes** must keep the `PRAGMA user_version` migration path working
-  (current version: 5). Add columns via `store/schema.py::COLUMNS`.
+  (current version: 7). Add columns via `store/schema.py::COLUMNS`.
   Schema v5 made `profiles.username` `COLLATE NOCASE`; `_rebuild_profiles()` dedupes
   and rebuilds old tables, and `_unique_indexes()` introspects `PRAGMA index_xinfo`
-  instead of matching formatted SQL.
+  instead of matching formatted SQL. Schema v6 added `posts.created_ts` (epoch
+  seconds, backfilled) so timeline ordering and `--since/--until` run in SQL.
+  Schema v7 added `source_health`.
+- **Timeline ordering uses `created_ts`, not the display string.** Never sort
+  `created_at` values lexicographically: ISO timestamps with different offsets
+  do not sort chronologically. `Store.timeline()` returns the newest window in
+  ascending order.
+- **Source health is recorded, not inferred:** `source health --live` probes
+  contract targets, upserts `source_health` (status, detail, latency), and the
+  web `/sources` + `/api/sources` surfaces read that table.
+- **Search scopes:** `Store.search()` (FTS5, snippet + prefix + source/username
+  filters), `search_profiles()`, `search_entities()`, and `search_all()` back the
+  CLI `--scope` flag and the web `scope` parameter. The default API response
+  stays a list for backward compatibility.
+- **Batch shares one `Fetcher`:** `coldtrail batch -j N` reuses a single fetcher
+  so pacing, budget, and circuit state span the whole batch; persistence is
+  serialized through one Store connection.
 - **Evidence is content-addressed:** `evidence.add_evidence()` hashes bytes,
   writes `<db dir>/evidence/<sha[:2]>/<sha>` atomically, and inserts an
   `attachments` row. Never store evidence only in the DB; `evidence verify`
@@ -212,13 +238,17 @@ tests/fixtures/contracts/ (recorded source fixtures)
 
 ## Web API surface
 
-Pages: `/`, `/runs`, `/runs/{id}`, `/runs/{id}/export?format=…`, `/search`,
-`/sources`, `/cases` (CRUD), `/tools` (workbench), `/pivot`, `/jobs/{id}`,
-`/healthz`, `/api/docs`.
+Pages: `/`, `/runs`, `/runs/{id}`, `/runs/{id}/export?format=…`, `/search`
+(`scope=posts|profiles|entities|all`, `prefix`, `source`, `username`),
+`/sources` (with recorded health), `/cases` (CRUD), `/tools` (workbench),
+`/pivot`, `/jobs/{id}`, `/help`, `/login`, `/logout`, `/evidence/{id}`,
+`/healthz`, `/api/docs`, `/api/openapi.json`.
 
 JSON: `/api/health`, `/api/stats`, `/api/runs`, `/api/runs/{id}`,
-`/api/runs/{id}/graph`, `/api/diff?a=&b=`, `/api/search?q=`, `/api/sources`,
-`/api/jobs/{id}`, `/api/jobs/{id}/stream` (SSE), `POST /api/pivot`.
+`/api/runs/{id}/graph`, `/api/diff?a=&b=`,
+`/api/search?q=&scope=&prefix=&source=&username=`, `/api/sources` (includes
+`health`), `/api/jobs/{id}`, `/api/jobs/{id}/stream` (SSE), `POST /api/pivot`,
+`/api/evidence/{id}`.
 
 Auth (when `web_token` is set): bearer/`X-API-Key`/cookie; `/login` page sets the cookie.
 

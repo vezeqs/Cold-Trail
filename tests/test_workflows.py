@@ -10,7 +10,7 @@ from typer.testing import CliRunner
 
 from coldtrail.cli import app
 from coldtrail.config import Settings
-from coldtrail.models import Profile
+from coldtrail.models import PivotReport, Profile
 from coldtrail.pivot import pivot
 from coldtrail.sources.base import Source
 
@@ -157,6 +157,50 @@ def test_cli_batch_from_file(tmp_path, monkeypatch):
 def test_cli_batch_requires_targets(tmp_path):
     result = runner.invoke(app, ["--db", str(tmp_path / "t.db"), "batch"])
     assert result.exit_code != 0
+
+
+def test_cli_batch_jobs_preserves_input_order(tmp_path, monkeypatch):
+    user, email = UserSource(), EmailSource()
+    monkeypatch.setattr("coldtrail.pivot.SOURCES", {user.name: user, email.name: email})
+    result = runner.invoke(
+        app,
+        ["--db", str(tmp_path / "t.db"), "batch", "alice", "bob", "--json", "-j", "2"],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert [report["target"] for report in payload] == ["alice", "bob"]
+
+
+def test_cli_batch_shares_one_fetcher(tmp_path, monkeypatch):
+    import coldtrail.cli.collect as collect
+
+    created = []
+    seen = []
+
+    class FakeFetcher:
+        def __init__(self, settings):
+            created.append(self)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc_info):
+            return None
+
+    async def fake_pivot(target, **kwargs):
+        seen.append(kwargs.get("fetcher"))
+        return PivotReport(target=target, kind="username", results=[], links=[])
+
+    monkeypatch.setattr(collect, "Fetcher", FakeFetcher)
+    monkeypatch.setattr(collect, "run_pivot", fake_pivot)
+    result = runner.invoke(
+        app,
+        ["--db", str(tmp_path / "t.db"), "batch", "alice", "bob", "--json", "-j", "2"],
+    )
+    assert result.exit_code == 0, result.output
+    assert len(created) == 1
+    assert len(seen) == 2
+    assert {id(fetcher) for fetcher in seen} == {id(created[0])}
 
 
 def test_cli_recluster(tmp_path):

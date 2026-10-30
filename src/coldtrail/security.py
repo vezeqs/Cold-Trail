@@ -12,7 +12,7 @@ import socket
 from urllib.parse import urlsplit
 
 
-def _public_ip(value: str) -> bool:
+def _public_ip(value: str | int) -> bool:
     try:
         ip = ipaddress.ip_address(value)
     except ValueError:

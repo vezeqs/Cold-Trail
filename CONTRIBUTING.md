@@ -21,7 +21,8 @@ Run these before opening a pull request:
 ```bash
 uv run ruff check .
 uv run ruff format --check .
-uv run pytest -q
+uv run mypy
+uv run pytest -q --cov=coldtrail
 uv build --wheel
 ```
 

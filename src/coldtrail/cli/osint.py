@@ -196,6 +196,73 @@ def source_verify(
         raise typer.Exit(code=1)
 
 
+@source_app.command("health", rich_help_panel="Intel")
+def source_health(
+    ctx: typer.Context,
+    live: Annotated[
+        bool, typer.Option("--live", help="Probe sources live and record the result")
+    ] = False,
+    group: Annotated[str | None, typer.Option("-g", "--group", help="Filter by group")] = None,
+    limit: Annotated[int, typer.Option("-n", "--limit", min=0, help="Max sources (0 = all)")] = 0,
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Show recorded source health, or probe live with --live."""
+    from ..contracts import CONTRACTS, probe_source_health
+
+    settings = _settings(ctx)
+    names = sorted(CONTRACTS)
+    if group:
+        names = [item for item in names if SOURCES[item].group == group]
+    if limit:
+        names = names[:limit]
+    if not names:
+        typer.echo("no sources match", err=True)
+        raise typer.Exit(code=2)
+
+    if live:
+
+        async def run() -> list[dict]:
+            semaphore = asyncio.Semaphore(max(1, settings.concurrency))
+            async with Fetcher(settings) as fetcher:
+
+                async def one(item: str) -> dict:
+                    async with semaphore:
+                        return await probe_source_health(item, settings, fetcher)
+
+                return await asyncio.gather(*(one(item) for item in names))
+
+        rows = asyncio.run(run())
+        with Store(settings.db_path) as store:
+            for row in rows:
+                store.record_source_health(
+                    row["source"], row["status"], row["detail"], row["latency_ms"]
+                )
+    else:
+        with Store(settings.db_path) as store:
+            known = set(names)
+            rows = [row for row in store.source_health() if row["source"] in known]
+
+    if json_out:
+        _print_json(rows)
+        return
+    if not rows:
+        console.print("no health data yet; run [bold]coldtrail source health --live[/bold]")
+        return
+    table = Table(title=f"Source health ({len(rows)})")
+    for column in ("Source", "Status", "Latency", "Checked", "Detail"):
+        table.add_column(column, overflow="fold")
+    for row in rows:
+        style = STATUS_STYLE.get(row["status"], "white")
+        table.add_row(
+            row["source"],
+            f"[{style}]{row['status']}[/]",
+            f"{row['latency_ms'] or 0} ms",
+            (row["checked_at"] or "")[:19],
+            _truncate(row["detail"] or "", 80),
+        )
+    console.print(table)
+
+
 # -- dorks ------------------------------------------------------------------
 
 

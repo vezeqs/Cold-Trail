@@ -186,4 +186,4 @@ def test_v4_profiles_migrate_to_case_insensitive_identity(tmp_path):
         rows = store.profiles(run_id=1)
         assert len(rows) == 1
         assert rows[0]["bio"] == "latest"
-        assert store.conn.execute("PRAGMA user_version").fetchone()[0] == 5
+        assert store.conn.execute("PRAGMA user_version").fetchone()[0] == 7
