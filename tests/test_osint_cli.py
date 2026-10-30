@@ -110,3 +110,25 @@ def test_ip_cli(tmp_path):
     payload = json.loads(result.output)
     assert payload["ptr"] == ["dns.google."]
     assert payload["hostnames"] == ["a.example.com"]
+
+
+def test_source_health_live_records_rows(tmp_path, monkeypatch):
+    async def fake_probe(name, settings, fetcher=None):
+        return {
+            "source": name,
+            "status": "found",
+            "detail": None,
+            "latency_ms": 5,
+            "checked_at": "2024-01-01T00:00:00Z",
+        }
+
+    monkeypatch.setattr("coldtrail.contracts.probe_source_health", fake_probe)
+    db = tmp_path / "health.db"
+    result = invoke(
+        ["--db", str(db), "source", "health", "--live", "--group", "dev", "-n", "2", "--json"]
+    )
+    assert len(json.loads(result.output)) == 2
+    with Store(db) as store:
+        assert len(store.source_health()) == 2
+    stored = invoke(["--db", str(db), "source", "health", "--group", "dev", "--json"])
+    assert len(json.loads(stored.output)) == 2

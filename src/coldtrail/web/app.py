@@ -801,10 +801,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         items = sorted(SOURCES.values(), key=lambda source: source.name)
         if group:
             items = [source for source in items if source.group == group]
+        with _open() as store:
+            health = store.source_health_map()
         return _render(
             request,
             "sources.html",
-            {"items": items, "group": group, "active": "sources"},
+            {
+                "items": items,
+                "group": group,
+                "health": health,
+                "active": "sources",
+            },
         )
 
     # -- cases, tags, notes CRUD --------------------------------------------
@@ -1508,6 +1515,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         items = sorted(SOURCES.values(), key=lambda source: source.name)
         if group:
             items = [source for source in items if source.group == group]
+        with _open() as store:
+            health = store.source_health_map()
         return [
             {
                 "name": source.name,
@@ -1517,6 +1526,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "posts": source.supports_posts,
                 "auth": source.requires_auth,
                 "homepage": source.homepage,
+                "health": health.get(source.name),
             }
             for source in items
         ]

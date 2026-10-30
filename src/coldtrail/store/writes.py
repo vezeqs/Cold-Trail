@@ -90,6 +90,23 @@ class WritesMixin:
                 ],
             )
 
+    def record_source_health(
+        self,
+        source: str,
+        status: str,
+        detail: str | None = None,
+        latency_ms: int | None = None,
+    ) -> None:
+        with self.conn:
+            self.conn.execute(
+                """INSERT INTO source_health (source, status, detail, latency_ms, checked_at)
+                   VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT(source) DO UPDATE SET
+                     status=excluded.status, detail=excluded.detail,
+                     latency_ms=excluded.latency_ms, checked_at=excluded.checked_at""",
+                (source, status, detail, latency_ms, now_iso()),
+            )
+
     def mark_missing_posts(
         self,
         source: str,

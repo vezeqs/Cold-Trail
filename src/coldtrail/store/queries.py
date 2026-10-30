@@ -301,6 +301,13 @@ class QueriesMixin:
             "entities": self.search_entities(query, limit=limit),
         }
 
+    def source_health(self) -> list[dict[str, Any]]:
+        rows = self.conn.execute("SELECT * FROM source_health ORDER BY source").fetchall()
+        return [dict(row) for row in rows]
+
+    def source_health_map(self) -> dict[str, dict[str, Any]]:
+        return {row["source"]: row for row in self.source_health()}
+
     def timeline(
         self,
         run_id: int | None = None,

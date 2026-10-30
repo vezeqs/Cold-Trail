@@ -85,6 +85,7 @@ def seeded(settings):
         store.save_clusters(run_id, [Cluster("github:alice", [profile], 0.7, ["same bio"])])
         store.save_entities(run_id, [Entity("github", "alice", "email", "a@example.com")])
         store.save_edges(run_id, [Edge("github", "alice", "bob")])
+        store.record_source_health("github", "found", None, 42)
         store.record_profile_history(run_id, [profile])
         store.add_tag("profile", "github:alice", "suspect")
         store.add_note("profile", "github:alice", "check the avatar")
@@ -279,6 +280,13 @@ def test_api_sources(client):
     assert payload
     assert {row["group"] for row in payload} == {"social"}
     assert client.get("/api/sources").json()
+
+
+def test_source_health_surfaces(client, seeded):
+    payload = client.get("/api/sources?group=dev").json()
+    github = next(row for row in payload if row["name"] == "github")
+    assert github["health"]["status"] == "found"
+    assert "found" in client.get("/sources?group=dev").text
 
 
 # -- pivot jobs -------------------------------------------------------------

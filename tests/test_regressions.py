@@ -489,7 +489,7 @@ def test_v5_posts_migrate_to_epoch_timestamps(tmp_path):
     conn.close()
 
     with Store(path) as store:
-        assert store.conn.execute("PRAGMA user_version").fetchone()[0] == 6
+        assert store.conn.execute("PRAGMA user_version").fetchone()[0] == 7
         row = store.conn.execute("SELECT created_ts FROM posts").fetchone()
         assert row["created_ts"] == 1704096000
         assert [post["post_id"] for post in store.timeline()] == ["p1"]

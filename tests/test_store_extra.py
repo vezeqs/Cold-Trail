@@ -187,3 +187,15 @@ def test_check_stats(store):
     stats = {(row["source"], row["status"]): row["count"] for row in store.check_stats()}
     assert stats[("github", "found")] == 1
     assert stats[("reddit", "blocked")] == 1
+
+
+def test_source_health_roundtrip(store):
+    store.record_source_health("github", "found", None, 120)
+    row = store.source_health_map()["github"]
+    assert row["status"] == "found"
+    assert row["latency_ms"] == 120
+    store.record_source_health("github", "blocked", "bot wall", 80)
+    row = store.source_health_map()["github"]
+    assert row["status"] == "blocked"
+    assert row["detail"] == "bot wall"
+    assert [item["source"] for item in store.source_health()] == ["github"]
