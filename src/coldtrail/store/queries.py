@@ -254,7 +254,7 @@ class QueriesMixin:
                 f"""SELECT p.*, bm25(posts_fts) AS rank,
                            snippet(posts_fts, 0, '', '', '…', 12) AS snippet
                     FROM posts_fts JOIN posts p ON p.id = posts_fts.rowid
-                    WHERE {' AND '.join(clauses)} ORDER BY rank LIMIT ?""",
+                    WHERE {" AND ".join(clauses)} ORDER BY rank LIMIT ?""",
                 params,
             ).fetchall()
         except sqlite3.OperationalError:
@@ -332,10 +332,7 @@ class QueriesMixin:
                 clauses.append(f"created_at {operator} ?")
                 params.append(value)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-        sql = (
-            f"SELECT * FROM posts {where} "
-            "ORDER BY created_ts IS NULL, created_ts DESC, id DESC"
-        )
+        sql = f"SELECT * FROM posts {where} ORDER BY created_ts IS NULL, created_ts DESC, id DESC"
         if limit is not None:
             sql += " LIMIT ?"
             params.append(limit)

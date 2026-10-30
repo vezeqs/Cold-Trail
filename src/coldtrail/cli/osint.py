@@ -203,9 +203,7 @@ def source_health(
         bool, typer.Option("--live", help="Probe sources live and record the result")
     ] = False,
     group: Annotated[str | None, typer.Option("-g", "--group", help="Filter by group")] = None,
-    limit: Annotated[
-        int, typer.Option("-n", "--limit", min=0, help="Max sources (0 = all)")
-    ] = 0,
+    limit: Annotated[int, typer.Option("-n", "--limit", min=0, help="Max sources (0 = all)")] = 0,
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Show recorded source health, or probe live with --live."""

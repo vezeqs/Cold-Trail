@@ -169,7 +169,7 @@ def detect_lang(text: str | None) -> str | None:
     counts = {
         lang: sum(1 for token in tokens if token in words) for lang, words in LANG_STOPWORDS.items()
     }
-    best = max(counts, key=counts.get)
+    best = max(counts, key=lambda lang: counts[lang])
     return best if counts[best] >= 2 else None
 
 

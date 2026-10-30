@@ -5,7 +5,7 @@ import json
 import os
 import sqlite3
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 from ..utils import parse_dt
 from .schema import COLUMNS, FTS, POSTS_AU_TRIGGER, SCHEMA, SCHEMA_VERSION
@@ -63,9 +63,7 @@ class StoreBase:
         self._rebuild_profiles()
         # Re-run the DDL so indexes attached to rebuilt tables are recreated.
         self.conn.executescript(SCHEMA)
-        self.conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_posts_created_ts ON posts(created_ts)"
-        )
+        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_posts_created_ts ON posts(created_ts)")
         self._backfill_post_timestamps()
         self.conn.executescript(FTS)
         # Keep the update trigger narrow: tombstone/metrics updates must not churn FTS.
@@ -202,7 +200,7 @@ class StoreBase:
     def close(self) -> None:
         self.conn.close()
 
-    def __enter__(self) -> StoreBase:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *exc_info: object) -> None:

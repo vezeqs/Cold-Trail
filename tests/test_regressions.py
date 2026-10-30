@@ -421,9 +421,7 @@ def test_timeline_limit_returns_newest_window(store):
     assert [row["post_id"] for row in store.timeline(limit=2)] == ["p2", "p3"]
     assert [
         row["post_id"]
-        for row in store.timeline(
-            since="2024-01-02T00:00:00Z", until="2024-01-02T23:59:59Z"
-        )
+        for row in store.timeline(since="2024-01-02T00:00:00Z", until="2024-01-02T23:59:59Z")
     ] == ["p2"]
 
 

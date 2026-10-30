@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -31,7 +31,38 @@ jobs:
         run: uv run ruff check .
       - name: Format
         run: uv run ruff format --check .
+      - name: Type check
+        run: uv run mypy
       - name: Test
-        run: uv run pytest -q
+        run: uv run pytest -q --cov=coldtrail --cov-report=term-missing
+      - name: Security scan
+        # B608 is skipped because every dynamic SQL fragment is built from fixed
+        # clauses with bound parameters; all sites were triaged manually.
+        run: uvx bandit -q -r src/coldtrail -ll --skip B608
+      - name: Dependency audit
+        run: uv run --with pip-audit pip-audit
+
+  wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+          enable-cache: true
       - name: Build wheel
         run: uv build --wheel
+      - name: Install wheel in a clean venv
+        run: |
+          uv venv /tmp/wheel-venv
+          uv pip install --python /tmp/wheel-venv/bin/python dist/*.whl
+      - name: Smoke test installed wheel
+        run: |
+          /tmp/wheel-venv/bin/coldtrail --version
+          /tmp/wheel-venv/bin/coldtrail sources --all --json > /tmp/sources.json
+          python - <<'PY'
+          import json
+          sources = json.load(open("/tmp/sources.json"))
+          assert len(sources) == 482, len(sources)
+          print(f"wheel contains {len(sources)} sources")
+          PY
