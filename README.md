@@ -61,7 +61,8 @@ Use it only for authorized research, public data, and lawful scope.
 | **Investigate** | Domain/IP/phone, RDAP, DNS, crt.sh, TLS, BGP/ASN, Wayback, dorks, breach metadata |
 | **Collect evidence** | Content-addressed SHA-256 blobs, case dossiers, tags, notes, audit log |
 | **Export** | JSON, JSONL, CSV, GraphML, GEXF, DOT, HTML, Markdown, STIX 2.1, Maltego |
-| **Automate** | `batch`, `watch`, `recluster`, `diff`, JSON output everywhere |
+| **Automate** | `batch` (with `--jobs`), `watch`, `recluster`, `diff`, JSON output everywhere |
+| **Health** | `source health --live` records per-source status and latency; shown in the web UI |
 
 ### Three interfaces, one database
 
@@ -99,8 +100,8 @@ from the 0.5.2 release notes on a laptop:
 
 | Scenario | Cold | Warm cache |
 | --- | --- | --- |
-| Curated pivot (≈42 checks) | ~4s | ~2s |
-| Web corpus (≈471 checks) | ~22s | ~15s |
+| Curated pivot (≈50 checks) | ~4s | ~2s |
+| Web corpus (≈432 checks) | ~22s | ~15s |
 
 Reproduce locally:
 
@@ -195,9 +196,11 @@ applicable law, platform terms, and scope authorization.
 ## Verification
 
 ```bash
-uv run pytest                  # 479 tests, no network (respx/TestClient/Textual pilot)
+uv run pytest                  # 521 tests, no network (respx/TestClient/Textual pilot)
+uv run pytest --cov=coldtrail  # coverage (73% floor)
 uv run ruff check .
 uv run ruff format --check .
+uv run mypy                    # typed core + store gate
 uv run coldtrail doctor --offline
 ```
 
