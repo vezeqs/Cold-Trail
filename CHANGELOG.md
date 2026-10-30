@@ -25,6 +25,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Split the web app factory into `web/helpers.py`, `web/api_routes.py`, and
+  `web/case_routes.py`; `create_app()` remains the public composition root.
 - Timeline queries now order and paginate in SQL using a normalized
   `posts.created_ts` epoch column (schema v6). `--limit` returns the newest
   window in chronological order; `--since/--until` no longer load every post.

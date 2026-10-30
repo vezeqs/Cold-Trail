@@ -13,16 +13,14 @@ Design notes:
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import hmac
 import html
 import json
 import logging
-import re
 import tempfile
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -37,12 +35,10 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field
 
 from .. import __version__
 from ..analysis import entities_from_posts
 from ..breach import full_breach_audit, pwned_password
-from ..casework import merge_case_payload
 from ..config import Settings
 from ..correlate import diff_runs, recluster_rows
 from ..domain import asn_lookup, lookup_domain, ptr, rdap_ip, reverse_ip, shodan_host
@@ -69,263 +65,45 @@ from ..report import (
     iter_csv,
     iter_jsonl,
     redact_payload,
-    to_dot,
-    to_gexf,
-    to_graphml,
     to_html,
-    to_json,
-    to_jsonl,
-    to_maltego_csv,
     to_markdown,
-    to_stix,
 )
 from ..security import ensure_public_target
 from ..sources import GROUPS, SOURCES
 from ..store import Store
 from ..wayback import cdx
+from .api_routes import register_api
+from .case_routes import register_cases
+from .helpers import (
+    COOKIE_NAME,
+    EXPORTERS,
+    JOB_RETENTION,
+    LOGIN_RATE_LIMIT,
+    LOGIN_RATE_WINDOW,
+    MAX_JOB_EVENTS,
+    MAX_JOBS,
+    MAX_UPLOAD,
+    PUBLIC_PATHS,
+    RATE_CLIENTS,
+    RATE_LIMIT,
+    RATE_WINDOW,
+    SSE_HEARTBEAT,
+    SSE_MAX_SECONDS,
+    STATIC_DIR,
+    TEMPLATES_DIR,
+    UPLOAD_CHUNK,
+    Job,
+    PivotRequest,
+    _cookie_value,
+    _filesize,
+    _safe_filename,
+    _safe_url,
+    _short,
+    _split_names,
+    _ts,
+)
 
 log = logging.getLogger("coldtrail.web")
-
-WEB_DIR = Path(__file__).resolve().parent
-TEMPLATES_DIR = WEB_DIR / "templates"
-STATIC_DIR = WEB_DIR / "static"
-
-EXPORTERS = {
-    "json": ("application/json", to_json),
-    "jsonl": ("application/x-ndjson", to_jsonl),
-    "csv": ("text/csv", None),
-    "graphml": ("application/graphml+xml", to_graphml),
-    "gexf": ("application/gexf+xml", to_gexf),
-    "dot": ("text/vnd.graphviz", to_dot),
-    "html": ("text/html", None),
-    "md": ("text/markdown", None),
-    "stix": ("application/stix+json", to_stix),
-    "maltego": ("text/csv", to_maltego_csv),
-}
-
-MAX_JOBS = 200
-MAX_JOB_EVENTS = 10_000
-JOB_RETENTION = 3600.0
-RATE_LIMIT = 20
-RATE_WINDOW = 60.0
-LOGIN_RATE_LIMIT = 10
-LOGIN_RATE_WINDOW = 300.0
-RATE_CLIENTS = 2048
-MAX_UPLOAD = 50 * 1024 * 1024
-UPLOAD_CHUNK = 1024 * 1024
-SSE_HEARTBEAT = 15.0
-SSE_MAX_SECONDS = 3600.0
-PUBLIC_PATHS = {"/healthz", "/api/health", "/login", "/logout"}
-COOKIE_NAME = "coldtrail_token"
-
-
-def _cookie_value(token: str) -> str:
-    """Derive the browser cookie from the shared token.
-
-    The cookie is an HMAC, never the bearer secret itself, so a cookie leak or
-    browser sync does not expose the API token.
-    """
-    return hmac.new(token.encode("utf-8"), b"coldtrail-cookie-v1", hashlib.sha256).hexdigest()
-
-
-@dataclass
-class Job:
-    id: str
-    target: str
-    status: str = "queued"  # queued | running | done | error
-    created_at: float = field(default_factory=time.time)
-    started_at: float | None = None
-    finished_at: float | None = None
-    run_id: int | None = None
-    result_count: int = 0
-    found_count: int = 0
-    error: str | None = None
-    params: dict[str, Any] = field(default_factory=dict)
-    events: list[dict[str, Any]] = field(default_factory=list)
-
-    def as_dict(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "target": self.target,
-            "status": self.status,
-            "created_at": self.created_at,
-            "started_at": self.started_at,
-            "finished_at": self.finished_at,
-            "run_id": self.run_id,
-            "result_count": self.result_count,
-            "found_count": self.found_count,
-            "error": self.error,
-            "events": self.events[-100:],
-        }
-
-
-class PivotRequest(BaseModel):
-    target: str = Field(min_length=1, max_length=320)
-    sources: list[str] | None = None
-    include_web: bool = False
-    expand: bool = False
-    depth: int = Field(default=1, ge=1, le=5)
-    variants: bool = False
-    avatar_hash: bool | None = None
-
-
-def _short(value: Any, width: int = 90) -> str:
-    text = " ".join(str(value or "").split())
-    return text if len(text) <= width else text[: width - 1] + "…"
-
-
-def _ts(value: Any) -> str:
-    text = str(value or "")
-    return text.replace("T", " ")[:19]
-
-
-def _safe_filename(value: str, fallback: str) -> str:
-    """Keep user-controlled names out of Content-Disposition headers."""
-    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", value).strip("-")
-    return (cleaned or fallback)[:80]
-
-
-def _safe_url(value: Any) -> str:
-    """Only http(s) URLs may become links; harvested data is untrusted."""
-    text = str(value or "").strip()
-    return text if text.startswith(("http://", "https://")) else "#"
-
-
-def _filesize(value: Any) -> str:
-    size = float(value or 0)
-    for unit in ("B", "KB", "MB", "GB"):
-        if size < 1024 or unit == "GB":
-            return f"{size:.1f} {unit}"
-        size /= 1024
-    return f"{int(value or 0)} B"
-
-
-CSV_TABLES = {
-    "run",
-    "checks",
-    "profiles",
-    "posts",
-    "links",
-    "clusters",
-    "entities",
-    "edges",
-    "history",
-    "attachments",
-}
-
-
-def _split_names(raw: str) -> list[str]:
-    return [part for part in re.split(r"[,\s]+", raw.strip()) if part]
-
-
-def _build_graph_payload(
-    profiles: list[dict[str, Any]],
-    links: list[dict[str, Any]],
-    clusters: list[dict[str, Any]],
-    entities: list[dict[str, Any]],
-    edges: list[dict[str, Any]],
-) -> dict[str, Any]:
-    """Build a JSON graph structure (nodes + edges) for the interactive canvas."""
-    cluster_of: dict[str, str] = {}
-    for cluster in clusters:
-        ckey = str(cluster.get("cluster_key") or "")
-        for member in cluster.get("members") or []:
-            cluster_of[f"{member['source']}:{member['username']}"] = ckey
-
-    nodes: list[dict[str, Any]] = []
-    seen_nodes: set[str] = set()
-    for p in profiles:
-        nid = f"{p['source']}:{p['username']}"
-        if nid in seen_nodes:
-            continue
-        seen_nodes.add(nid)
-        nodes.append(
-            {
-                "id": nid,
-                "label": p.get("display_name") or p["username"],
-                "username": p["username"],
-                "source": p["source"],
-                "kind": "profile",
-                "cluster": cluster_of.get(nid, ""),
-                "url": _safe_url(p.get("url")),
-                "bio": (p.get("bio") or "")[:160],
-                "followers": p.get("followers"),
-            }
-        )
-
-    graph_edges: list[dict[str, Any]] = []
-    for link in links:
-        sa = f"{link['source_a']}:{link['username_a']}"
-        sb = f"{link['source_b']}:{link['username_b']}"
-        graph_edges.append(
-            {
-                "source": sa,
-                "target": sb,
-                "kind": "correlation",
-                "score": float(link.get("score") or 0.5),
-                "label": ", ".join(link.get("reasons") or []),
-            }
-        )
-
-    for ent in entities[:80]:
-        eid = f"entity:{ent['kind']}:{ent['value']}"
-        owner = f"{ent['source']}:{ent['username']}"
-        if eid not in seen_nodes:
-            seen_nodes.add(eid)
-            nodes.append(
-                {
-                    "id": eid,
-                    "label": f"{ent['kind']}: {ent['value']}",
-                    "username": ent["value"],
-                    "source": ent["kind"],
-                    "kind": "entity",
-                    "cluster": "",
-                    "url": "#",
-                    "bio": ent.get("context") or "",
-                    "followers": None,
-                }
-            )
-        if owner in seen_nodes:
-            graph_edges.append(
-                {
-                    "source": owner,
-                    "target": eid,
-                    "kind": "entity",
-                    "score": 0.8,
-                    "label": ent["kind"],
-                }
-            )
-
-    for edge in edges[:120]:
-        actor_id = f"{edge['platform']}:{edge['actor']}"
-        target_id = f"{edge['platform']}:{edge['target']}"
-        for nid, uname in ((actor_id, edge["actor"]), (target_id, edge["target"])):
-            if nid not in seen_nodes:
-                seen_nodes.add(nid)
-                nodes.append(
-                    {
-                        "id": nid,
-                        "label": uname,
-                        "username": uname,
-                        "source": edge["platform"],
-                        "kind": "follow",
-                        "cluster": "",
-                        "url": "#",
-                        "bio": "",
-                        "followers": None,
-                    }
-                )
-        graph_edges.append(
-            {
-                "source": actor_id,
-                "target": target_id,
-                "kind": "follow",
-                "score": 0.4,
-                "label": edge.get("direction", "follows"),
-            }
-        )
-
-    return {"nodes": nodes, "edges": graph_edges}
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -655,20 +433,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         context.update({"coverage": coverage, "active": "runs", "formats": sorted(EXPORTERS)})
         return _render(request, "run.html", context)
 
-    @app.get("/api/runs/{run_id}/graph")
-    def api_run_graph(run_id: int):
-        with _open() as store:
-            run = store.run(run_id)
-            if run is None:
-                raise HTTPException(status_code=404, detail=f"run {run_id} not found")
-            return _build_graph_payload(
-                store.profiles(run_id, limit=None),
-                store.links(run_id, limit=10_000),
-                store.clusters(run_id, limit=10_000),
-                store.entities(run_id, limit=10_000),
-                store.edges(run_id, limit=10_000),
-            )
-
     @app.get("/runs/{run_id}/export")
     def run_export(
         run_id: int,
@@ -705,14 +469,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             filename=_safe_filename(row["filename"], "evidence.bin"),
         )
 
-    @app.get("/api/evidence/{attachment_id}")
-    def api_evidence(attachment_id: int):
-        with _open() as store:
-            row = store.attachment(attachment_id)
-        if row is None:
-            raise HTTPException(status_code=404, detail="attachment not found")
-        return row
-
     @app.get("/diff", response_class=HTMLResponse)
     def diff_page(
         request: Request,
@@ -731,16 +487,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "diff.html",
             {"runs": runs, "payload": payload, "a": a, "b": b, "active": "diff"},
         )
-
-    @app.get("/api/diff")
-    def api_diff(
-        a: Annotated[int, Query(ge=1)],
-        b: Annotated[int, Query(ge=1)],
-    ):
-        with _open() as store:
-            if store.run(a) is None or store.run(b) is None:
-                raise HTTPException(status_code=404, detail="run not found")
-            return diff_runs(store, a, b)
 
     @app.get("/search", response_class=HTMLResponse)
     def search_page(
@@ -812,133 +558,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "health": health,
                 "active": "sources",
             },
-        )
-
-    # -- cases, tags, notes CRUD --------------------------------------------
-
-    @app.get("/cases", response_class=HTMLResponse)
-    def cases_page(request: Request):
-        with _open() as store:
-            cases = store.cases()
-            tags = store.tags()
-            notes = store.notes()
-            runs = store.runs(limit=100)
-        return _render(
-            request,
-            "cases.html",
-            {"cases": cases, "tags": tags, "notes": notes, "runs": runs, "active": "cases"},
-        )
-
-    @app.post("/cases/new")
-    async def cases_new(
-        name: Annotated[str, Form(min_length=1, max_length=120)],
-        notes: Annotated[str, Form()] = "",
-    ):
-        with _open() as store:
-            try:
-                store.create_case(name.strip(), notes.strip() or None)
-            except Exception as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return RedirectResponse("/cases", status_code=303)
-
-    @app.post("/cases/add-run")
-    async def cases_add_run(
-        case_name: Annotated[str, Form(min_length=1)],
-        run_id: Annotated[int, Form(ge=1)],
-    ):
-        with _open() as store:
-            case = store.case(case_name.strip())
-            if case is None:
-                raise HTTPException(status_code=404, detail=f"no such case: {case_name}")
-            store.add_to_case(case["id"], run_id)
-        return RedirectResponse("/cases", status_code=303)
-
-    @app.post("/tags/new")
-    async def tags_new(
-        target_type: Annotated[str, Form(pattern="^(profile|post|run|entity|case)$")],
-        target: Annotated[str, Form(min_length=1, max_length=200)],
-        tag: Annotated[str, Form(min_length=1, max_length=80)],
-    ):
-        with _open() as store:
-            store.add_tag(target_type, target.strip(), tag.strip())
-        return RedirectResponse("/cases", status_code=303)
-
-    @app.post("/notes/new")
-    async def notes_new(
-        target_type: Annotated[str, Form(pattern="^(profile|post|run|entity|case)$")],
-        target: Annotated[str, Form(min_length=1, max_length=200)],
-        note: Annotated[str, Form(min_length=1, max_length=2000)],
-    ):
-        with _open() as store:
-            store.add_note(target_type, target.strip(), note.strip())
-        return RedirectResponse("/cases", status_code=303)
-
-    @app.get("/cases/{name}", response_class=HTMLResponse)
-    def case_detail(request: Request, name: str):
-        with _open() as store:
-            case = store.case(name)
-            if case is None:
-                raise HTTPException(status_code=404, detail=f"no such case: {name}")
-            run_ids = [run["id"] for run in case["runs"]]
-            profiles: dict[tuple[str, str], dict[str, Any]] = {}
-            clusters: list[dict[str, Any]] = []
-            entities: list[dict[str, Any]] = []
-            for run_id in run_ids:
-                for profile in store.profiles(run_id=run_id, limit=None):
-                    profiles.setdefault((profile["source"], profile["username"]), profile)
-                clusters.extend(store.clusters(run_id=run_id, limit=10_000))
-                entities.extend(store.entities(run_id=run_id, limit=10_000))
-            targets = {name} | {f"{s}:{u}" for s, u in profiles}
-            tags = [tag for tag in store.tags() if tag["target"] in targets]
-            notes = [note for note in store.notes() if note["target"] in targets]
-            attachments: list[dict[str, Any]] = []
-            seen_attachments: set[str] = set()
-            for run_id in run_ids:
-                for attachment in store.attachments(run_id=run_id, limit=10_000):
-                    if attachment["sha256"] not in seen_attachments:
-                        seen_attachments.add(attachment["sha256"])
-                        attachments.append(attachment)
-        return _render(
-            request,
-            "case_detail.html",
-            {
-                "case": case,
-                "profiles": list(profiles.values()),
-                "clusters": clusters,
-                "entities": entities[:500],
-                "tags": tags,
-                "notes": notes,
-                "attachments": attachments,
-                "formats": sorted(EXPORTERS),
-                "active": "cases",
-            },
-        )
-
-    @app.get("/cases/{name}/export")
-    def case_export(
-        name: str,
-        format: Annotated[
-            str, Query(pattern="^(json|jsonl|csv|graphml|gexf|dot|html|md|stix|maltego)$")
-        ] = "json",
-        table: Annotated[
-            str,
-            Query(
-                pattern="^(run|checks|profiles|posts|links|clusters|entities|edges|history|attachments)$"
-            ),
-        ] = "profiles",
-        redact: bool = False,
-    ):
-        with _open() as store:
-            case = store.case(name)
-            if case is None:
-                raise HTTPException(status_code=404, detail=f"no such case: {name}")
-            payload = merge_case_payload(store, case)
-        return _export_response(
-            payload,
-            format,
-            table,
-            redact,
-            f"coldtrail-case-{_safe_filename(name, 'case')}.{format}",
         )
 
     # -- OSINT tools workbench ----------------------------------------------
@@ -1431,104 +1050,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             f"<tbody>{''.join(rows)}</tbody></table></body></html>"
         )
 
-    @app.get("/healthz")
-    @app.get("/api/health")
-    def api_health():
-        healthy = True
-        detail = "ok"
-        try:
-            with _open() as store:
-                store.conn.execute("SELECT 1").fetchone()
-        except Exception as exc:
-            healthy = False
-            detail = f"{type(exc).__name__}: {exc}"
-        payload = {
-            "status": "ok" if healthy else "error",
-            "detail": detail,
-            "version": __version__,
-        }
-        if not healthy:
-            return JSONResponse(payload, status_code=503)
-        return payload
-
-    @app.get("/api/stats")
-    def api_stats():
-        with _open() as store:
-            return {
-                "stats": store.stats(),
-                "db": store.db_info(),
-                "health": store.check_stats(),
-                "version": __version__,
-            }
-
-    @app.get("/api/runs")
-    def api_runs(
-        limit: Annotated[int, Query(ge=1, le=500)] = 25,
-        offset: Annotated[int, Query(ge=0)] = 0,
-    ):
-        with _open() as store:
-            return {"runs": store.runs(limit=limit, offset=offset), "total": store.count_runs()}
-
-    @app.get("/api/runs/{run_id}")
-    def api_run(run_id: int):
-        with _open() as store:
-            try:
-                return store.export_run(run_id)
-            except KeyError as exc:
-                raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    @app.get("/api/search")
-    def api_search(
-        q: Annotated[str, Query(min_length=1)],
-        limit: Annotated[int, Query(ge=1, le=500)] = 100,
-        scope: str = "posts",
-        prefix: bool = False,
-        source: str = "",
-        username: str = "",
-    ):
-        scope = scope if scope in {"posts", "profiles", "entities", "all"} else "posts"
-        with _open() as store:
-            if scope == "profiles":
-                results: Any = store.search_profiles(q, limit=limit)
-            elif scope == "entities":
-                results = store.search_entities(q, limit=limit)
-            elif scope == "all":
-                results = store.search_all(
-                    q,
-                    limit=limit,
-                    prefix=prefix,
-                    source=source or None,
-                    username=username or None,
-                )
-            else:
-                results = store.search(
-                    q,
-                    limit=limit,
-                    prefix=prefix,
-                    source=source or None,
-                    username=username or None,
-                )
-        return {"query": q, "scope": scope, "results": results}
-
-    @app.get("/api/sources")
-    def api_sources(group: str = ""):
-        items = sorted(SOURCES.values(), key=lambda source: source.name)
-        if group:
-            items = [source for source in items if source.group == group]
-        with _open() as store:
-            health = store.source_health_map()
-        return [
-            {
-                "name": source.name,
-                "label": source.label,
-                "kind": source.kind,
-                "group": source.group,
-                "posts": source.supports_posts,
-                "auth": source.requires_auth,
-                "homepage": source.homepage,
-                "health": health.get(source.name),
-            }
-            for source in items
-        ]
-
+    register_cases(app, settings, _render, _export_response)
+    register_api(app, settings)
     return app

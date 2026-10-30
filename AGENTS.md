@@ -61,7 +61,10 @@ src/coldtrail/
 │   └── interfaces.py tui, serve
 ├── tui/app.py      Textual app: Dashboard / Pivot / Browse / Search / Tools / Cases / Help
 ├── web/
-│   ├── app.py        create_app(settings) -> FastAPI (pages, JSON API, jobs, SSE, graph, tools, evidence)
+│   ├── app.py        create_app(settings) -> FastAPI (pages, jobs, SSE, tools, evidence)
+│   ├── helpers.py    constants, template filters, Job/PivotRequest, graph payload
+│   ├── api_routes.py JSON API registration (runs, graph, search, sources, health)
+│   ├── case_routes.py cases, tags, and notes registration
 │   ├── templates/    Jinja2 templates (autoescape on; help.html, run.html evidence)
 │   └── static/       style.css, app.js (scope toggle, SSE stream, canvas graph, source filter)
 ├── store/          Store composed from mixins (public API: from coldtrail.store import Store)
