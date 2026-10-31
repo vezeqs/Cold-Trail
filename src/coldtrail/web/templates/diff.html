@@ -26,6 +26,7 @@
 <section class="panel">
   <h2>Summary</h2>
   <p>
+    <a class="chip" href="/diff?a={{ a }}&b={{ b }}&format=html">download HTML</a>
     <span class="badge status-found">profiles +{{ payload.profiles.added | length }} / -{{ payload.profiles.removed | length }} / ~{{ payload.profiles.changed | length }}</span>
     <span class="badge">entities +{{ payload.entities.added | length }} / -{{ payload.entities.removed | length }}</span>
     <span class="badge">links +{{ payload.links.added | length }} / -{{ payload.links.removed | length }}</span>

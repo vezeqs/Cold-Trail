@@ -40,7 +40,7 @@
     "applicationCategory": "SecurityApplication",
     "applicationSubCategory": "Open Source Intelligence",
     "operatingSystem": "Linux, macOS, Windows",
-    "softwareVersion": "0.9.0",
+    "softwareVersion": "0.10.0",
     "license": "https://opensource.org/licenses/MIT",
     "codeRepository": "https://github.com/vezeqs/Cold-Trail",
     "url": "https://vezeqs.github.io/Cold-Trail/",
@@ -140,8 +140,13 @@ uv run coldtrail serve --open</code></pre>
         </article>
         <article class="card">
           <span class="tag">Output</span>
-          <h3>Ten export formats</h3>
-          <p>JSON, JSONL, CSV, GraphML, GEXF, DOT, HTML, Markdown, STIX 2.1, and Maltego CSV — with optional redaction and encryption.</p>
+          <h3>Eleven export formats</h3>
+          <p>JSON, JSONL, CSV, GraphML, GEXF, DOT, HTML, Markdown, STIX 2.1, SARIF 2.1.0, and Maltego CSV — with optional redaction and encryption.</p>
+        </article>
+        <article class="card">
+          <span class="tag">Operations</span>
+          <h3>Inspectable configuration</h3>
+          <p><code>coldtrail config</code> shows every effective setting and its source, with secrets redacted. <code>coldtrail schema</code> publishes JSON Schema contracts for the <code>--json</code> payloads.</p>
         </article>
       </div>
     </section>

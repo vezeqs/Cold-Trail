@@ -4,14 +4,16 @@ import base64
 import contextlib
 import hashlib
 import html
+import json
 import os
 import re
 from datetime import UTC, datetime
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
+_SHA256_RE = re.compile(r"[0-9a-f]{64}")
 
 
 def ssh_fingerprint(key_line: str | None) -> str | None:
@@ -164,6 +166,34 @@ def hamming_hex(left: str, right: str) -> int:
 
 def short_key(text: str, length: int = 12) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:length]
+
+
+def is_sha256(value: object) -> bool:
+    """True for a lowercase 64-character hex digest (evidence blob names)."""
+    return isinstance(value, str) and _SHA256_RE.fullmatch(value) is not None
+
+
+def json_loads(value: object, default: object) -> object:
+    """Parse stored JSON without letting one corrupt row crash a query."""
+    try:
+        return json.loads(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+
+
+def redact_url_credentials(value: str | None) -> str | None:
+    """Strip ``user:password@`` from a URL before it reaches output or logs."""
+    if not value:
+        return value
+    parts = urlsplit(value)
+    if not parts.username and not parts.password:
+        return value
+    host = parts.hostname or ""
+    if ":" in host:
+        host = f"[{host}]"
+    port = f":{parts.port}" if parts.port else ""
+    netloc = f"[redacted]@{host}{port}"
+    return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
 
 
 def dedupe(values: list[str]) -> list[str]:

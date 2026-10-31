@@ -6,8 +6,56 @@ from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
+from .utils import redact_url_credentials
+
 DEFAULT_INSTANCES = ("mastodon.social", "fosstodon.org", "infosec.exchange")
-DEFAULT_UA = "coldtrail/0.9 (OSINT research; public data only)"
+DEFAULT_UA = "coldtrail/0.10 (OSINT research; public data only)"
+
+ENV_VARS = {
+    "db_path": "COLDTRAIL_DB",
+    "timeout": "COLDTRAIL_TIMEOUT",
+    "concurrency": "COLDTRAIL_CONCURRENCY",
+    "requests_per_second": "COLDTRAIL_RPS",
+    "user_agent": "COLDTRAIL_USER_AGENT",
+    "mastodon_instances": "COLDTRAIL_MASTODON_INSTANCES",
+    "proxy": "COLDTRAIL_PROXY",
+    "max_requests": "COLDTRAIL_MAX_REQUESTS",
+    "cache_ttl": "COLDTRAIL_CACHE_TTL",
+    "retention_days": "COLDTRAIL_RETENTION_DAYS",
+    "tor": "COLDTRAIL_TOR",
+    "keep_raw": "COLDTRAIL_KEEP_RAW",
+    "avatar_hash": "COLDTRAIL_AVATAR_HASH",
+    "web_token": "COLDTRAIL_WEB_TOKEN",
+    "trust_proxy": "COLDTRAIL_TRUST_PROXY",
+    "allow_private_targets": "COLDTRAIL_ALLOW_PRIVATE_TARGETS",
+    "github_token": "GITHUB_TOKEN",
+    "hibp_api_key": "HIBP_API_KEY",
+    "emailrep_api_key": "EMAILREP_API_KEY",
+    "shodan_api_key": "SHODAN_API_KEY",
+    "hunter_api_key": "HUNTER_API_KEY",
+    "x_bearer_token": "X_BEARER_TOKEN",
+    "serper_api_key": "SERPER_API_KEY",
+    "brave_api_key": "BRAVE_API_KEY",
+    "searxng_url": "SEARXNG_URL",
+    "opencorporates_api_key": "OPENCORPORATES_API_KEY",
+    "companies_house_api_key": "COMPANIES_HOUSE_API_KEY",
+    "opensanctions_api_key": "OPENSANCTIONS_API_KEY",
+}
+
+SECRET_FIELDS = {
+    "github_token",
+    "hibp_api_key",
+    "emailrep_api_key",
+    "shodan_api_key",
+    "hunter_api_key",
+    "x_bearer_token",
+    "serper_api_key",
+    "brave_api_key",
+    "opencorporates_api_key",
+    "companies_house_api_key",
+    "opensanctions_api_key",
+    "web_token",
+}
 
 
 def _default_db() -> Path:
@@ -31,6 +79,18 @@ def _instances(value: str | tuple[str, ...] | list[str] | None) -> tuple[str, ..
         for part in parts
         if part and part.strip()
     )
+
+
+def _display_value(name: str, value: Any) -> Any:
+    if name in SECRET_FIELDS:
+        return "set" if value else "unset"
+    if name in {"proxy", "searxng_url"}:
+        return redact_url_credentials(value if isinstance(value, str) else None)
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, tuple):
+        return list(value)
+    return value
 
 
 @dataclass(slots=True)
@@ -141,3 +201,34 @@ class Settings:
             env.get("COMPANIES_HOUSE_API_KEY") or self.companies_house_api_key
         )
         self.opensanctions_api_key = env.get("OPENSANCTIONS_API_KEY") or self.opensanctions_api_key
+
+    def describe(self, overrides: dict[str, str] | None = None) -> list[dict[str, Any]]:
+        """Effective values with provenance (default/config/env/flag), secrets redacted."""
+        overrides = overrides or {}
+        config_keys: set[str] = set()
+        if self.config_path and self.config_path.is_file():
+            with self.config_path.open("rb") as handle:
+                config_keys = set(tomllib.load(handle))
+        rows: list[dict[str, Any]] = []
+        for item in fields(self):
+            name = item.name
+            if name == "config_path":
+                continue
+            value = getattr(self, name)
+            source = "default"
+            if name in config_keys:
+                source = "config"
+            env_name = ENV_VARS.get(name)
+            if env_name and os.environ.get(env_name):
+                source = "env"
+            if name in overrides:
+                source = overrides[name]
+            rows.append(
+                {
+                    "key": name,
+                    "value": _display_value(name, value),
+                    "source": source,
+                    "secret": name in SECRET_FIELDS,
+                }
+            )
+        return rows

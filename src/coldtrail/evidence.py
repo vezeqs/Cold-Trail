@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from .store import Store
+from .utils import is_sha256
 
 
 def evidence_root(db_path: Path) -> Path:
@@ -35,6 +36,8 @@ def _sha256_bytes(data: bytes) -> str:
 
 
 def _store_blob(root: Path, digest: str, data: bytes) -> Path:
+    if not is_sha256(digest):
+        raise ValueError(f"invalid evidence digest: {digest!r}")
     directory = root / digest[:2]
     directory.mkdir(parents=True, exist_ok=True)
     for folder in (root, directory):
@@ -77,9 +80,7 @@ def add_evidence(
         source_path = Path(source_path)
         data = source_path.read_bytes()
         filename = filename or source_path.name
-        digest = _sha256_file(source_path) if source_path.is_file() else _sha256_bytes(data)
-    else:
-        digest = _sha256_bytes(data)
+    digest = _sha256_bytes(data)
     filename = filename or "evidence.bin"
     media_type = media_type or mimetypes.guess_type(filename)[0] or "application/octet-stream"
     root = evidence_root(store.path)
@@ -109,6 +110,8 @@ def add_evidence(
 
 
 def evidence_path(store: Store, sha256: str) -> Path:
+    if not is_sha256(sha256):
+        raise ValueError(f"invalid evidence digest: {sha256!r}")
     return evidence_root(store.path) / sha256[:2] / sha256
 
 
@@ -116,6 +119,9 @@ def verify_evidence(store: Store) -> list[dict[str, Any]]:
     """Return problems for attachments whose blob is missing or corrupted."""
     problems: list[dict[str, Any]] = []
     for row in store.attachments(limit=10_000_000):
+        if not is_sha256(row["sha256"]):
+            problems.append({"id": row["id"], "sha256": row["sha256"], "problem": "invalid digest"})
+            continue
         path = evidence_path(store, row["sha256"])
         if not path.is_file():
             problems.append({"id": row["id"], "sha256": row["sha256"], "problem": "missing file"})

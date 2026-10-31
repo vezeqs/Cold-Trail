@@ -11,7 +11,7 @@ real defects, then prove the fixed state.
 ## 0. Freeze and scope
 
 - `git status --short`, `git branch --show-current`, `git log --oneline -5`, `git remote -v`.
-- Read `AGENTS.md`, `CONTRIBUTING.md`, `SECURITY.md`, and `LAUNCH.md`.
+- Read `AGENTS.md`, `CONTRIBUTING.md`, `SECURITY.md`, and `AUDIT.md`.
 - Confirm what is being shipped and whether push/tag/release/publish was explicitly approved.
 - Do not ship with a dirty tree, unresolved conflicts, or uncommitted generated artifacts.
 
@@ -25,7 +25,9 @@ uv run pytest -q
 uv build --wheel
 ```
 
-- Confirm the wheel contains `coldtrail/data/sites.toml`, `web/templates/`, and `web/static/`.
+- Confirm the wheel contains `coldtrail/data/sites.toml`, `web/templates/`, `web/static/`,
+  and `schemas.py`. Build to a fresh directory (`--out-dir /tmp/wheel-check`) so a stale
+  `dist/` wheel cannot mask a missing module.
 - Run `uvx bandit -r src/coldtrail` and triage every Medium/High finding.
 - Run `uvx pip-audit` and investigate known CVEs.
 - Secret scan: `gho_`, `ghp_`, `sk-`, `AKIA`, private-key headers, `.env`, DBs, exports.
@@ -35,15 +37,20 @@ uv build --wheel
 ## 2. Functional smoke tests
 
 - `uv run coldtrail --version` and `--help`.
-- `uv run coldtrail doctor --offline --json`; check DB mode, raw/avatar defaults, retention.
+- `uv run coldtrail doctor --offline --json`; check DB mode, raw/avatar defaults, retention,
+  and that proxy credentials are redacted.
+- `uv run coldtrail config --json`; check provenance values and that every secret is
+  `set`/`unset`, never the value.
+- `uv run coldtrail schema --list`; validate one real payload against its schema.
 - Offline contract replay for available fixtures: `uv run coldtrail source verify -s <source>`.
+  A bare `source verify` fails for sources that intentionally have no fixture.
 - Live pivot on a known handle with `--no-save --json` (curated only). Confirm statuses are
   plausible and failures are isolated.
 - Exercise the web app with `TestClient` or a local server: `/`, `/runs/{id}`, `/pivot`,
   `/tools`, `/cases`, `/search`, `/api/health`, `/api/runs`, `/api/diff`, SSE job stream.
 - TUI: run the Textual pilot tests, not just the CLI.
-- Export every format once (json, jsonl, csv, graphml, gexf, dot, html, md, stix, maltego);
-  verify `--redact`, `--encrypt`, `decrypt`, and case dossiers.
+- Export every format once (json, jsonl, csv, graphml, gexf, dot, html, md, stix, sarif,
+  maltego); verify `--redact`, `--encrypt`, `decrypt`, `diff --format html`, and case dossiers.
 - Evidence: add, list, export, verify; corrupt a blob and confirm detection.
 - Retention: create an old run/evidence/audit row, run `prune`, confirm rows and blobs vanish.
 
@@ -64,8 +71,11 @@ uv build --wheel
 ## 4. Privacy audit
 
 - `keep_raw=False` and `avatar_hash=False` by default; config/env override works.
-- DB/WAL/SHM, evidence, and CLI exports are `0600`; evidence dirs `0700`.
+- DB/WAL/SHM, evidence, and CLI exports are `0600`; evidence dirs `0700`; the DB is created
+  under `umask(0o077)` (owner-only from creation).
 - Tor uses `socks5h`; no local DNS resolution.
+- Redirects cannot reach loopback/link-local unless private targets are explicitly allowed.
+- `/healthz` returns a fixed detail, not exception text.
 - Email targets hashed in cache/raw keys; `final_url` does not leak them.
 - API keys absent from cache/raw keys; headers used where supported.
 - No telemetry or hidden network calls; `doctor --offline` makes none.
@@ -80,9 +90,10 @@ uv build --wheel
 - Privacy claims match code; limits are stated honestly.
 - `docs/` links, sitemap, robots, JSON-LD, nav, and screenshots resolve.
 - Version matches in `pyproject.toml`, `__init__.py`, `CITATION.cff`, docs, and lockfile.
-- `CHANGELOG.md` has the release entry; `LAUNCH.md` steps are current.
+- `CHANGELOG.md` has the release entry; the release sequence in `CONTRIBUTING.md` is current.
 - Badges are not dead; CI/Pages URLs will work after publishing.
 - No broken image paths; social preview/OG image exists.
+- `tests/test_media_manifest.py` passes (assets and UI code fingerprint are current).
 
 ## 6. Fix loop
 

@@ -34,6 +34,8 @@ async def harvest(
 ) -> tuple[CheckResult, list[Post]]:
     source: Source = SOURCES[source_name]
     username = username.strip().lstrip("@")
+    if not username:
+        raise ValueError("username must be non-empty")
     async with shared_fetcher(settings, store, fetcher, run_id=run_id) as active_fetcher:
         result = await _check(source, active_fetcher, username)
         posts: list[Post] = []
@@ -58,6 +60,8 @@ async def collect_follows(
 ) -> tuple[CheckResult, list[Edge]]:
     source: Source = SOURCES[source_name]
     username = username.strip().lstrip("@")
+    if not username:
+        raise ValueError("username must be non-empty")
     async with shared_fetcher(settings, store, fetcher, run_id=run_id) as active_fetcher:
         result = await _check(source, active_fetcher, username)
         edges: list[Edge] = []

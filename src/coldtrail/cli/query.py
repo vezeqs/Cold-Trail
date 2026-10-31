@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated
 
 import typer
 from rich.table import Table
 
+from ..report import to_diff_html
 from ..store import Store
+from ..utils import write_private
 from ._app import (
     _print_json,
     _render_history,
@@ -331,10 +334,18 @@ def diff(
     ctx: typer.Context,
     run_a: Annotated[int, typer.Argument(help="Baseline run ID")],
     run_b: Annotated[int, typer.Argument(help="Comparison run ID")],
+    format: Annotated[str, typer.Option("--format", help="table|json|html")] = "table",
+    out: Annotated[Path | None, typer.Option("-o", "--out", help="Write HTML to this file")] = None,
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Compare two stored runs: added/removed/changed profiles, entities, links, posts."""
     from ..correlate import diff_runs
+
+    fmt = format.casefold()
+    if fmt not in {"table", "json", "html"}:
+        raise typer.BadParameter("--format must be table, json, or html")
+    if out is not None and fmt != "html":
+        raise typer.BadParameter("--out requires --format html")
 
     with Store(_settings(ctx).db_path) as store:
         missing = [run_id for run_id in (run_a, run_b) if store.run(run_id) is None]
@@ -342,8 +353,16 @@ def diff(
             typer.echo(f"run(s) not found: {', '.join(map(str, missing))}", err=True)
             raise typer.Exit(code=1)
         payload = diff_runs(store, run_a, run_b)
-    if json_out:
+    if json_out or fmt == "json":
         _print_json(payload)
+        return
+    if fmt == "html":
+        body = to_diff_html(payload)
+        if out is not None:
+            write_private(out, body.encode("utf-8"))
+            console.print(f"wrote {out}")
+        else:
+            typer.echo(body)
         return
 
     profiles = payload["profiles"]

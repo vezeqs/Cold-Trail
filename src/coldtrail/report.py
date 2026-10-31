@@ -6,16 +6,18 @@ import hashlib
 import io
 import json
 import os
+import re
 import uuid
 from typing import Any
 from urllib.parse import urlsplit
-from xml.sax.saxutils import escape
+from xml.sax.saxutils import escape, quoteattr
 
 from cryptography.fernet import Fernet, InvalidToken
 
+from . import __version__
 from .correlate import calibrate_probability
 from .dorks import dorks
-from .utils import short_key
+from .utils import epoch_seconds, short_key
 
 MAGIC = b"LPH1"
 PBKDF2_ROUNDS = 200_000
@@ -133,6 +135,18 @@ def _node_id(profile: dict[str, Any]) -> str:
     return f"{profile['source']}:{profile['username']}"
 
 
+_XML_ILLEGAL = re.compile("[^\u0009\u000a\u000d\u0020-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]")
+
+
+def _xml_text(value: object) -> str:
+    return escape(_XML_ILLEGAL.sub("", str(value)))
+
+
+def _xml_attr(value: object) -> str:
+    """Quote an XML attribute value, including quotes and illegal controls."""
+    return quoteattr(_XML_ILLEGAL.sub("", str(value)))
+
+
 def to_graphml(payload: dict[str, Any]) -> str:
     nodes = payload.get("profiles", [])
     links = payload.get("links", [])
@@ -154,19 +168,19 @@ def to_graphml(payload: dict[str, Any]) -> str:
     ]
     for profile in nodes:
         node = _node_id(profile)
-        label = escape(str(profile.get("display_name") or profile["username"]))
-        out.append(f'<node id="{escape(node)}">')
+        label = _xml_text(profile.get("display_name") or profile["username"])
+        out.append(f"<node id={_xml_attr(node)}>")
         out.append(f'<data key="label">{label}</data>')
-        out.append(f'<data key="source">{escape(str(profile.get("source")))}</data>')
-        out.append(f'<data key="url">{escape(str(profile.get("url") or ""))}</data>')
-        out.append(f'<data key="cluster">{escape(str(cluster_of.get(node, "")))}</data>')
+        out.append(f'<data key="source">{_xml_text(profile.get("source"))}</data>')
+        out.append(f'<data key="url">{_xml_text(profile.get("url") or "")}</data>')
+        out.append(f'<data key="cluster">{_xml_text(cluster_of.get(node, ""))}</data>')
         out.append("</node>")
     for link in links:
         source = f"{link['source_a']}:{link['username_a']}"
         target = f"{link['source_b']}:{link['username_b']}"
-        out.append(f'<edge source="{escape(source)}" target="{escape(target)}">')
+        out.append(f"<edge source={_xml_attr(source)} target={_xml_attr(target)}>")
         out.append(f'<data key="score">{float(link.get("score") or 0)}</data>')
-        out.append(f'<data key="reasons">{escape(", ".join(link.get("reasons") or []))}</data>')
+        out.append(f'<data key="reasons">{_xml_text(", ".join(link.get("reasons") or []))}</data>')
         out.append("</edge>")
     out.append("</graph></graphml>")
     return "\n".join(out)
@@ -184,22 +198,24 @@ def to_gexf(payload: dict[str, Any]) -> str:
     for profile in nodes:
         node = _node_id(profile)
         label = str(profile.get("display_name") or profile["username"])
-        out.append(f'<node id="{escape(node)}" label="{escape(label)}"/>')
+        out.append(f"<node id={_xml_attr(node)} label={_xml_attr(label)}/>")
     out.append("</nodes><edges>")
     for index, link in enumerate(links):
         source = f"{link['source_a']}:{link['username_a']}"
         target = f"{link['source_b']}:{link['username_b']}"
         weight = float(link.get("score") or 0)
         out.append(
-            f'<edge id="{index}" source="{escape(source)}" '
-            f'target="{escape(target)}" weight="{weight}"/>'
+            f'<edge id="{index}" source={_xml_attr(source)} '
+            f"target={_xml_attr(target)} weight={_xml_attr(weight)}/>"
         )
     out.append("</edges></graph></gexf>")
     return "\n".join(out)
 
 
 def _dot_escape(value: object) -> str:
-    return str(value).replace("\\", "\\\\").replace('"', '\\"')
+    return (
+        str(value).replace("\\", "\\\\").replace('"', '\\"').replace("\r", "").replace("\n", "\\n")
+    )
 
 
 def to_dot(payload: dict[str, Any]) -> str:
@@ -211,12 +227,28 @@ def to_dot(payload: dict[str, Any]) -> str:
     for link in payload.get("links", []):
         source = f"{link['source_a']}:{link['username_a']}"
         target = f"{link['source_b']}:{link['username_b']}"
+        score = float(link.get("score") or 0)
         out.append(
             f'  "{_dot_escape(source)}" -- "{_dot_escape(target)}" '
-            f'[label="{link.get("score")}", weight={link.get("score")}];'
+            f'[label="{score}", weight={score}];'
         )
     out.append("}")
     return "\n".join(out)
+
+
+def _md_cell(value: object) -> str:
+    """Keep harvested text inside its Markdown table cell."""
+    return " ".join(str(value if value is not None else "").split()).replace("|", "\\|")
+
+
+def _md_code(value: object) -> str:
+    return _md_cell(value).replace("`", "'")
+
+
+def _post_order(item: dict[str, Any]) -> tuple[bool, int]:
+    """Chronological order for display strings with mixed UTC offsets."""
+    stamp = epoch_seconds(item.get("created_at"))
+    return (stamp is None, stamp or 0)
 
 
 def to_markdown(payload: dict[str, Any], redacted: bool = False) -> str:
@@ -235,7 +267,7 @@ def to_markdown(payload: dict[str, Any], redacted: bool = False) -> str:
     cov_str = ", ".join(f"{k}: {v}" for k, v in sorted(counts.items()))
 
     lines = [
-        f"# OSINT Dossier: `{target}`",
+        f"# OSINT Dossier: `{_md_code(target)}`",
         "",
         f"- **Run ID:** {run.get('id', 'n/a')}",
         f"- **Kind:** {run.get('kind', 'pivot')}",
@@ -250,11 +282,12 @@ def to_markdown(payload: dict[str, Any], redacted: bool = False) -> str:
         lines.append("| --- | --- | --- | --- | --- |")
         for cluster in clusters:
             members = ", ".join(
-                f"`{m['source']}:{m['username']}`" for m in cluster.get("members", [])
+                f"`{_md_code(m['source'])}:{_md_code(m['username'])}`"
+                for m in cluster.get("members", [])
             )
-            reasons = ", ".join(cluster.get("reasons") or [])
+            reasons = _md_cell(", ".join(cluster.get("reasons") or []))
             lines.append(
-                f"| `{cluster.get('cluster_key', '')}` | {cluster.get('size', 0)} "
+                f"| `{_md_code(cluster.get('cluster_key', ''))}` | {cluster.get('size', 0)} "
                 f"| {float(cluster.get('score') or 0):.2f} | {members} | {reasons} |"
             )
         lines.append("")
@@ -266,8 +299,9 @@ def to_markdown(payload: dict[str, Any], redacted: bool = False) -> str:
         for p in profiles:
             followers = p.get("followers") if p.get("followers") is not None else ""
             lines.append(
-                f"| {p.get('source', '')} | `{p.get('username', '')}` "
-                f"| {p.get('display_name') or ''} | {followers} | {p.get('url') or ''} |"
+                f"| {_md_cell(p.get('source', ''))} | `{_md_code(p.get('username', ''))}` "
+                f"| {_md_cell(p.get('display_name'))} | {_md_cell(followers)} "
+                f"| {_md_cell(p.get('url'))} |"
             )
         lines.append("")
 
@@ -278,10 +312,10 @@ def to_markdown(payload: dict[str, Any], redacted: bool = False) -> str:
         for row in links:
             score = float(row.get("score") or 0)
             lines.append(
-                f"| `{row.get('source_a')}:{row.get('username_a')}` "
-                f"| `{row.get('source_b')}:{row.get('username_b')}` "
+                f"| `{_md_code(row.get('source_a'))}:{_md_code(row.get('username_a'))}` "
+                f"| `{_md_code(row.get('source_b'))}:{_md_code(row.get('username_b'))}` "
                 f"| {score:.2f} | {calibrate_probability(score):.2f} "
-                f"| {', '.join(row.get('reasons') or [])} |"
+                f"| {_md_cell(', '.join(row.get('reasons') or []))} |"
             )
         lines.append("")
 
@@ -291,14 +325,14 @@ def to_markdown(payload: dict[str, Any], redacted: bool = False) -> str:
         lines.append("| --- | --- | --- |")
         for e in entities:
             lines.append(
-                f"| {e.get('kind', '')} | `{e.get('value', '')}` "
-                f"| `{e.get('source')}:{e.get('username')}` |"
+                f"| {_md_cell(e.get('kind', ''))} | `{_md_code(e.get('value', ''))}` "
+                f"| `{_md_code(e.get('source'))}:{_md_code(e.get('username'))}` |"
             )
         lines.append("")
 
     if posts:
         lines.extend(["## Recent Posts", ""])
-        for p in sorted(posts, key=lambda item: item.get("created_at") or "")[:50]:
+        for p in sorted(posts, key=_post_order)[:50]:
             when = str(p.get("created_at") or "")[:19]
             txt = " ".join(str(p.get("text") or "").split())[:200]
             lines.append(f"- **{when}** `{p.get('source')}:{p.get('username')}` — {txt}")
@@ -311,12 +345,224 @@ def to_markdown(payload: dict[str, Any], redacted: bool = False) -> str:
         lines.append("| --- | --- | --- | --- | --- |")
         for a in attachments:
             lines.append(
-                f"| {a.get('id')} | {a.get('filename')} | {int(a.get('size') or 0)} B "
-                f"| `{str(a.get('sha256') or '')[:16]}…` | {a.get('note') or ''} |"
+                f"| {a.get('id')} | {_md_cell(a.get('filename'))} "
+                f"| {int(a.get('size') or 0)} B "
+                f"| `{_md_code(str(a.get('sha256') or '')[:16])}…` "
+                f"| {_md_cell(a.get('note'))} |"
             )
         lines.append("")
 
     return "\n".join(lines)
+
+
+SARIF_SCHEMA = "https://json.schemastore.org/sarif-2.1.0.json"
+
+
+def _sarif_uri(value: object) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = urlsplit(text)
+    except ValueError:
+        return None
+    if parsed.scheme.casefold() not in ("http", "https") or not parsed.netloc:
+        return None
+    return text
+
+
+def to_sarif(payload: dict[str, Any]) -> str:
+    """Export profiles, entities, and clusters as SARIF 2.1.0 results."""
+    run = payload.get("run") or {}
+    rules: dict[str, dict[str, Any]] = {}
+    results: list[dict[str, Any]] = []
+
+    def add(
+        rule_id: str,
+        rule_name: str,
+        message: str,
+        *,
+        uri: str | None = None,
+        properties: dict[str, Any] | None = None,
+    ) -> None:
+        rules.setdefault(
+            rule_id,
+            {
+                "id": rule_id,
+                "name": rule_name,
+                "shortDescription": {"text": rule_name},
+            },
+        )
+        result: dict[str, Any] = {
+            "ruleId": rule_id,
+            "level": "note",
+            "message": {"text": message},
+            "properties": properties or {},
+        }
+        if uri:
+            result["locations"] = [{"physicalLocation": {"artifactLocation": {"uri": uri}}}]
+        results.append(result)
+
+    for profile in payload.get("profiles") or []:
+        source = str(profile.get("source") or "")
+        username = str(profile.get("username") or "")
+        label = profile.get("display_name") or username
+        add(
+            "coldtrail/profile",
+            "Public profile",
+            f"{source}:{username} ({label})",
+            uri=_sarif_uri(profile.get("url")),
+            properties={
+                "source": source,
+                "username": username,
+                "followers": profile.get("followers"),
+            },
+        )
+
+    for entity in payload.get("entities") or []:
+        kind = str(entity.get("kind") or "unknown")
+        value = str(entity.get("value") or "")
+        add(
+            f"coldtrail/entity/{kind}",
+            f"Extracted {kind}",
+            f"{kind}: {value}",
+            properties={
+                "source": entity.get("source"),
+                "username": entity.get("username"),
+                "context": entity.get("context"),
+            },
+        )
+
+    for cluster in payload.get("clusters") or []:
+        key = str(cluster.get("cluster_key") or cluster.get("key") or "")
+        add(
+            "coldtrail/cluster",
+            "Inferred identity cluster",
+            f"cluster {key} ({cluster.get('size') or len(cluster.get('profiles') or [])} "
+            f"profiles, score {float(cluster.get('score') or 0):.2f})",
+            properties={"cluster": key, "reasons": cluster.get("reasons") or []},
+        )
+
+    document = {
+        "$schema": SARIF_SCHEMA,
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "ColdTrail",
+                        "informationUri": "https://github.com/vezeqs/Cold-Trail",
+                        "version": __version__,
+                        "rules": [rules[key] for key in sorted(rules)],
+                    }
+                },
+                "results": results,
+                "properties": {
+                    "run_id": run.get("id"),
+                    "target": run.get("target"),
+                    "kind": run.get("kind"),
+                },
+            }
+        ],
+    }
+    return json.dumps(document, indent=2, ensure_ascii=False, default=str)
+
+
+def to_diff_html(payload: dict[str, Any]) -> str:
+    """Render a run diff as a self-contained HTML page."""
+    run_a = payload.get("run_a")
+    run_b = payload.get("run_b")
+    profiles = payload.get("profiles") or {}
+    entities = payload.get("entities") or {}
+    links = payload.get("links") or {}
+    clusters = payload.get("clusters") or {}
+    posts = payload.get("posts") or {}
+
+    def table(headers: list[str], rows: list[list[str]]) -> str:
+        if not rows:
+            return '<p class="muted">none</p>'
+        head = "".join(f"<th>{escape(header)}</th>" for header in headers)
+        body = "".join(
+            "<tr>" + "".join(f"<td>{cell}</td>" for cell in row) + "</tr>" for row in rows
+        )
+        return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+
+    profile_rows = [
+        [escape(str(row.get("source", ""))), escape(str(row.get("username", "")))]
+        for key in ("added", "removed")
+        for row in profiles.get(key) or []
+    ]
+    changed_rows = [
+        [
+            escape(str(row.get("source", ""))),
+            escape(str(row.get("username", ""))),
+            escape(str(field)),
+            escape(str(values[0])),
+            escape(str(values[1])),
+        ]
+        for row in profiles.get("changed") or []
+        for field, values in (row.get("fields") or {}).items()
+    ]
+    entity_rows = [
+        [
+            escape(str(row.get("kind", ""))),
+            escape(str(row.get("value", ""))),
+            escape(f"{row.get('source')}:{row.get('username')}"),
+        ]
+        for key in ("added", "removed")
+        for row in entities.get(key) or []
+    ]
+    link_rows = [
+        [
+            escape(f"{row.get('source_a')}:{row.get('username_a')}"),
+            escape(f"{row.get('source_b')}:{row.get('username_b')}"),
+            f"{float(row.get('score') or 0):.2f}",
+        ]
+        for key in ("added", "removed")
+        for row in links.get(key) or []
+    ]
+    cluster_rows = [
+        [escape(str(key)), escape(str(value))]
+        for key in ("added", "removed")
+        for value in clusters.get(key) or []
+    ]
+    post_rows = [
+        [escape(str(row.get("source", ""))), escape(str(row.get("post_id", "")))]
+        for key in ("added", "removed", "tombstoned")
+        for row in posts.get(key) or []
+    ]
+    sections = [
+        ("Profiles added / removed", table(["Source", "Username"], profile_rows)),
+        ("Profiles changed", table(["Source", "Username", "Field", "Old", "New"], changed_rows)),
+        ("Entities added / removed", table(["Kind", "Value", "Observed on"], entity_rows)),
+        ("Links added / removed", table(["A", "B", "Score"], link_rows)),
+        ("Clusters added / removed", table(["Change", "Cluster"], cluster_rows)),
+        ("Posts added / removed / tombstoned", table(["Source", "Post"], post_rows)),
+    ]
+    body = "\n".join(
+        f"<section><h2>{escape(title)}</h2>{content}</section>" for title, content in sections
+    )
+    return f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ColdTrail diff: run {escape(str(run_a))} → run {escape(str(run_b))}</title>
+<style>
+:root {{ color-scheme: dark; }}
+body {{ font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 2rem;
+        background:#0e1116; color:#d7dde7; }}
+h1 {{ margin:0 0 .25rem; font-size:1.6rem; }}
+h2 {{ margin:0 0 .75rem; font-size:1.05rem; color:#9ecbff; }}
+section {{ margin: 1.75rem 0; }}
+table {{ border-collapse: collapse; width:100%; font-size:.85rem; }}
+th, td {{ text-align:left; padding:.45rem .6rem; border-bottom:1px solid #232a36;
+          vertical-align:top; }}
+th {{ color:#8b97a8; font-weight:600; text-transform:uppercase; font-size:.7rem;
+      letter-spacing:.05em; }}
+.muted {{ color:#6c7889; }}
+</style></head><body>
+<h1>Diff: run #{escape(str(run_a))} → run #{escape(str(run_b))}</h1>
+{body}
+</body></html>"""
 
 
 def _stix_id(kind: str, seed: str) -> str:
@@ -511,7 +757,7 @@ def to_html(payload: dict[str, Any], redacted: bool = False) -> str:
             escape(str(p.get("username", ""))),
             escape(str(p.get("display_name") or "")),
             escape(str(p.get("bio") or ""))[:280],
-            str(p.get("followers") if p.get("followers") is not None else ""),
+            escape(str(p.get("followers") if p.get("followers") is not None else "")),
             link(str(p.get("url") or "")),
         ]
         for p in profiles
@@ -543,7 +789,7 @@ def to_html(payload: dict[str, Any], redacted: bool = False) -> str:
             escape(str(p.get("text") or ""))[:400],
             link(str(p.get("url") or "")),
         ]
-        for p in sorted(posts, key=lambda item: item.get("created_at") or "")
+        for p in sorted(posts, key=_post_order)
     ]
     history_rows = [
         [

@@ -12,6 +12,7 @@ from .models import ProfileChange
 from .pivot import entities_for_profiles, pivot
 from .sources import SOURCES
 from .store import Store
+from .utils import epoch_seconds
 
 
 def _change_key(change: ProfileChange) -> tuple[str, str, str, str | None]:
@@ -86,7 +87,9 @@ async def watch(
                     store.save_entities(run_id, entities_from_posts(posts))
                     if posts:
                         oldest = min(
-                            (post.created_at for post in posts if post.created_at), default=None
+                            (post.created_at for post in posts if post.created_at),
+                            key=lambda value: epoch_seconds(value) or 0,
+                            default=None,
                         )
                         store.mark_missing_posts(
                             source.name,

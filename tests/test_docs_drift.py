@@ -23,9 +23,15 @@ def test_readme_source_count_matches_runtime():
 
 def test_agents_command_and_schema_counts_match():
     agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
-    commands = re.search(r"\((\d+) top-level commands", agents)
+    commands = re.search(r"(\d+) top-level commands", agents)
     assert commands, "AGENTS.md is missing the command-count sentence"
     assert int(commands.group(1)) == len(app.registered_commands)
+    leaves = re.search(r"(\d+) leaf commands", agents)
+    assert leaves, "AGENTS.md is missing the leaf-command count"
+    total = len(app.registered_commands) + sum(
+        len(group.typer_instance.registered_commands) for group in app.registered_groups
+    )
+    assert int(leaves.group(1)) == total
     schema = re.search(r"SCHEMA_VERSION \((\d+)\)", agents)
     assert schema, "AGENTS.md is missing the schema-version note"
     assert int(schema.group(1)) == SCHEMA_VERSION

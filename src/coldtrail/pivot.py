@@ -133,6 +133,8 @@ async def pivot(
     fetcher: Fetcher | None = None,
 ) -> PivotReport:
     target = target.strip().lstrip("@")
+    if not target:
+        raise ValueError("target must be a non-empty username or email")
     kind: Kind = "email" if "@" in target else "username"
     if avatar_hash is None:
         avatar_hash = settings.avatar_hash

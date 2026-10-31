@@ -20,6 +20,7 @@ from ..report import (
     to_jsonl,
     to_maltego_csv,
     to_markdown,
+    to_sarif,
     to_stix,
 )
 from ..sites import slugify
@@ -36,7 +37,7 @@ def export_cmd(
     run_id: Annotated[int, typer.Argument(help="Run ID")],
     format: Annotated[
         str,
-        typer.Option("--format", help="json|jsonl|csv|graphml|gexf|dot|html|md|stix|maltego"),
+        typer.Option("--format", help="json|jsonl|csv|graphml|gexf|dot|html|md|stix|sarif|maltego"),
     ] = "json",
     table: Annotated[str, typer.Option("--table", help="CSV table")] = "profiles",
     out: Annotated[Path | None, typer.Option("-o", "--out")] = None,
@@ -115,6 +116,8 @@ def _render_format(payload: dict[str, Any], fmt: str, table: str, redacted: bool
         return to_markdown(payload, redacted=redacted)
     if fmt == "stix":
         return to_stix(payload)
+    if fmt == "sarif":
+        return to_sarif(payload)
     if fmt == "maltego":
         return to_maltego_csv(payload)
     raise typer.BadParameter(f"unknown format {fmt!r}")

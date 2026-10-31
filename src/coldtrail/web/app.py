@@ -65,6 +65,7 @@ from ..report import (
     iter_csv,
     iter_jsonl,
     redact_payload,
+    to_diff_html,
     to_html,
     to_markdown,
 )
@@ -437,7 +438,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def run_export(
         run_id: int,
         format: Annotated[
-            str, Query(pattern="^(json|jsonl|csv|graphml|gexf|dot|html|md|stix|maltego)$")
+            str,
+            Query(pattern="^(json|jsonl|csv|graphml|gexf|dot|html|md|stix|sarif|maltego)$"),
         ] = "json",
         table: Annotated[
             str,
@@ -474,6 +476,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         request: Request,
         a: Annotated[int | None, Query(ge=1)] = None,
         b: Annotated[int | None, Query(ge=1)] = None,
+        format: Annotated[str, Query(pattern="^(page|html)$")] = "page",
     ):
         payload = None
         with _open() as store:
@@ -482,6 +485,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 if store.run(a) is None or store.run(b) is None:
                     raise HTTPException(status_code=404, detail="run not found")
                 payload = diff_runs(store, a, b)
+        if format == "html":
+            if payload is None:
+                raise HTTPException(status_code=400, detail="a and b are required")
+            return Response(
+                content=to_diff_html(payload).encode("utf-8"),
+                media_type="text/html",
+                headers={
+                    "Content-Disposition": f'attachment; filename="coldtrail-diff-{a}-{b}.html"'
+                },
+            )
         return _render(
             request,
             "diff.html",
@@ -524,8 +537,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                             source=source or None,
                             username=username or None,
                         )
-                except Exception as exc:  # FTS syntax problems must not 500
-                    error = f"invalid query: {exc}"
+                except Exception:  # FTS syntax problems must not 500
+                    log.warning("search query failed", exc_info=True)
+                    error = "invalid query"
         return _render(
             request,
             "search.html",
@@ -701,6 +715,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if _rate_limited(request):
             raise HTTPException(status_code=429, detail="rate limit exceeded")
         cleaned = target.strip()
+        if not cleaned and tool not in {"pwned", "recluster"}:
+            raise HTTPException(status_code=400, detail="target must be non-empty")
         result: Any = None
         run_id: int | None = None
 
@@ -932,8 +948,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=400, detail="custom scope needs source names")
         if scope != "custom":
             names = None
+        cleaned_target = target.strip()
+        if not cleaned_target:
+            raise HTTPException(status_code=400, detail="target must be non-empty")
         job = _start_job(
-            target.strip(),
+            cleaned_target,
             sources=names,
             include_web=include_web,
             expand=expand,
@@ -1012,8 +1031,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def api_pivot(payload: PivotRequest, request: Request):
         if _rate_limited(request):
             raise HTTPException(status_code=429, detail="rate limit exceeded")
+        cleaned_target = payload.target.strip()
+        if not cleaned_target:
+            raise HTTPException(status_code=400, detail="target must be non-empty")
         job = _start_job(
-            payload.target.strip(),
+            cleaned_target,
             sources=payload.sources,
             include_web=payload.include_web,
             expand=payload.expand,

@@ -6,8 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-30
+
 ### Added
 
+- **`coldtrail config`.** Shows every effective setting, where it came from
+  (default / TOML / environment / flag), and redacts secrets. `--json` is a
+  stable contract (`coldtrail schema config`).
+- **`coldtrail schema`.** Emits JSON Schema (draft 2020-12) for the `pivot`,
+  `run`, `diff`, `sources`, `doctor`, `config`, and `stats` payloads so
+  downstream tooling can validate `--json` output.
+- **SARIF 2.1.0 export.** `coldtrail export <run> --format sarif` (and
+  `?format=sarif` on the web export routes) turns profiles, entities, and
+  clusters into SARIF results for CI/code-scanning pipelines.
+- **HTML run diff.** `coldtrail diff A B --format html [-o file]` and
+  `/diff?a=&b=&format=html` render a self-contained diff dossier.
 - **Source health.** `coldtrail source health [--live]` records per-source
   status, detail, and latency in a new `source_health` table (schema v7).
   `/sources` and `/api/sources` surface the recorded health.
@@ -27,6 +40,10 @@ All notable changes to this project are documented here. The format follows
 
 - Split the web app factory into `web/helpers.py`, `web/api_routes.py`, and
   `web/case_routes.py`; `create_app()` remains the public composition root.
+- The SQLite database and its parent directory are created under `umask(0o077)`
+  so the file is owner-only from its first byte, not after a chmod.
+- Removed the stale `GOOD_FIRST_ISSUES.md` and `LAUNCH.md` scaffolding; release
+  guidance now lives in `CONTRIBUTING.md`, and the audit record in `AUDIT.md`.
 - Timeline queries now order and paginate in SQL using a normalized
   `posts.created_ts` epoch column (schema v6). `--limit` returns the newest
   window in chronological order; `--since/--until` no longer load every post.
@@ -40,6 +57,29 @@ All notable changes to this project are documented here. The format follows
   lexicographically.
 - Search filters (`source:`, `username:`) and prefix matching now work, and
   profile/entity scopes are searchable.
+- HTML and Markdown dossiers, `harvest` tombstones, and `watch` windows now use
+  the same chronological ordering as `Store.timeline()`.
+- GraphML/GEXF exports are well-formed XML for handles or display names that
+  contain quotes or control characters.
+- A cached WAF/challenge page is no longer replayed as a valid profile; blocked
+  responses are classified before they are cached and re-checked on cache hits.
+- The HTTP cache varies by `Accept` and decodes cached bodies with their stored
+  charset, so JSON/HTML requests cannot poison each other.
+- Evidence is hashed from the bytes actually read, and evidence blob paths
+  reject non-SHA-256 digests.
+- `doctor` and the audit log redact proxy credentials; `doctor` warns when the
+  config file is group/world-readable.
+- Redirects to loopback/link-local hosts are blocked unless private targets are
+  explicitly allowed.
+- Matrix IDs (`@user:server`) are no longer misclassified as Telegram handles.
+- Blank/whitespace targets are rejected by pivot, harvest, graph, and the web
+  routes; case names reject whitespace.
+- A corrupt SQLite database or corrupt JSON row no longer crashes commands with
+  a traceback.
+- Markdown tables escape `|` and newlines; DOT exports default a missing score
+  to `0`.
+- README/AGENTS counts no longer drift (tests are no longer hardcoded; the
+  command count is 48 top-level / 61 leaf).
 
 ## [0.9.0] - 2026-10-27
 

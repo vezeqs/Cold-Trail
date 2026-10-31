@@ -21,6 +21,7 @@ from ..pivot import entities_for_profiles, persist_pivot
 from ..pivot import pivot as run_pivot
 from ..sources import SOURCES
 from ..store import Store
+from ..utils import epoch_seconds
 from ..watch import watch as run_watch
 from ._app import (
     STATUS_STYLE,
@@ -340,6 +341,8 @@ def harvest(
         raise typer.BadParameter(f"unknown source {source!r}; try `coldtrail sources`")
     if SOURCES[source].kind != "username":
         raise typer.BadParameter(f"{source!r} is an email source; use `pivot` for emails")
+    if not username.strip().lstrip("@"):
+        raise typer.BadParameter("username must be non-empty")
 
     store = Store(settings.db_path)
     try:
@@ -382,7 +385,9 @@ def harvest(
                     store.save_edges(run_id, edges)
                 if posts:
                     oldest = min(
-                        (post.created_at for post in posts if post.created_at), default=None
+                        (post.created_at for post in posts if post.created_at),
+                        key=lambda value: epoch_seconds(value) or 0,
+                        default=None,
                     )
                     store.mark_missing_posts(
                         source,
@@ -392,11 +397,18 @@ def harvest(
                         since=oldest or since,
                     )
                 if posts:
-                    newest = max(
-                        (post.created_at for post in posts if post.created_at), default=None
+                    newest_post = max(
+                        (post for post in posts if post.created_at),
+                        key=lambda post: epoch_seconds(post.created_at) or 0,
+                        default=None,
                     )
-                    if newest:
-                        store.set_cursor(source, username, posts[0].post_id, newest)
+                    if newest_post:
+                        store.set_cursor(
+                            source,
+                            username,
+                            newest_post.post_id,
+                            newest_post.created_at or "",
+                        )
             except Exception:
                 store.finish_run(run_id, "error")
                 raise
@@ -449,6 +461,8 @@ def graph(
         raise typer.BadParameter(f"unknown source {source!r}")
     if SOURCES[source].kind != "username":
         raise typer.BadParameter(f"{source!r} is an email source; graphs need a username source")
+    if not username.strip().lstrip("@"):
+        raise typer.BadParameter("username must be non-empty")
     store = Store(settings.db_path)
     try:
         check, edges = asyncio.run(
