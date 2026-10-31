@@ -112,8 +112,5 @@ third-party content, so prune them.
   distinguish UTC+13 from UTC-11; the reported offset is a hint, not a fact.
 - **Correlation is O(n²).** A 482-source pivot evaluates ~116k pairs. This is a
   performance property, not a correctness or security issue.
-- **Textual 8 compatibility.** The TUI source uses supported APIs; the test
-  suite still reads `Static.renderable`, which Textual 8 removed. Tracked in
-  Dependabot PR #15.
 - **No encryption at rest.** Use full-disk encryption on shared hosts; exports
   support `--encrypt` (PBKDF2 + Fernet) for transport.

@@ -41,7 +41,7 @@ Severity: **H** high, **M** medium, **L** low. Status: **fixed** in this branch,
 | 24 | — | Sources | Mastodon/Nostr/domain/avatar probes use `resolve=False`, which skips DNS for the initial host | documented |
 | 25 | — | Analysis | Posting-hour timezone inference is ambiguous by 24h, so UTC+12/+13/+14 are not distinguishable from UTC-12/-11/-10 | documented |
 | 26 | — | Correlate | Pair scoring is O(n²); a full 482-source pivot is ~116k pair evaluations | documented |
-| 27 | — | TUI | `textual` 8.x renamed/removed `Static.renderable`; 7 TUI tests (and Dependabot PR #15) fail | open (tracked) |
+| 27 | L | TUI | `textual` 8.x removed `Static.renderable`; 7 TUI tests failed | fixed |
 | 28 | L | Web UI | The identity graph's force layout collapsed nodes into an unreadable center hub with overlapping labels | fixed (visual) |
 | 29 | L | Evidence | `add_evidence` used a production `assert` for an input guard, which disappears under `python -O` | fixed |
 
@@ -256,8 +256,10 @@ without re-validating the destination. A public URL can redirect to
 - **O(n²) correlation.** 482 profiles produce ~116k pair evaluations; measured
   runs are still dominated by network time. A blocking/index pass is a future
   optimisation, not a correctness bug.
-- **Textual 8 compatibility.** The source uses supported `Static.update()`
-  calls; only the tests reach into `.renderable`. Tracked as Dependabot PR #15.
+- **Textual 8 (#27):** the TUI source already used supported `Static.update()`
+  calls; only the tests read `.renderable`. Added `_static_text()` in
+  `tests/test_tui.py` (renderable → content → render). The full suite passes on
+  Textual 2.1.2 and 8.2.8. **Test:** `tests/test_tui.py` (15 passed on both).
 
 ## False positives
 
