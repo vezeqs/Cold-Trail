@@ -11,9 +11,9 @@ from rich.console import Console
 from rich.table import Table
 
 from .. import __version__
-from ..config import Settings
+from ..config import ConfigError, Settings
 from ..models import Link, PivotReport, Post, Profile
-from ..store import Store
+from ..store import Store, StoreError
 
 app = typer.Typer(
     add_completion=True,
@@ -176,13 +176,27 @@ def main(
                     None,
                     {"argv": _redact_argv(sys.argv[1:])},
                 )
-        except (OSError, ValueError, sqlite3.Error):
+        except (OSError, ValueError, sqlite3.Error, StoreError):
             pass
 
 
 def _settings(ctx: typer.Context) -> Settings:
     settings: Settings = ctx.obj
     return settings
+
+
+def run_cli(argv: list[str] | None = None) -> None:
+    """Console entry point.
+
+    Configuration and database problems are the two failures a user hits with a
+    typo or a damaged file, so they become one actionable line with exit 2
+    instead of a Rich traceback that hides the cause.
+    """
+    try:
+        app(args=argv)
+    except (ConfigError, StoreError) as exc:
+        console.print(f"[red]error:[/red] {exc}", highlight=False, soft_wrap=True)
+        raise SystemExit(2) from None
 
 
 def _print_json(payload: Any) -> None:

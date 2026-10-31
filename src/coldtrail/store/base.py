@@ -10,6 +10,10 @@ from ..utils import json_loads, parse_dt
 from .schema import COLUMNS, FTS, POSTS_AU_TRIGGER, SCHEMA, SCHEMA_VERSION
 
 
+class StoreError(RuntimeError):
+    """The database could not be opened, migrated, or is not a database."""
+
+
 class StoreBase:
     """Connection lifecycle, migrations, and row helpers shared by every mixin."""
 
@@ -22,14 +26,20 @@ class StoreBase:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             self.conn = sqlite3.connect(path)
+        except (OSError, sqlite3.Error) as exc:
+            raise StoreError(f"cannot open database {path}: {exc}") from exc
         finally:
             os.umask(previous_umask)
         self.conn.row_factory = sqlite3.Row
-        self.conn.execute("PRAGMA journal_mode=WAL")
-        self.conn.execute("PRAGMA foreign_keys=ON")
-        self.conn.execute("PRAGMA busy_timeout=5000")
-        self.conn.execute("PRAGMA synchronous=NORMAL")
-        self._migrate()
+        try:
+            self.conn.execute("PRAGMA journal_mode=WAL")
+            self.conn.execute("PRAGMA foreign_keys=ON")
+            self.conn.execute("PRAGMA busy_timeout=5000")
+            self.conn.execute("PRAGMA synchronous=NORMAL")
+            self._migrate()
+        except sqlite3.Error as exc:
+            self.conn.close()
+            raise StoreError(f"cannot use database {path}: {exc}") from exc
         self._secure_files()
 
     def _secure_files(self) -> None:

@@ -23,6 +23,7 @@ import uuid
 from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated, Any
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import (
@@ -76,11 +77,13 @@ from ..wayback import cdx
 from .api_routes import register_api
 from .case_routes import register_cases
 from .helpers import (
+    COOKIE_MAX_AGE,
     COOKIE_NAME,
     EXPORTERS,
     JOB_RETENTION,
     LOGIN_RATE_LIMIT,
     LOGIN_RATE_WINDOW,
+    LOOPBACK_HOSTS,
     MAX_JOB_EVENTS,
     MAX_JOBS,
     MAX_UPLOAD,
@@ -88,6 +91,7 @@ from .helpers import (
     RATE_CLIENTS,
     RATE_LIMIT,
     RATE_WINDOW,
+    SAFE_METHODS,
     SSE_HEARTBEAT,
     SSE_MAX_SECONDS,
     STATIC_DIR,
@@ -95,6 +99,7 @@ from .helpers import (
     UPLOAD_CHUNK,
     Job,
     PivotRequest,
+    _cookie_is_valid,
     _cookie_value,
     _filesize,
     _safe_filename,
@@ -262,12 +267,59 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             supplied = request.headers["x-api-key"].strip()
         cookie = request.cookies.get(COOKIE_NAME, "")
         valid_header = bool(supplied) and hmac.compare_digest(supplied, token)
-        valid_cookie = bool(cookie) and hmac.compare_digest(cookie, _cookie_value(token))
+        valid_cookie = bool(cookie) and _cookie_is_valid(cookie, token)
         if valid_header or valid_cookie:
             return await call_next(request)
         if path.startswith("/api"):
             return JSONResponse({"detail": "unauthorized"}, status_code=401)
         return RedirectResponse("/login", status_code=303)
+
+    @app.middleware("http")
+    async def _guard(request: Request, call_next):
+        """Reject foreign Host headers and cross-site state-changing requests.
+
+        Binding to loopback is not a security boundary: a browser resolves an
+        attacker domain to 127.0.0.1 once the DNS TTL expires (rebinding), and
+        any page the analyst visits can POST to this server. The Host allowlist
+        stops the first; the Origin/Sec-Fetch-Site check stops the second.
+        """
+        host = request.headers.get("host", "")
+        try:
+            hostname = (urlsplit(f"//{host}").hostname or "").casefold()
+        except ValueError:
+            hostname = ""
+        if hostname and hostname not in LOOPBACK_HOSTS and not settings.allow_remote_host:
+            return _forbidden(request, "unexpected Host header")
+
+        if request.method not in SAFE_METHODS:
+            # Chrome sends `Origin: null` on form posts because of our
+            # `Referrer-Policy: no-referrer`, so Sec-Fetch-Site is the reliable
+            # signal; Origin is checked when it carries a real origin.
+            site = request.headers.get("sec-fetch-site", "").casefold()
+            if site and site not in {"same-origin", "none"}:
+                return _forbidden(request, "cross-site request")
+            origin = request.headers.get("origin")
+            if origin is not None and origin.casefold() != "null":
+                try:
+                    origin_host = (urlsplit(origin).netloc or "").casefold()
+                except ValueError:
+                    origin_host = ""
+                if origin_host != host.casefold():
+                    return _forbidden(request, "cross-origin request")
+        return await call_next(request)
+
+    def _forbidden(request: Request, reason: str) -> Response:
+        detail = {
+            "host": request.headers.get("host", "")[:120],
+            "origin": request.headers.get("origin", "")[:120],
+            "site": request.headers.get("sec-fetch-site", "")[:40],
+        }
+        log.warning("blocked %s %s: %s %s", request.method, request.url.path, reason, detail)
+        if request.url.path.startswith("/api"):
+            return JSONResponse({"detail": "forbidden"}, status_code=403)
+        return templates.TemplateResponse(
+            request, "403.html", {"settings": settings, "reason": reason}, status_code=403
+        )
 
     @app.get("/login", response_class=HTMLResponse)
     def login_page(request: Request):
@@ -287,12 +339,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             response = RedirectResponse("/", status_code=303)
             response.set_cookie(
                 COOKIE_NAME,
-                _cookie_value(token.strip()),
+                _cookie_value(token.strip(), int(time.time())),
                 httponly=True,
                 samesite="strict",
                 secure=_is_https(request),
                 path="/",
-                max_age=86_400,
+                max_age=COOKIE_MAX_AGE,
             )
             return response
         return _render(

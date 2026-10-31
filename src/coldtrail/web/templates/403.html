@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Forbidden · ColdTrail{% endblock %}
+{% block content %}
+<h1>403</h1>
+<p class="muted">This request was refused: {{ reason }}.</p>
+<p class="muted">
+  ColdTrail only answers its own loopback host name. If you deliberately bound a
+  LAN address, start the server with <code>--host</code> and a token, or set
+  <code>COLDTRAIL_ALLOW_REMOTE_HOST=1</code>.
+</p>
+<p><a class="button" href="/">← dashboard</a></p>
+{% endblock %}

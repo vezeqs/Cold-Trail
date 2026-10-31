@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 import random
 import re
@@ -14,8 +15,8 @@ from urllib.robotparser import RobotFileParser
 
 import httpx
 
-from .config import Settings
-from .security import is_public_host
+from .config import ConfigError, Settings
+from .security import is_public_host, resolve_public_ips
 from .utils import now_iso
 
 if TYPE_CHECKING:
@@ -27,6 +28,9 @@ CIRCUIT_THRESHOLD = 5
 CIRCUIT_SECONDS = 60.0
 MAX_BODY = 2_000_000
 MAX_TEXT = 2_000_000
+# A source that asks us to come back tomorrow is effectively refusing service;
+# sleeping on it would stall the whole pivot, so above this we stop retrying.
+MAX_RETRY_AFTER = 10.0
 # Declarative checks only need the document head; caching whole multi-MB pages
 # wastes disk and makes warm-cache runs decode gigabytes of HTML.
 CACHE_HTML_MAX = 262_144
@@ -75,6 +79,62 @@ def redact_url(value: str) -> str:
     return EMAIL_RE.sub("[email]", cleaned)
 
 
+def _is_ip_literal(host: str) -> bool:
+    try:
+        ipaddress.ip_address(host.strip("[]"))
+    except ValueError:
+        return False
+    return True
+
+
+class _PinnedTransport(httpx.AsyncHTTPTransport):
+    """Resolve once, validate, and connect to the address that was validated.
+
+    ``httpx`` resolves the hostname again at connect time, so validating a
+    hostname and then letting the client resolve it is a TOCTOU: a hostile DNS
+    can answer the check with a public address and the connection with
+    ``10.x.x.x``. Rewriting the request to the validated IP (keeping the
+    original ``Host`` header and TLS SNI name) closes that window for direct
+    connections. Proxied clients skip this: the proxy resolves the name.
+    """
+
+    def _pin(self, request: httpx.Request) -> None:
+        original = request.url
+        host = original.host
+        if _is_ip_literal(host):
+            return
+        try:
+            pinned = resolve_public_ips(host)[0]
+        except ValueError as exc:
+            raise httpx.ConnectError(str(exc), request=request) from exc
+        request.url = original.copy_with(host=pinned)
+        # httpx already built the `Host` header from the original URL; leave it
+        # alone. The SNI name keeps certificate verification on the hostname.
+        request.extensions["sni_hostname"] = host
+
+    def _owns_routing(self) -> bool:
+        """True when this transport is the one talking to the network.
+
+        A test transport (respx) swaps the pool's request handler and matches on
+        the URL it is given; rewriting that URL underneath it would break every
+        recorded fixture, so pinning only applies to real connections.
+        """
+        pool = getattr(self, "_pool", None)
+        handler = getattr(pool, "handle_async_request", None)
+        return getattr(handler, "__module__", "").split(".")[0] == "httpcore"
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        if not self._owns_routing():
+            return await super().handle_async_request(request)
+        original = request.url
+        self._pin(request)
+        response = await super().handle_async_request(request)
+        # Restore the logical URL so redirects, cache keys, and reports keep
+        # talking about the hostname rather than the pinned address.
+        request.url = original
+        return response
+
+
 class FetchError(Exception):
     """A request could not be completed (network error, retries exhausted, no recording)."""
 
@@ -112,19 +172,32 @@ class Fetcher:
         self.store = store
         self.run_id = run_id
         proxy = "socks5h://127.0.0.1:9050" if settings.tor else settings.proxy
-        self._client = httpx.AsyncClient(
-            timeout=settings.timeout,
-            follow_redirects=True,
-            proxy=proxy or None,
-            limits=httpx.Limits(
-                max_connections=max(8, settings.concurrency * 2),
-                max_keepalive_connections=max(4, settings.concurrency),
-            ),
-            headers={
-                "User-Agent": settings.user_agent,
-                "Accept-Language": "en-US,en;q=0.9",
-            },
+        limits = httpx.Limits(
+            max_connections=max(8, settings.concurrency * 2),
+            max_keepalive_connections=max(4, settings.concurrency),
         )
+        # Direct connections are pinned to a validated address; proxied ones are
+        # resolved by the proxy, so pinning there would only add a local DNS
+        # lookup (and defeat socks5h's remote DNS).
+        transport = (
+            _PinnedTransport(limits=limits)
+            if proxy is None and not settings.allow_private_targets
+            else None
+        )
+        try:
+            self._client = httpx.AsyncClient(
+                timeout=settings.timeout,
+                follow_redirects=True,
+                proxy=proxy or None,
+                transport=transport,
+                limits=limits,
+                headers={
+                    "User-Agent": settings.user_agent,
+                    "Accept-Language": "en-US,en;q=0.9",
+                },
+            )
+        except (ValueError, httpx.InvalidURL) as exc:
+            raise ConfigError(f"invalid proxy or HTTP client configuration: {exc}") from exc
         self._sem = asyncio.Semaphore(max(1, settings.concurrency))
         self._hosts: dict[str, dict[str, Any]] = {}
         self._robots: dict[str, RobotFileParser] = {}
@@ -336,10 +409,16 @@ class Fetcher:
                 return self._from_cache(stale, key)
 
             if response.status_code == 429 or response.status_code >= 500:
+                retry_after = response.headers.get("Retry-After", "")
+                requested = float(retry_after) if retry_after.isdigit() else None
+                if requested is not None and requested > MAX_RETRY_AFTER:
+                    self._record_failure(state)
+                    raise BlockedError(
+                        f"HTTP {response.status_code} from {host}: Retry-After of "
+                        f"{requested:.0f}s exceeds the {MAX_RETRY_AFTER:.0f}s limit"
+                    )
                 if attempt < attempts - 1:
-                    retry_after = response.headers.get("Retry-After", "")
-                    wait = float(retry_after) if retry_after.isdigit() else delay
-                    await asyncio.sleep(wait)
+                    await asyncio.sleep(requested if requested is not None else delay)
                     delay *= 2
                     continue
                 self._record_failure(state)
@@ -349,8 +428,14 @@ class Fetcher:
 
             if not self.settings.allow_private_targets:
                 final_host = urlsplit(str(response.url)).hostname or ""
-                if final_host and not is_public_host(final_host, resolve=False):
-                    raise BlockedError(f"redirect to non-public host blocked: {final_host}")
+                original_host = urlsplit(url).hostname or ""
+                if final_host and final_host != original_host:
+                    # A redirect to a hostname that resolves into loopback or a
+                    # private range is an SSRF pivot; resolve before trusting it.
+                    if not is_public_host(final_host, resolve=True):
+                        raise BlockedError(f"redirect to non-public host blocked: {final_host}")
+                elif final_host and not is_public_host(final_host, resolve=False):
+                    raise BlockedError(f"non-public host blocked: {final_host}")
             state["fails"] = 0
             fetched = self._build(response, key)
             if self.settings.keep_raw and self.store is not None:
@@ -456,6 +541,10 @@ class Fetcher:
             self._record_failure(state)
             raise FetchError(f"{type(exc).__name__}: {exc}") from exc
         if response.status_code != 200:
+            return []
+        # A redirect from robots.txt must not become an unvalidated internal GET.
+        final_host = urlsplit(str(response.url)).hostname or ""
+        if final_host and not is_public_host(final_host, resolve=True):
             return []
         content_type = response.headers.get("content-type", "").lower()
         body = response.text

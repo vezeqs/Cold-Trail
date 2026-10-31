@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .base import StoreBase
+from .base import StoreBase, StoreError
 from .caches import CachesMixin
 from .cases import CasesMixin
 from .maintenance import MaintenanceMixin
@@ -25,4 +25,4 @@ class Store(
     caches,cases,maintenance}.py; schema and migrations in store/{schema,base}.py."""
 
 
-__all__ = ["SCHEMA_VERSION", "Store"]
+__all__ = ["SCHEMA_VERSION", "Store", "StoreError"]

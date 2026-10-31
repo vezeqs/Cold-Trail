@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
+from datetime import UTC
 
 from .models import Entity, Post, Profile
 from .utils import parse_dt
@@ -175,7 +176,13 @@ def detect_lang(text: str | None) -> str | None:
 
 
 def infer_timezone(posts: list[Post]) -> str | None:
-    hours = [dt.hour for dt in (parse_dt(post.created_at) for post in posts) if dt is not None]
+    # Bin in UTC: the stored offset is a formatting detail, and mixing source
+    # offsets shifts every window by that offset.
+    hours = [
+        dt.astimezone(UTC).hour
+        for dt in (parse_dt(post.created_at) for post in posts)
+        if dt is not None
+    ]
     if len(hours) < 5:
         return None
     counts = Counter(hours)

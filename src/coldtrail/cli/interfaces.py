@@ -61,6 +61,10 @@ def serve(
         console.print(
             "[yellow]warning:[/yellow] web token is short; use at least 16 random characters."
         )
+    if host not in LOCAL_HOSTS:
+        # The Host/Origin guard only accepts loopback names by default; a
+        # deliberate non-loopback bind opts into accepting its own Host header.
+        settings.allow_remote_host = True
     try:
         import uvicorn
     except ImportError as exc:

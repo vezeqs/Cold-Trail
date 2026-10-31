@@ -17,6 +17,8 @@ from . import (  # noqa: F401, E402
     query,
     websearch,
 )
-from ._app import app
+from ._app import app, run_cli
 
-__all__ = ["app"]
+main = run_cli
+
+__all__ = ["app", "main"]

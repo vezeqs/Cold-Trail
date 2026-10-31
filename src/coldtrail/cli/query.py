@@ -8,7 +8,7 @@ from rich.table import Table
 
 from ..report import to_diff_html
 from ..store import Store
-from ..utils import write_private
+from ..utils import epoch_seconds, write_private
 from ._app import (
     _print_json,
     _render_history,
@@ -293,6 +293,9 @@ def timeline(
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Cross-source chronological timeline."""
+    for label, value in (("--since", since), ("--until", until)):
+        if value and epoch_seconds(value) is None:
+            raise typer.BadParameter(f"{label} must be an ISO timestamp, got {value!r}")
     with Store(_settings(ctx).db_path) as store:
         rows = store.timeline(run_id=run, limit=limit, since=since, until=until)
     if json_out:

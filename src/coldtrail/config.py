@@ -11,6 +11,11 @@ from .utils import redact_url_credentials
 DEFAULT_INSTANCES = ("mastodon.social", "fosstodon.org", "infosec.exchange")
 DEFAULT_UA = "coldtrail/0.10.1 (OSINT research; public data only)"
 
+
+class ConfigError(ValueError):
+    """A configuration value (TOML file or environment) is invalid."""
+
+
 ENV_VARS = {
     "db_path": "COLDTRAIL_DB",
     "timeout": "COLDTRAIL_TIMEOUT",
@@ -28,6 +33,7 @@ ENV_VARS = {
     "web_token": "COLDTRAIL_WEB_TOKEN",
     "trust_proxy": "COLDTRAIL_TRUST_PROXY",
     "allow_private_targets": "COLDTRAIL_ALLOW_PRIVATE_TARGETS",
+    "allow_remote_host": "COLDTRAIL_ALLOW_REMOTE_HOST",
     "github_token": "GITHUB_TOKEN",
     "hibp_api_key": "HIBP_API_KEY",
     "emailrep_api_key": "EMAILREP_API_KEY",
@@ -41,6 +47,66 @@ ENV_VARS = {
     "companies_house_api_key": "COMPANIES_HOUSE_API_KEY",
     "opensanctions_api_key": "OPENSANCTIONS_API_KEY",
 }
+
+FLOAT_FIELDS = {"timeout", "requests_per_second", "jitter"}
+INT_FIELDS = {
+    "concurrency",
+    "cache_ttl",
+    "negative_cache_ttl",
+    "max_requests",
+    "retention_days",
+}
+BOOL_FIELDS = {
+    "tor",
+    "respect_robots",
+    "keep_raw",
+    "avatar_hash",
+    "replay",
+    "trust_proxy",
+    "allow_private_targets",
+    "allow_remote_host",
+}
+PATH_FIELDS = {"db_path", "sites_path"}
+
+
+def _coerce(key: str, value: Any, where: str) -> Any:
+    """Reject a wrong-typed config value instead of accepting it silently."""
+    if key in FLOAT_FIELDS:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ConfigError(f"{where}: {key} must be a number, got {value!r}")
+        return float(value)
+    if key in INT_FIELDS:
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ConfigError(f"{where}: {key} must be an integer, got {value!r}")
+        return value
+    if key in BOOL_FIELDS:
+        if not isinstance(value, bool):
+            raise ConfigError(f"{where}: {key} must be true or false, got {value!r}")
+        return value
+    if key in PATH_FIELDS:
+        if not isinstance(value, str):
+            raise ConfigError(f"{where}: {key} must be a path string, got {value!r}")
+        return Path(value).expanduser()
+    if key == "mastodon_instances":
+        if not isinstance(value, (str, list)):
+            raise ConfigError(f"{where}: {key} must be a string or a list, got {value!r}")
+        return _instances(value)
+    if value is not None and not isinstance(value, str):
+        raise ConfigError(f"{where}: {key} must be a string, got {value!r}")
+    return value
+
+
+def _env_number(name: str, value: str, cast: type) -> Any:
+    try:
+        return cast(value)
+    except ValueError as exc:
+        kind = "a number" if cast is float else "an integer"
+        raise ConfigError(f"{name} must be {kind}, got {value!r}") from exc
+
+
+def _env_bool(value: str) -> bool:
+    return value.strip().lower() in ("1", "true", "yes", "on")
+
 
 SECRET_FIELDS = {
     "github_token",
@@ -127,6 +193,7 @@ class Settings:
     web_token: str | None = None
     trust_proxy: bool = False
     allow_private_targets: bool = False
+    allow_remote_host: bool = False
     sites_path: Path = field(
         default_factory=lambda: Path(__file__).resolve().parent / "data" / "sites.toml"
     )
@@ -140,12 +207,13 @@ class Settings:
             with path.open("rb") as handle:
                 data = tomllib.load(handle)
         known = {f.name for f in fields(cls)} - {"config_path"}
-        values = {key: value for key, value in data.items() if key in known}
-        if "mastodon_instances" in values:
-            values["mastodon_instances"] = _instances(values["mastodon_instances"])
-        for key in ("db_path", "sites_path"):
-            if key in values:
-                values[key] = Path(values[key]).expanduser()
+        unknown = sorted(set(data) - known)
+        if unknown:
+            raise ConfigError(
+                f"{path}: unknown key(s): {', '.join(unknown)}. "
+                f"Known keys: {', '.join(sorted(known))}"
+            )
+        values = {key: _coerce(key, value, str(path)) for key, value in data.items()}
         settings = cls(**values)
         settings.config_path = path if path.is_file() else None
         settings._apply_env()
@@ -156,11 +224,11 @@ class Settings:
         if value := env.get("COLDTRAIL_DB"):
             self.db_path = Path(value).expanduser()
         if value := env.get("COLDTRAIL_TIMEOUT"):
-            self.timeout = float(value)
+            self.timeout = _env_number("COLDTRAIL_TIMEOUT", value, float)
         if value := env.get("COLDTRAIL_CONCURRENCY"):
-            self.concurrency = int(value)
+            self.concurrency = _env_number("COLDTRAIL_CONCURRENCY", value, int)
         if value := env.get("COLDTRAIL_RPS"):
-            self.requests_per_second = float(value)
+            self.requests_per_second = _env_number("COLDTRAIL_RPS", value, float)
         if value := env.get("COLDTRAIL_USER_AGENT"):
             self.user_agent = value
         if value := env.get("COLDTRAIL_MASTODON_INSTANCES"):
@@ -168,23 +236,25 @@ class Settings:
         if value := env.get("COLDTRAIL_PROXY"):
             self.proxy = value
         if value := env.get("COLDTRAIL_MAX_REQUESTS"):
-            self.max_requests = int(value)
+            self.max_requests = _env_number("COLDTRAIL_MAX_REQUESTS", value, int)
         if value := env.get("COLDTRAIL_CACHE_TTL"):
-            self.cache_ttl = int(value)
+            self.cache_ttl = _env_number("COLDTRAIL_CACHE_TTL", value, int)
         if value := env.get("COLDTRAIL_RETENTION_DAYS"):
-            self.retention_days = int(value)
+            self.retention_days = _env_number("COLDTRAIL_RETENTION_DAYS", value, int)
         if value := env.get("COLDTRAIL_TOR"):
-            self.tor = value.lower() in ("1", "true", "yes")
+            self.tor = _env_bool(value)
         if value := env.get("COLDTRAIL_KEEP_RAW"):
-            self.keep_raw = value.lower() in ("1", "true", "yes")
+            self.keep_raw = _env_bool(value)
         if value := env.get("COLDTRAIL_AVATAR_HASH"):
-            self.avatar_hash = value.lower() in ("1", "true", "yes")
+            self.avatar_hash = _env_bool(value)
         if value := env.get("COLDTRAIL_WEB_TOKEN"):
             self.web_token = value
         if value := env.get("COLDTRAIL_TRUST_PROXY"):
-            self.trust_proxy = value.lower() in ("1", "true", "yes")
+            self.trust_proxy = _env_bool(value)
         if value := env.get("COLDTRAIL_ALLOW_PRIVATE_TARGETS"):
-            self.allow_private_targets = value.lower() in ("1", "true", "yes")
+            self.allow_private_targets = _env_bool(value)
+        if value := env.get("COLDTRAIL_ALLOW_REMOTE_HOST"):
+            self.allow_remote_host = _env_bool(value)
         self.github_token = env.get("GITHUB_TOKEN") or self.github_token
         self.hibp_api_key = env.get("HIBP_API_KEY") or self.hibp_api_key
         self.emailrep_api_key = env.get("EMAILREP_API_KEY") or self.emailrep_api_key

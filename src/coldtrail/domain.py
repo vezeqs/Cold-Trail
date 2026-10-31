@@ -9,7 +9,7 @@ import struct
 from typing import Any
 
 from .http import Fetcher, FetchError
-from .security import is_public_host
+from .security import is_public_host, resolve_public_ips
 from .utils import dedupe, sensitive_cache_key
 
 RDAP = "https://rdap.org/domain"
@@ -94,6 +94,18 @@ async def dns(fetcher: Fetcher, name: str, record_type: str) -> list[str]:
     return dedupe([str(answer.get("data")) for answer in answers if answer.get("data")])
 
 
+def _domain_matches(host: str, suffix: str) -> bool:
+    """True when *host* is *suffix* or a subdomain of it.
+
+    A bare ``endswith`` also matches lookalikes (``notexample.com`` ends with
+    ``example.com``), which produced false subdomains, MX providers, and
+    takeover findings.
+    """
+    host = host.casefold().rstrip(".")
+    suffix = suffix.casefold().rstrip(".")
+    return bool(suffix) and (host == suffix or host.endswith(f".{suffix}"))
+
+
 async def crtsh(fetcher: Fetcher, domain: str, limit: int = 200) -> list[str]:
     try:
         status, data = await fetcher.get_json(CRTSH, params={"q": f"%.{domain}", "output": "json"})
@@ -105,7 +117,7 @@ async def crtsh(fetcher: Fetcher, domain: str, limit: int = 200) -> list[str]:
     for entry in data[:limit]:
         for value in str(entry.get("name_value") or "").splitlines():
             value = value.strip().lstrip("*.").casefold()
-            if value and value.endswith(domain):
+            if value and _domain_matches(value, domain):
                 names.append(value)
     return dedupe(sorted(names))
 
@@ -114,7 +126,7 @@ def guess_mx_provider(mx_records: list[str]) -> str | None:
     for record in mx_records:
         low = record.casefold().rstrip(".")
         for suffix, provider in MX_PROVIDERS.items():
-            if low.endswith(suffix):
+            if _domain_matches(low, suffix):
                 return provider
     return None
 
@@ -208,7 +220,7 @@ async def check_subdomain_takeover(
     for cname in cname_records:
         low = cname.casefold().rstrip(".")
         for suffix, (service, fingerprint) in TAKEOVER_CNAMES.items():
-            if low.endswith(suffix):
+            if _domain_matches(low, suffix):
                 try:
                     status, text = await fetcher.get_text(f"http://{domain}")
                 except FetchError:
@@ -253,13 +265,15 @@ async def lookup_domain(fetcher: Fetcher, domain: str, *, deep: bool = False) ->
             fetch_security_txt(fetcher, domain),
             fetch_favicon_hash(fetcher, domain),
             check_subdomain_takeover(fetcher, domain, cname),
-            tls_cert_info(domain),
+            tls_cert_info(domain, settings=fetcher.settings),
         )
         result["dmarc"] = dmarc
         result["security_txt"] = sec_txt
         result["favicon_mmh3"] = fav_hash
         result["takeover"] = takeover
         result["tls"] = tls
+        if tls is None and (fetcher.settings.tor or fetcher.settings.proxy):
+            result["tls_skipped"] = "direct TLS probe disabled with --proxy/--tor"
     return result
 
 
@@ -450,13 +464,29 @@ async def crtsh_identities(
 
 
 async def tls_cert_info(
-    domain: str, port: int = 443, timeout: float = 6.0
+    domain: str,
+    port: int = 443,
+    timeout: float = 6.0,
+    *,
+    settings: Any = None,
 ) -> dict[str, Any] | None:
-    """Perform a live TLS handshake and extract subject, issuer, SANs, and validity."""
+    """Perform a live TLS handshake and extract subject, issuer, SANs, and validity.
+
+    This is a raw socket, so it cannot use the configured proxy: with ``--tor``
+    or ``--proxy`` it is skipped rather than leaking a direct connection. The
+    hostname is resolved once and the handshake is pinned to the validated
+    address, so a second DNS answer cannot redirect it into loopback.
+    """
+    if settings is not None and (settings.tor or settings.proxy):
+        return None
+    try:
+        addresses = resolve_public_ips(domain)
+    except ValueError:
+        return None
     context = ssl.create_default_context()
     try:
         _reader, writer = await asyncio.wait_for(
-            asyncio.open_connection(domain, port, ssl=context, server_hostname=domain),
+            asyncio.open_connection(addresses[0], port, ssl=context, server_hostname=domain),
             timeout=timeout,
         )
     except (TimeoutError, OSError, ssl.SSLError):

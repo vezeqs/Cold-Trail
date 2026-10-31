@@ -42,7 +42,7 @@ dependencies = [
 ]
 
 [project.scripts]
-coldtrail = "coldtrail.cli:app"
+coldtrail = "coldtrail.cli:main"
 
 [project.urls]
 Homepage = "https://vezeqs.github.io/Cold-Trail/"
@@ -71,6 +71,9 @@ packages = ["src/coldtrail"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+markers = [
+    "network: test may open a real connection (everything else is offline)",
+]
 
 [tool.coverage.run]
 source = ["coldtrail"]

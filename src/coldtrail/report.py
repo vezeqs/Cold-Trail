@@ -100,6 +100,18 @@ def to_jsonl(payload: dict[str, Any]) -> str:
     return "\n".join(iter_jsonl(payload))
 
 
+def _csv_cell(value: Any) -> Any:
+    """Neutralize spreadsheet formulas in harvested, attacker-controlled text.
+
+    A bio or post starting with ``=``, ``+``, ``-`` or ``@`` is executed by
+    Excel/LibreOffice on open (DDE, HYPERLINK). Prefixing an apostrophe keeps
+    the value readable while forcing it to be treated as text.
+    """
+    if isinstance(value, str) and value.startswith(("=", "+", "-", "@", "\t", "\r")):
+        return f"'{value}"
+    return value
+
+
 def iter_csv(payload: dict[str, Any], table: str = "profiles"):
     """Yield a CSV header then one row at a time."""
     rows = payload.get(table) or []
@@ -110,9 +122,9 @@ def iter_csv(payload: dict[str, Any], table: str = "profiles"):
         flat = {}
         for key, value in row.items():
             if isinstance(value, (dict, list)):
-                flat[key] = json.dumps(value, ensure_ascii=False, default=str)
+                flat[key] = _csv_cell(json.dumps(value, ensure_ascii=False, default=str))
             else:
-                flat[key] = value
+                flat[key] = _csv_cell(value)
         flat_rows.append(flat)
     fieldnames = list(dict.fromkeys(key for row in flat_rows for key in row))
     buffer = io.StringIO()
@@ -677,10 +689,14 @@ def to_maltego_csv(payload: dict[str, Any]) -> str:
     """Export links and entity observations as a Maltego-importable edge table."""
     buffer = io.StringIO()
     writer = csv.writer(buffer)
+
+    def write(values: list[Any]) -> None:
+        writer.writerow([_csv_cell(value) for value in values])
+
     header = ["SourceType", "SourceValue", "Relation", "TargetType", "TargetValue", "Weight"]
-    writer.writerow(header)
+    write(header)
     for link in payload.get("links") or []:
-        writer.writerow(
+        write(
             [
                 "maltego.Alias",
                 f"{link['source_a']}:{link['username_a']}",
@@ -691,7 +707,7 @@ def to_maltego_csv(payload: dict[str, Any]) -> str:
             ]
         )
     for ent in payload.get("entities") or []:
-        writer.writerow(
+        write(
             [
                 "maltego.Alias",
                 f"{ent.get('source')}:{ent.get('username')}",
@@ -702,7 +718,7 @@ def to_maltego_csv(payload: dict[str, Any]) -> str:
             ]
         )
     for edge in payload.get("edges") or []:
-        writer.writerow(
+        write(
             [
                 "maltego.Alias",
                 f"{edge.get('platform')}:{edge.get('actor')}",

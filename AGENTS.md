@@ -12,7 +12,9 @@ Python 3.11+, `uv`, `src/` layout, async `httpx`, Pydantic v2, SQLite + FTS5.
 The CLI exposes 48 top-level commands and 61 leaf commands.
 
 The public APIs are stable: `from coldtrail.store import Store`,
-`from coldtrail.cli import app`, entry point `coldtrail.cli:app`.
+`from coldtrail.cli import app`, entry point `coldtrail.cli:main` (a wrapper that
+turns `ConfigError`/`StoreError` into one line and exit 2; `app` stays the
+Typer object).
 
 ## Which entry point answers which question
 
@@ -58,7 +60,7 @@ uv run --with playwright python scripts/capture_media.py  # regenerate README pr
 
 ```
 src/coldtrail/
-├── cli/            Typer commands (entry point: coldtrail.cli:app)
+├── cli/            Typer commands (entry point: coldtrail.cli:main)
 │   ├── _app.py       app, global callback (settings/audit/source sync), renderers
 │   ├── collect.py    pivot, batch, harvest, graph, watch, recluster
 │   ├── query.py      profiles, posts, links, clusters, entities, runs, edges,
@@ -118,25 +120,31 @@ src/coldtrail/
 
 1. **Tests never touch the network.** `respx` for sources, `TestClient` for web,
    `App.run_test()` for TUI, monkeypatched workers for pivot/harvest.
+   `tests/conftest.py` blocks `socket.connect` for every test; a test that really
+   needs a socket must carry `@pytest.mark.network`.
 2. **Timestamps sort chronologically.** Never `sorted(..., key=created_at)` or
    `min()/max()` on display strings. Use `utils.epoch_seconds()` or the stored
-   `created_ts`. This applies to SQL, reports, harvest windows, and watch.
+   `created_ts`. This applies to SQL, reports, harvest windows, watch, and
+   `analysis.infer_timezone` (bin in UTC, not in the source offset).
 3. **Untrusted text is escaped in the right context.** HTML: Jinja autoescape or
    `html.escape`. XML attributes: `quoteattr`, not `escape`. Markdown tables:
    `_md_cell`. DOT: `_dot_escape`. URLs: `_safe_url`/`report.link` (http/https only).
+   CSV: `report._csv_cell`, or a harvested `=HYPERLINK(...)` executes on open.
 4. **The cache never hides a failure.** A blocked/WAF page must not be written to
    `http_cache`; a cache hit is re-classified before being returned. Cache keys
    vary by `Accept`, and cached bodies decode with their stored charset.
 5. **Evidence is content-addressed and path-safe.** Hash the bytes you read,
    require 64 lowercase hex characters before joining a blob path, and keep
-   `evidence verify` able to detect missing/tampered blobs.
+   `evidence verify` able to detect missing/tampered blobs. `source_path` input
+   is streamed (`_store_blob_from_path`), never read into RAM.
 6. **Privacy defaults do not regress:** `keep_raw=False`, `avatar_hash=False`,
    DB/WAL/SHM/evidence/exports `0600`, evidence dirs `0700`, Tor `socks5h://`,
    email targets hashed with `sensitive_cache_key`, no telemetry, and non-loopback
    `serve` requires a token unless `--allow-unauthenticated` is explicit.
+   Exports are created 0600 by `os.open`, not by a chmod after the write.
 7. **Secrets never reach output.** `doctor`/`config` redact proxy userinfo and
    key values; `_redact_argv` covers `--token`, `--passphrase`, `--api-key`,
-   `--secret`, `--key`, and `--proxy`.
+   `--secret`, `--key`, and `--proxy`. `redact_url_credentials` never raises.
 8. **Persistence goes through `pivot.persist_pivot(store, report)`.** CLI, TUI,
    and web must not duplicate run-saving logic.
 9. **SQLite connections are thread-bound.** Each thread/request opens its own
@@ -150,10 +158,20 @@ src/coldtrail/
     hash transmission; Pwned Passwords sends only the 5-char SHA-1 prefix.
 13. **No guard rails that weaken collection.** Do not add artificial caps or
     allowlists that reduce coverage. Rate limiting/pacing is politeness, not
-    restriction.
+    restriction. (`MAX_RETRY_AFTER` caps a *sleep*, not a source.)
 14. **Public API and schema paths stay compatible.** Add columns via
     `store/schema.py::COLUMNS` and keep the `PRAGMA user_version` migration path
     working (current: 7).
+15. **The web UI is Host/Origin gated.** Loopback names (plus `testserver` in
+    tests) are accepted unless `settings.allow_remote_host`; a non-GET request
+    with a foreign `Origin` or a cross-site `Sec-Fetch-Site` is 403. `serve`
+    sets `allow_remote_host` only for a deliberate non-loopback bind.
+16. **A raw socket must validate and pin.** `tls_cert_info` resolves through
+    `security.resolve_public_ips` and connects to the validated address; with
+    `--proxy`/`--tor` it refuses instead of leaking a direct connection.
+17. **Config is closed and typed.** `Settings.load` rejects unknown keys and
+    wrong types (`ConfigError`); every `COLDTRAIL_*` value is parsed through
+    `_env_number`/`_env_bool` so a typo is a one-line error, not a traceback.
 
 ## Sharp edges (each one already produced a bug here)
 
@@ -259,6 +277,33 @@ src/coldtrail/
 - **Contract fixtures** (`tests/fixtures/contracts/*.json`) embed decompressed
   bodies; raw rows in SQLite are zlib-compressed. Re-record with
   `coldtrail source verify --record -s <source>`.
+- **`_PinnedTransport` must not rewrite a URL another layer owns.** respx swaps
+  the httpcore pool's `handle_async_request`; `_owns_routing()` detects that and
+  passes the request through untouched. Remove that check and every mocked
+  source test matches on an IP instead of a hostname.
+- **The redirect check resolves DNS only when the host changed** (`resolve=True`)
+  and falls back to `resolve=False` for the unchanged case, so literal private
+  IPs stay blocked without a DNS lookup on every response.
+- **`Retry-After` above `MAX_RETRY_AFTER` is a refusal, not a sleep.** A source
+  asking for an hour must fail the check, not stall `asyncio.gather`.
+- **Suffix matching needs a label boundary.** `_domain_matches` (not `endswith`)
+  for CT subdomains, MX providers, and takeover CNAMEs; `notexample.com` is not
+  a subdomain of `example.com`.
+- **`tls_cert_info` takes `settings` and refuses under `--proxy`/`--tor`.** It is
+  a raw socket, so it cannot use the proxy; returning `None` is the honest
+  answer, and `lookup_domain` records `tls_skipped`.
+- **`Settings.load` is a closed schema.** Unknown keys, `[section]` tables, and
+  wrong types raise `ConfigError`; add new settings to `ENV_VARS`, `_coerce`
+  type sets, and the README table together.
+- **`Store.__init__` raises `StoreError`, and `run_cli` maps it to exit 2.**
+  Tests that invoke `app` directly still see the exception; assert on
+  `StoreError`, not a traceback string.
+- **The login cookie is `"<issued>.<hmac>"`.** `_cookie_is_valid` rejects a
+  tampered or expired value; `_cookie_value` needs the issue time, and the
+  docstring must not claim the cookie is harmless — it is a bearer credential
+  for its lifetime.
+- **Web tests send `Host: testserver`.** It is in `LOOPBACK_HOSTS`; a new
+  non-loopback test must set `settings.allow_remote_host = True`.
 
 ## Testing rules
 
@@ -270,7 +315,10 @@ src/coldtrail/
 - Async web jobs: poll `/api/jobs/{id}` until `done`/`error`
   (`_wait_job` in `tests/test_web.py`).
 - Every bug fix gets a regression test. The 2026-10-30 audit tests live in
-  `tests/test_audit_fixes.py`; 0.10 features in `tests/test_features_v10.py`.
+  `tests/test_audit_fixes.py`; the 2026-10-31 pass in
+  `tests/test_audit_2026_10_31.py`; 0.10 features in `tests/test_features_v10.py`.
+- `tests/conftest.py` blocks real sockets for every test. A test that needs one
+  must be marked `@pytest.mark.network`, and that marker needs a reason.
 - Source tests: `tests/test_sources.py`, `test_new_sources.py`,
   `test_sources_expanded.py`; engine: `test_engine_upgrades.py`; workflows:
   `test_workflows.py`; contracts: `test_contracts.py`; evidence:

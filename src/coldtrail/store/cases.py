@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from ..utils import now_iso
+from ..utils import json_loads, now_iso
 
 
 class CasesMixin:
@@ -23,7 +23,7 @@ class CasesMixin:
         out = []
         for row in rows:
             item = dict(row)
-            item["args"] = json.loads(item.pop("args_json"))
+            item["args"] = json_loads(item.pop("args_json"), {})
             out.append(item)
         return out
 
@@ -154,6 +154,7 @@ class CasesMixin:
         target_type: str | None = None,
         target: str | None = None,
         limit: int = 200,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         clauses: list[str] = []
         params: list[Any] = []
@@ -167,9 +168,9 @@ class CasesMixin:
             clauses.append("target = ? COLLATE NOCASE")
             params.append(target)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-        params.append(limit)
+        params.extend([limit, offset])
         rows = self.conn.execute(
-            f"SELECT * FROM attachments {where} ORDER BY id DESC LIMIT ?", params
+            f"SELECT * FROM attachments {where} ORDER BY id DESC LIMIT ? OFFSET ?", params
         ).fetchall()
         return [dict(row) for row in rows]
 

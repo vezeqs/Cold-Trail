@@ -59,6 +59,9 @@ SSE_HEARTBEAT = 15.0
 SSE_MAX_SECONDS = 3600.0
 PUBLIC_PATHS = {"/healthz", "/api/health", "/login", "/logout"}
 COOKIE_NAME = "coldtrail_token"
+COOKIE_MAX_AGE = 86_400
+LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1", "testserver"}
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 CSV_TABLES = {
     "run",
@@ -74,13 +77,28 @@ CSV_TABLES = {
 }
 
 
-def _cookie_value(token: str) -> str:
-    """Derive the browser cookie from the shared token.
+def _cookie_value(token: str, issued_at: int) -> str:
+    """Derive the browser cookie from the shared token and an issue time.
 
-    The cookie is an HMAC, never the bearer secret itself, so a cookie leak or
-    browser sync does not expose the API token.
+    The cookie is an HMAC, never the token itself, and it carries an issue time
+    so the server can expire it. It is still a bearer credential for its
+    lifetime: anyone holding it can use the UI until it expires or the token
+    changes.
     """
-    return hmac.new(token.encode("utf-8"), b"coldtrail-cookie-v1", hashlib.sha256).hexdigest()
+    stamp = str(int(issued_at))
+    signature = hmac.new(
+        token.encode("utf-8"), f"coldtrail-cookie-v1:{stamp}".encode(), hashlib.sha256
+    ).hexdigest()
+    return f"{stamp}.{signature}"
+
+
+def _cookie_is_valid(cookie: str, token: str, *, max_age: int = COOKIE_MAX_AGE) -> bool:
+    stamp, _, signature = cookie.partition(".")
+    if not stamp.isdigit() or not signature:
+        return False
+    if time.time() - int(stamp) > max_age:
+        return False
+    return hmac.compare_digest(cookie, _cookie_value(token, int(stamp)))
 
 
 @dataclass

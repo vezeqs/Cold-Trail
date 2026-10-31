@@ -12,7 +12,7 @@ dossiers — from a CLI, a TUI, or a local web UI.
 ![Real coldtrail pivot output](docs/assets/cli-pivot.gif)
 
 *Real `coldtrail pivot octocat` output, captured by `scripts/capture_media.py`.
-`octocat` is a shared handle: the 19 hits below are public accounts with that
+`octocat` is a shared handle: the 16 hits below are public accounts with that
 name, not a claim that they belong to one person.*
 
 ## The problem
@@ -50,8 +50,11 @@ reviewer.
 
 ![ColdTrail web dashboard](docs/assets/web-dashboard.png)
 
-*The dashboard after the live `octocat` pivot: 40 checks, 20 profiles, 17
-correlation links, 1 cluster, and per-source health.*
+*The dashboard after the live `octocat` pivot: 40 checks, 17 profiles, 2
+extracted entities, and per-source health. Links and clusters are 0 here on
+purpose — a shared handle is not evidence, so this run produces no correlation
+until two profiles share something stronger (bio, website, avatar, or a
+cryptographic identifier).*
 
 ## Quickstart
 
@@ -101,8 +104,11 @@ check as an SSE event while the page fills in.*
 
 ![Identity graph settling](docs/assets/web-graph.gif)
 
-*Profile nodes, extracted-entity nodes, and correlation edges. The canvas runs
-a force simulation; nodes are draggable and the graph is clickable.*
+*Profile nodes, extracted-entity nodes, and the edges between them. The canvas
+runs a force simulation; nodes are draggable and the graph is clickable. This
+run has no correlation edges because a shared handle is not evidence — the
+entity edges (`mastodon` → `domain:octocat.se`, `ens` → `eth:0xA16a…`) are
+what the extractor found.*
 
 ### Run diff
 
@@ -181,8 +187,9 @@ time uv run coldtrail pivot alice --web --no-save
 time uv run coldtrail pivot alice --no-save          # warm cache
 ```
 
-The 2026-10-30 audit run of `pivot octocat` (curated sources) completed 40
-checks with 19 found, 10 blocked, and 11 not found. Blocked sources are reported
+The 2026-10-31 captures of `pivot octocat` (curated sources) completed 40
+checks: 16-17 found depending on which sources were reachable, 9 blocked, 4
+timed out, 11 not found. Blocked sources are reported
 as blocked, not silently dropped.
 
 ## Privacy first
@@ -207,9 +214,15 @@ ColdTrail is designed to keep investigations on your machine.
 - **Redirects are re-validated.** A public URL may not redirect into loopback, link-local,
   `.local`, or a literal private address unless `--allow-private-targets` is explicit.
 - **Web UI is local and locked down.** Binds `127.0.0.1`; non-loopback binds require
-  `--token` (or an explicit `--allow-unauthenticated`); cookies are HMAC-derived; CSP,
-  `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, and no third-party assets.
-  `/healthz` returns a fixed `database unavailable` detail, never exception text.
+  `--token` (or an explicit `--allow-unauthenticated`); cookies are HMAC-derived with a
+  server-side expiry; CSP, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, and
+  no third-party assets. `/healthz` returns a fixed `database unavailable` detail, never
+  exception text.
+- **The web UI refuses foreign hosts and cross-site writes.** Requests must carry a
+  loopback `Host` header; a non-GET request with a foreign `Origin` or a cross-site
+  `Sec-Fetch-Site` is answered `403`. That closes DNS rebinding and drive-by form posts
+  from any page the analyst happens to visit. A deliberate non-loopback bind opts in with
+  `--host` plus a token (or `COLDTRAIL_ALLOW_REMOTE_HOST=1`).
 - **Redaction and encryption.** Exports support `--redact`; encrypted exports use
   PBKDF2 + Fernet.
 - **Retention.** `--retention-days N` or `prune --days N` removes old runs, raw/cache rows,
@@ -237,9 +250,13 @@ machines. `--raw` and the local HTTP cache can retain third-party content. See
   handle used to demonstrate the mechanics.
 - **Timezone inference is ambiguous.** Posting-hour analysis cannot distinguish
   UTC+13 from UTC-11; the value is a hint.
-- **DNS rebinding is a known TOCTOU.** Host validation resolves once; a pinned-IP
-  transport is future work. Keep the web UI on loopback or behind an
-  authenticating proxy.
+- **DNS rebinding is a known TOCTOU.** Host validation resolves once; direct HTTP
+  connections are pinned to the validated address (`_PinnedTransport`), and the TLS
+  probe resolves and pins too, but a proxied client leaves resolution to the proxy.
+  Keep the web UI on loopback or behind an authenticating proxy.
+- **The TLS probe needs a direct connection.** `domain --deep` skips the raw TLS
+  handshake when `--tor` or `--proxy` is set (it would otherwise bypass the proxy and
+  leak your address); the payload reports `tls_skipped` instead of a certificate.
 - **Correlation is O(n²).** A full 482-source pivot evaluates ~116k pairs; network
   time still dominates.
 - **No encryption at rest by default.** Use full-disk encryption or `--encrypt`

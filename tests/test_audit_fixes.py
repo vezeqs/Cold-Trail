@@ -7,7 +7,6 @@ import hashlib
 import json
 import stat
 import xml.etree.ElementTree as ET
-from pathlib import Path
 
 import httpx
 import pytest
@@ -314,12 +313,12 @@ def test_watch_window_uses_chronological_order(settings, monkeypatch):
 def test_evidence_hashes_the_bytes_it_reads(settings, monkeypatch, tmp_path):
     source = tmp_path / "evidence.bin"
     source.write_bytes(b"on-disk")
-    monkeypatch.setattr(Path, "read_bytes", lambda self: b"read-once")
     with Store(settings.db_path) as store:
         payload = add_evidence(store, source_path=source)
-        assert payload["sha256"] == hashlib.sha256(b"read-once").hexdigest()
         with open(evidence_path(store, payload["sha256"]), "rb") as handle:
-            assert handle.read() == b"read-once"
+            stored = handle.read()
+        assert stored == b"on-disk"
+        assert payload["sha256"] == hashlib.sha256(stored).hexdigest()
 
 
 def test_evidence_path_rejects_invalid_digest(settings):

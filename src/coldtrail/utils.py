@@ -46,10 +46,21 @@ def sensitive_cache_key(prefix: str, value: str) -> str:
 
 
 def write_private(path: Path, data: bytes) -> None:
-    """Write an export/evidence copy with owner-only permissions."""
+    """Write an export/evidence copy with owner-only permissions.
+
+    The file is created with mode 0600 under ``umask(0o077)``; a write-then-chmod
+    leaves a world-readable window on a shared host and silently keeps 0644 when
+    chmod is unsupported.
+    """
     destination = Path(path).expanduser()
     destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_bytes(data)
+    previous_umask = os.umask(0o077)
+    try:
+        handle = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    finally:
+        os.umask(previous_umask)
+    with os.fdopen(handle, "wb") as stream:
+        stream.write(data)
     with contextlib.suppress(OSError):
         os.chmod(destination, 0o600)
 
@@ -182,16 +193,23 @@ def json_loads(value: object, default: object) -> object:
 
 
 def redact_url_credentials(value: str | None) -> str | None:
-    """Strip ``user:password@`` from a URL before it reaches output or logs."""
+    """Strip ``user:password@`` from a URL before it reaches output or logs.
+
+    A malformed URL (bad port, unbalanced IPv6 bracket) must not crash the
+    commands whose job is to explain a bad setting, so it degrades to a marker.
+    """
     if not value:
         return value
-    parts = urlsplit(value)
-    if not parts.username and not parts.password:
-        return value
-    host = parts.hostname or ""
+    try:
+        parts = urlsplit(value)
+        if not parts.username and not parts.password:
+            return value
+        host = parts.hostname or ""
+        port = f":{parts.port}" if parts.port else ""
+    except ValueError:
+        return "[invalid url]"
     if ":" in host:
         host = f"[{host}]"
-    port = f":{parts.port}" if parts.port else ""
     netloc = f"[redacted]@{host}{port}"
     return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
 

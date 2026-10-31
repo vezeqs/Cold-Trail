@@ -6,6 +6,43 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Web UI: requests with a non-loopback `Host` header are refused, and non-GET
+  requests with a foreign `Origin` or a cross-site `Sec-Fetch-Site` are `403`.
+  Loopback binding is not a security boundary — DNS rebinding and drive-by form
+  posts reached every page and API route before this.
+- The TLS probe (`domain --deep`) resolves once and connects to the validated
+  address, and is skipped under `--proxy`/`--tor` instead of opening a direct
+  socket that bypassed the proxy.
+- Direct HTTP connections are pinned to the validated address
+  (`_PinnedTransport`), closing the check-then-resolve window; the redirect
+  check now resolves DNS when the host changes.
+- The test suite no longer opens a real connection: `tests/conftest.py` blocks
+  `socket.connect`, and `test_lookup_domain_deep` patches the TLS probe.
+- CSV and Maltego exports neutralize spreadsheet formulas (`=`, `+`, `-`, `@`)
+  from harvested text.
+- A malformed `COLDTRAIL_*` value or config file is a one-line `ConfigError`
+  (exit 2), not a traceback; unknown keys and `[section]` tables are rejected.
+- A corrupt or unopenable database raises `StoreError` and exits 2, including
+  from `doctor`; `coldtrail.cli:main` is the new console entry point.
+- A malformed proxy URL no longer crashes `config`/`doctor`
+  (`redact_url_credentials` degrades to `[invalid url]`).
+- `Retry-After` above 10s is treated as a refusal instead of sleeping; one
+  source could stall a pivot for hours.
+- CT subdomains, MX providers, and takeover CNAMEs require a label boundary, so
+  `notexample.com` is no longer a subdomain of `example.com`.
+- `write_private` creates exports with mode 0600 via `os.open` instead of
+  chmod-after-write, which left a 0644 window and silently kept 0644 when chmod
+  failed.
+- `infer_timezone` bins posting hours in UTC, so the same instants infer the same
+  offset regardless of how the source formatted the timestamp.
+- A corrupt `audit.args_json` row no longer crashes `coldtrail audit`.
+- `timeline --since <non-ISO>` and `export --table <unknown>` fail with exit 2
+  instead of returning an empty result.
+- Evidence: `add_evidence(source_path=...)` streams the file instead of reading
+  it into RAM, and `verify_evidence` pages through attachments.
+
 ### Changed
 
 - Dependency refresh: `textual` 8.2.8, `rich` 15.0.0, `fastapi` 0.162.0,
@@ -14,6 +51,8 @@ All notable changes to this project are documented here. The format follows
   `codeql-action` v4.
 - TUI tests now read `Static` text on both Textual 2.x and 8.x via a
   `_static_text()` helper.
+- The login cookie is `"<issued>.<hmac>"` and expires server-side; it is still a
+  bearer credential for its lifetime, and the docstring now says so.
 
 ## [0.10.1] - 2026-10-30
 

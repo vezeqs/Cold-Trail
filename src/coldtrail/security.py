@@ -11,11 +11,44 @@ import ipaddress
 import socket
 from urllib.parse import urlsplit
 
+# Ranges that are not routable on the public internet but are not always covered
+# by ``ipaddress.is_private`` (it changed across Python 3.12/3.13). Pinned
+# explicitly so the answer does not depend on the interpreter version.
+NON_PUBLIC_NETWORKS = tuple(
+    ipaddress.ip_network(network)
+    for network in (
+        "0.0.0.0/8",
+        "10.0.0.0/8",
+        "100.64.0.0/10",  # CGNAT / carrier-grade NAT
+        "127.0.0.0/8",
+        "169.254.0.0/16",
+        "172.16.0.0/12",
+        "192.0.0.0/24",
+        "192.0.2.0/24",
+        "192.88.99.0/24",
+        "192.168.0.0/16",
+        "198.18.0.0/15",  # benchmarking
+        "198.51.100.0/24",
+        "203.0.113.0/24",
+        "224.0.0.0/4",
+        "240.0.0.0/4",
+        "255.255.255.255/32",
+        "::/128",
+        "::1/128",
+        "fc00::/7",
+        "fe80::/10",
+        "ff00::/8",
+        "2001:db8::/32",
+    )
+)
+
 
 def _public_ip(value: str | int) -> bool:
     try:
         ip = ipaddress.ip_address(value)
     except ValueError:
+        return False
+    if any(ip in network for network in NON_PUBLIC_NETWORKS):
         return False
     return not (
         ip.is_private
@@ -53,6 +86,29 @@ def is_public_host(host: str, *, resolve: bool = True) -> bool:
         return True
     addresses = {info[4][0] for info in infos if info[4]}
     return bool(addresses) and all(_public_ip(address) for address in addresses)
+
+
+def resolve_public_ips(host: str) -> list[str]:
+    """Resolve *host* once and return only public addresses.
+
+    Callers that open a raw socket (the TLS probe) use this to pin the
+    connection to the address that was validated, so a second DNS answer cannot
+    redirect them into loopback.
+    """
+    try:
+        infos = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
+    except OSError as exc:
+        raise ValueError(f"could not resolve {host}: {exc}") from exc
+    addresses = sorted({str(info[4][0]) for info in infos if info[4]})
+    if not addresses:
+        raise ValueError(f"could not resolve {host}")
+    blocked = [address for address in addresses if not _public_ip(address)]
+    if blocked:
+        raise ValueError(
+            f"{host} resolves to non-public address(es): {', '.join(blocked)}; "
+            "use --allow-private-targets only for authorized internal recon"
+        )
+    return addresses
 
 
 def host_of(value: str) -> str | None:

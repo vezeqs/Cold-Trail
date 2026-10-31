@@ -56,8 +56,14 @@ def test_favicon_shodan_hash_returns_int():
 
 
 @respx.mock
-async def test_lookup_domain_deep(settings):
+async def test_lookup_domain_deep(settings, monkeypatch):
     domain = "example.com"
+
+    async def no_live_tls(*args, **kwargs):
+        # The TLS probe is a raw socket, so respx cannot intercept it.
+        return {"subject_cn": domain, "issuer_cn": "test", "sans": [domain]}
+
+    monkeypatch.setattr("coldtrail.domain.tls_cert_info", no_live_tls)
 
     def dns_response(*answers):
         return httpx.Response(200, json={"Answer": list(answers)})

@@ -55,6 +55,10 @@ def export_cmd(
             raise typer.Exit(code=1) from exc
     if redact:
         payload = redact_payload(payload)
+    if format.casefold() == "csv" and table not in payload:
+        raise typer.BadParameter(
+            f"unknown table {table!r}; choose from {', '.join(sorted(payload))}"
+        )
     text = _render_format(payload, format, table, redacted=redact)
     data = text.encode()
     if encrypt:
