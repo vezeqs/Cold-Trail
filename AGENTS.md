@@ -283,7 +283,9 @@ src/coldtrail/
 - **`_PinnedTransport` must not rewrite a URL another layer owns.** respx swaps
   the httpcore pool's `handle_async_request`; `_owns_routing()` detects that and
   passes the request through untouched. Remove that check and every mocked
-  source test matches on an IP instead of a hostname.
+  source test matches on an IP instead of a hostname. It also prefers an IPv4
+  address when a dual-stack host publishes one; taking `addresses[0]` blindly
+  times out on IPv4-only networks.
 - **The redirect check resolves DNS only when the host changed** (`resolve=True`)
   and falls back to `resolve=False` for the unchanged case, so literal private
   IPs stay blocked without a DNS lookup on every response.

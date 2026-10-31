@@ -111,6 +111,25 @@ def resolve_public_ips(host: str) -> list[str]:
     return addresses
 
 
+def preferred_public_ip(addresses: list[str]) -> str:
+    """Return an IPv4 address when the host publishes one, else the first.
+
+    Dual-stack hosts often return AAAA records before A. A pinned connection
+    that always takes ``addresses[0]`` then times out on IPv4-only networks;
+    preferring IPv4 keeps the common case working while still pinning to a
+    validated address.
+    """
+    if not addresses:
+        raise ValueError("no addresses to pin")
+    for address in addresses:
+        try:
+            if ipaddress.ip_address(address).version == 4:
+                return address
+        except ValueError:
+            continue
+    return addresses[0]
+
+
 def host_of(value: str) -> str | None:
     raw = value.strip()
     if not raw:

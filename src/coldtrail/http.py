@@ -16,7 +16,7 @@ from urllib.robotparser import RobotFileParser
 import httpx
 
 from .config import ConfigError, Settings
-from .security import is_public_host, resolve_public_ips
+from .security import is_public_host, preferred_public_ip, resolve_public_ips
 from .utils import now_iso
 
 if TYPE_CHECKING:
@@ -104,7 +104,7 @@ class _PinnedTransport(httpx.AsyncHTTPTransport):
         if _is_ip_literal(host):
             return
         try:
-            pinned = resolve_public_ips(host)[0]
+            pinned = preferred_public_ip(resolve_public_ips(host))
         except ValueError as exc:
             raise httpx.ConnectError(str(exc), request=request) from exc
         request.url = original.copy_with(host=pinned)

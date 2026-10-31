@@ -26,7 +26,7 @@ from coldtrail.evidence import add_evidence, evidence_path, verify_evidence
 from coldtrail.http import BlockedError, Fetcher
 from coldtrail.models import Post
 from coldtrail.report import to_csv, to_maltego_csv
-from coldtrail.security import is_public_host, resolve_public_ips
+from coldtrail.security import is_public_host, preferred_public_ip, resolve_public_ips
 from coldtrail.store import Store
 from coldtrail.store.base import StoreError
 from coldtrail.utils import redact_url_credentials, write_private
@@ -199,6 +199,57 @@ def test_tls_probe_refuses_private_resolution(monkeypatch):
 def test_resolve_public_ips_rejects_private_answers():
     with pytest.raises(ValueError, match="non-public"):
         resolve_public_ips("localhost")
+
+
+def test_preferred_public_ip_prefers_ipv4():
+    assert preferred_public_ip(["2001:4860:4860::8888", "8.8.8.8"]) == "8.8.8.8"
+    assert preferred_public_ip(["2001:4860:4860::8888"]) == "2001:4860:4860::8888"
+
+
+def test_pinned_transport_prefers_ipv4(monkeypatch):
+    from coldtrail.http import _PinnedTransport
+
+    monkeypatch.setattr(
+        "coldtrail.security.socket.getaddrinfo",
+        lambda *a, **k: [
+            (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("2001:4860:4860::8888", 0, 0, 0)),
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 0)),
+        ],
+    )
+    transport = _PinnedTransport()
+    request = httpx.Request("GET", "https://dns.google/resolve")
+    transport._pin(request)
+    assert request.url.host == "8.8.8.8"
+    assert request.headers["host"] == "dns.google"
+
+
+def test_tls_probe_prefers_ipv4(monkeypatch):
+    captured = {}
+
+    class FakeWriter:
+        def get_extra_info(self, name):
+            return None
+
+        def close(self):
+            return None
+
+        async def wait_closed(self):
+            return None
+
+    async def fake_open(host, port, **kwargs):
+        captured["host"] = host
+        return object(), FakeWriter()
+
+    monkeypatch.setattr(asyncio, "open_connection", fake_open)
+    monkeypatch.setattr(
+        "coldtrail.security.socket.getaddrinfo",
+        lambda *a, **k: [
+            (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("2001:4860:4860::8888", 0, 0, 0)),
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 0)),
+        ],
+    )
+    asyncio.run(tls_cert_info("dns.google"))
+    assert captured["host"] == "8.8.8.8"
 
 
 def test_pinned_transport_rewrites_the_url_but_keeps_host_and_sni(monkeypatch):

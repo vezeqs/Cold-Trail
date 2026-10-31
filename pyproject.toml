@@ -1,6 +1,6 @@
 [project]
 name = "coldtrail"
-version = "0.10.2"
+version = "0.10.3"
 description = "ColdTrail: OSINT username/email pivoting and public profile & post harvesting"
 readme = "README.md"
 requires-python = ">=3.11"

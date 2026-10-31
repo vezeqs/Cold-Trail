@@ -9,7 +9,7 @@ import struct
 from typing import Any
 
 from .http import Fetcher, FetchError
-from .security import is_public_host, resolve_public_ips
+from .security import is_public_host, preferred_public_ip, resolve_public_ips
 from .utils import dedupe, sensitive_cache_key
 
 RDAP = "https://rdap.org/domain"
@@ -480,13 +480,13 @@ async def tls_cert_info(
     if settings is not None and (settings.tor or settings.proxy):
         return None
     try:
-        addresses = resolve_public_ips(domain)
+        address = preferred_public_ip(resolve_public_ips(domain))
     except ValueError:
         return None
     context = ssl.create_default_context()
     try:
         _reader, writer = await asyncio.wait_for(
-            asyncio.open_connection(addresses[0], port, ssl=context, server_hostname=domain),
+            asyncio.open_connection(address, port, ssl=context, server_hostname=domain),
             timeout=timeout,
         )
     except (TimeoutError, OSError, ssl.SSLError):

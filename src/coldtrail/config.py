@@ -9,7 +9,7 @@ from typing import Any
 from .utils import redact_url_credentials
 
 DEFAULT_INSTANCES = ("mastodon.social", "fosstodon.org", "infosec.exchange")
-DEFAULT_UA = "coldtrail/0.10.2 (OSINT research; public data only)"
+DEFAULT_UA = "coldtrail/0.10.3 (OSINT research; public data only)"
 
 
 class ConfigError(ValueError):

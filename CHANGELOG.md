@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.10.3] - 2026-10-31
+
+### Fixed
+
+- Pinned HTTP and TLS connections prefer an IPv4 address when a dual-stack host
+  publishes one, so `domain`, `ip`, and `ct` no longer time out on IPv4-only
+  networks.
+
 ## [0.10.2] - 2026-10-31
 
 ### Fixed

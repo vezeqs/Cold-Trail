@@ -29,7 +29,7 @@ body:
     attributes:
       label: ColdTrail version
       description: Output of `uv run coldtrail --version`
-      placeholder: coldtrail 0.10.2
+      placeholder: coldtrail 0.10.3
     validations:
       required: true
   - type: dropdown
