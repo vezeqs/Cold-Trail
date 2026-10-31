@@ -43,6 +43,7 @@ Severity: **H** high, **M** medium, **L** low. Status: **fixed** in this branch,
 | 26 | — | Correlate | Pair scoring is O(n²); a full 482-source pivot is ~116k pair evaluations | documented |
 | 27 | — | TUI | `textual` 8.x renamed/removed `Static.renderable`; 7 TUI tests (and Dependabot PR #15) fail | open (tracked) |
 | 28 | L | Web UI | The identity graph's force layout collapsed nodes into an unreadable center hub with overlapping labels | fixed (visual) |
+| 29 | L | Evidence | `add_evidence` used a production `assert` for an input guard, which disappears under `python -O` | fixed |
 
 ## Details and fixes
 
@@ -219,14 +220,19 @@ without re-validating the destination. A public URL can redirect to
 - **Markdown (#19):** table cells escape `|` and collapse newlines; the
   Markdown timeline uses the chronological helper.
   **Test:** `test_markdown_tables_escape_pipes_and_newlines`.
-- **Docs (#20):** README no longer hardcodes a test count; AGENTS.md records 59
-  leaf commands; `test_docs_drift.py` guards both.
+- **Docs (#20):** README no longer hardcodes a test count; AGENTS.md records 48
+  top-level / 61 leaf commands; `test_docs_drift.py` guards both. The Pages
+  JSON-LD `softwareVersion` was also stale at 0.9.0 and now matches 0.10.0.
 - **Config permissions (#21):** `doctor` warns and sets
   `privacy.config_mode_warning` when the config is group/world-readable.
   **Test:** `test_doctor_warns_about_world_readable_config`.
 - **Stale docs (#22):** `GOOD_FIRST_ISSUES.md` (two items already shipped) and
   `LAUNCH.md` (pre-launch scaffolding) removed; release guidance folded into
   CONTRIBUTING.md.
+- **Production assert (#29):** `add_evidence` narrowed `source_path` with
+  `assert source_path is not None` after an earlier guard. `python -O` strips
+  asserts, so the guard is now an explicit `ValueError`.
+  **Test:** `test_evidence_hashes_the_bytes_it_reads` exercises the path branch.
 - **Graph layout (#28):** the force simulation's repulsion was too weak against
   the centering force, so a hub-and-spoke graph collapsed into one unreadable
   cluster. Raised repulsion, lowered centering, lengthened link targets, drew

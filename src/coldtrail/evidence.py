@@ -75,7 +75,8 @@ def add_evidence(
     if data is None and source_path is None:
         raise ValueError("provide data or source_path")
     if data is None:
-        assert source_path is not None
+        if source_path is None:
+            raise ValueError("provide data or source_path")
         source_path = Path(source_path)
         data = source_path.read_bytes()
         filename = filename or source_path.name
