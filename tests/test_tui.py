@@ -12,6 +12,17 @@ from coldtrail.store import Store
 from coldtrail.tui import ColdTrailTUI
 
 
+def _static_text(widget) -> str:
+    """Read a Static's text on Textual 2.x (renderable) and 8.x (content)."""
+    renderable = getattr(widget, "renderable", None)
+    if renderable is not None:
+        return str(renderable)
+    content = getattr(widget, "content", None)
+    if content is not None:
+        return str(content)
+    return str(widget.render())
+
+
 @pytest.fixture
 def settings(tmp_path) -> Settings:
     base = Settings.load()
@@ -111,7 +122,7 @@ async def test_tui_pivot_worker_persists(settings, seeded, monkeypatch):
         await pilot.pause()
         results = app.query_one("#pivot-results", DataTable)
         assert results.row_count == 2
-        status = str(app.query_one("#pivot-status").renderable)
+        status = _static_text(app.query_one("#pivot-status"))
         assert "run #2" in status
     with Store(settings.db_path) as store:
         assert store.profiles(run_id=2)[0]["username"] == "bob"
@@ -129,7 +140,7 @@ async def test_tui_pivot_worker_reports_failure(settings, seeded, monkeypatch):
         app.start_pivot()
         await app.workers.wait_for_complete()
         await pilot.pause()
-        status = str(app.query_one("#pivot-status").renderable)
+        status = _static_text(app.query_one("#pivot-status"))
         assert "pivot failed" in status
         assert "boom" in status
 
@@ -194,7 +205,7 @@ async def test_tui_streams_rows_as_checks_finish(settings, seeded, monkeypatch):
         await app.workers.wait_for_complete()
         await pilot.pause()
         assert app.query_one("#pivot-results", DataTable).row_count == 3
-        status = str(app.query_one("#pivot-status").renderable)
+        status = _static_text(app.query_one("#pivot-status"))
         assert "3 found" in status
 
 
@@ -210,7 +221,7 @@ async def test_tui_tools_phone(settings):
         app.start_tool()
         await app.workers.wait_for_complete()
         await pilot.pause()
-        output = str(app.query_one("#tool-output").renderable)
+        output = _static_text(app.query_one("#tool-output"))
         assert "e164" in output
 
 
@@ -220,7 +231,7 @@ async def test_tui_tools_requires_target(settings):
         await pilot.pause()
         app.start_tool()
         await pilot.pause()
-        assert str(app.query_one("#tool-output").renderable) == ""
+        assert _static_text(app.query_one("#tool-output")) == ""
 
 
 async def test_tui_cases_create_and_list(settings):
@@ -289,7 +300,7 @@ async def test_tui_action_harvest_row(settings, seeded, monkeypatch):
         await app.workers.wait_for_complete()
         await pilot.pause()
         assert app.query_one("#tool-target", Input).value == "alice"
-        assert "not_found" in str(app.query_one("#tool-output").renderable)
+        assert "not_found" in _static_text(app.query_one("#tool-output"))
 
 
 async def test_tui_action_diff_runs(settings):
@@ -311,7 +322,7 @@ async def test_tui_action_diff_runs(settings):
         await pilot.pause()
         await pilot.press("d")
         await pilot.pause()
-        output = str(app.query_one("#tool-output").renderable)
+        output = _static_text(app.query_one("#tool-output"))
         assert '"run_a"' in output
         assert "gitlab" in output
 
