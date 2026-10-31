@@ -157,9 +157,9 @@ src/coldtrail/
 
 ## Sharp edges (each one already produced a bug here)
 
-- **`Static.renderable` does not exist in Textual 8.** Tests read
-  `app.query_one("#x").renderable`; use a helper that falls back to the widget's
-  rendered content. Dependabot PR #15 tracks the bump.
+- **Textual 8 is the runtime.** `Static.renderable` was removed; tests use
+  `_static_text()` (`renderable` → `content` → `render()`). The TUI source uses
+  `Static.update()`. Keep both test paths working if the dependency floor moves.
 - **`Fetcher` cache ordering:** `_cache_put` must run *after* `_looks_blocked`.
   Otherwise a 200 Cloudflare/challenge page is replayed as a valid profile.
 - **`Fetcher` cache identity:** `get_json` and `get_text` on the same URL must not

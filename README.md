@@ -242,8 +242,6 @@ machines. `--raw` and the local HTTP cache can retain third-party content. See
   authenticating proxy.
 - **Correlation is O(n²).** A full 482-source pivot evaluates ~116k pairs; network
   time still dominates.
-- **The TUI test suite is pinned to Textual 2.x.** Dependabot PR #15 (Textual 8)
-  is blocked on the `Static.renderable` test helper.
 - **No encryption at rest by default.** Use full-disk encryption or `--encrypt`
   for transport.
 

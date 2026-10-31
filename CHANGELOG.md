@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Dependency refresh: `textual` 8.2.8, `rich` 15.0.0, `fastapi` 0.162.0,
+  `pytest-asyncio` 1.4.1, `ruff` 0.17.3; GitHub Actions `checkout` v7,
+  `configure-pages` v6, `deploy-pages` v5, `upload-pages-artifact` v5, and
+  `codeql-action` v4.
+- TUI tests now read `Static` text on both Textual 2.x and 8.x via a
+  `_static_text()` helper.
+
 ## [0.10.1] - 2026-10-30
 
 ### Fixed
