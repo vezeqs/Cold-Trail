@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import contextlib
-import json
 import os
 import sqlite3
 from pathlib import Path
 from typing import Any, Self
 
-from ..utils import parse_dt
+from ..utils import json_loads, parse_dt
 from .schema import COLUMNS, FTS, POSTS_AU_TRIGGER, SCHEMA, SCHEMA_VERSION
 
 
@@ -16,9 +15,15 @@ class StoreBase:
 
     def __init__(self, path: Path) -> None:
         path = Path(path).expanduser()
-        path.parent.mkdir(parents=True, exist_ok=True)
         self.path = path
-        self.conn = sqlite3.connect(path)
+        # Create the database (and its WAL/SHM sidecars) owner-only from the
+        # first syscall; a chmod after connect leaves a readable window.
+        previous_umask = os.umask(0o077)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            self.conn = sqlite3.connect(path)
+        finally:
+            os.umask(previous_umask)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.execute("PRAGMA foreign_keys=ON")
@@ -211,11 +216,11 @@ class StoreBase:
     @staticmethod
     def _profile_row(row: sqlite3.Row) -> dict[str, Any]:
         item = dict(row)
-        item["extra"] = json.loads(item.pop("extra_json"))
+        item["extra"] = json_loads(item.pop("extra_json"), {})
         return item
 
     @staticmethod
     def _post_row(row: sqlite3.Row) -> dict[str, Any]:
         item = dict(row)
-        item["metrics"] = json.loads(item.pop("metrics_json"))
+        item["metrics"] = json_loads(item.pop("metrics_json"), {})
         return item

@@ -47,10 +47,13 @@ def register_cases(app: FastAPI, settings: Settings, render: Any, export_respons
         case_name: Annotated[str, Form(min_length=1)],
         run_id: Annotated[int, Form(ge=1)],
     ):
+        cleaned_name = case_name.strip()
+        if not cleaned_name:
+            raise HTTPException(status_code=400, detail="case name must be non-empty")
         with _open() as store:
-            case = store.case(case_name.strip())
+            case = store.case(cleaned_name)
             if case is None:
-                raise HTTPException(status_code=404, detail=f"no such case: {case_name}")
+                raise HTTPException(status_code=404, detail=f"no such case: {cleaned_name}")
             store.add_to_case(case["id"], run_id)
         return RedirectResponse("/cases", status_code=303)
 
@@ -119,7 +122,8 @@ def register_cases(app: FastAPI, settings: Settings, render: Any, export_respons
     def case_export(
         name: str,
         format: Annotated[
-            str, Query(pattern="^(json|jsonl|csv|graphml|gexf|dot|html|md|stix|maltego)$")
+            str,
+            Query(pattern="^(json|jsonl|csv|graphml|gexf|dot|html|md|stix|sarif|maltego)$"),
         ] = "json",
         table: Annotated[
             str,

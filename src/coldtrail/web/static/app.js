@@ -114,7 +114,7 @@
         var byId = {};
         nodes.forEach(function (n, idx) {
           var angle = (2 * Math.PI * idx) / Math.max(1, nodes.length);
-          var radius = Math.min(W, H) * 0.34;
+          var radius = Math.min(W, H) * 0.44;
           n.x = W / 2 + radius * Math.cos(angle);
           n.y = H / 2 + radius * Math.sin(angle);
           n.vx = 0;
@@ -139,7 +139,7 @@
               var a = nodes[i], b = nodes[j];
               var dx = b.x - a.x, dy = b.y - a.y;
               var d2 = dx * dx + dy * dy + 1;
-              var f = 1400 / d2;
+              var f = 5200 / d2;
               var d = Math.sqrt(d2);
               a.vx -= (dx / d) * f;
               a.vy -= (dy / d) * f;
@@ -152,7 +152,7 @@
             if (!s || !t) return;
             var dx = t.x - s.x, dy = t.y - s.y;
             var d = Math.sqrt(dx * dx + dy * dy) || 1;
-            var targetLen = e.kind === "correlation" ? 110 : 85;
+            var targetLen = e.kind === "correlation" ? 150 : 105;
             var k = (d - targetLen) * 0.025;
             s.vx += (dx / d) * k;
             s.vy += (dy / d) * k;
@@ -161,10 +161,10 @@
           });
           nodes.forEach(function (n) {
             if (n === dragging) return;
-            n.vx += (W / 2 - n.x) * 0.004;
-            n.vy += (H / 2 - n.y) * 0.004;
-            n.vx *= 0.82;
-            n.vy *= 0.82;
+            n.vx += (W / 2 - n.x) * 0.0014;
+            n.vy += (H / 2 - n.y) * 0.0014;
+            n.vx *= 0.85;
+            n.vy *= 0.85;
             n.x = Math.max(28, Math.min(W - 28, n.x + n.vx));
             n.y = Math.max(24, Math.min(H - 24, n.y + n.vy));
           });
@@ -198,16 +198,19 @@
             ctx.strokeStyle = n === selected ? "#ffffff" : "#0e1116";
             ctx.stroke();
 
+            ctx.font = "10px ui-monospace, monospace";
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = "#0e1116";
+            ctx.strokeText(n.id.slice(0, 24), n.x + r + 4, n.y + 4);
             ctx.fillStyle = "#d7dee8";
-            ctx.font = "11px ui-monospace, monospace";
-            ctx.fillText(n.id.slice(0, 28), n.x + r + 4, n.y + 4);
+            ctx.fillText(n.id.slice(0, 24), n.x + r + 4, n.y + 4);
           });
           ctx.restore();
         }
 
         var ticks = 0;
         function animate() {
-          if (ticks < 240 || dragging) {
+          if (ticks < 360 || dragging) {
             step();
             ticks += 1;
           }

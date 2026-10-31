@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import os
 from typing import Annotated
 
@@ -10,9 +11,39 @@ from rich.table import Table
 
 from ..http import Fetcher
 from ..store import Store
+from ..utils import redact_url_credentials
 from ._app import _print_json, _settings, app, console
 
 # -- ops --------------------------------------------------------------------
+
+
+@app.command(rich_help_panel="Operations")
+def config(
+    ctx: typer.Context,
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Show effective settings, their source, and redacted secrets."""
+    settings = _settings(ctx)
+    rows = settings.describe(ctx.meta.get("overrides") or {})
+    config_mode = None
+    if settings.config_path:
+        with contextlib.suppress(OSError):
+            config_mode = oct(os.stat(settings.config_path).st_mode & 0o777)
+    payload = {
+        "config_path": str(settings.config_path) if settings.config_path else None,
+        "config_mode": config_mode,
+        "settings": rows,
+    }
+    if json_out:
+        _print_json(payload)
+        return
+    console.print(f"config file: {payload['config_path'] or '[none] (defaults + environment)'}")
+    table = Table(title="Effective settings")
+    for column in ("Key", "Value", "Source"):
+        table.add_column(column, overflow="fold")
+    for row in rows:
+        table.add_row(row["key"], str(row["value"]), row["source"])
+    console.print(table)
 
 
 @app.command(rich_help_panel="Operations")
@@ -67,6 +98,11 @@ def doctor(
     if settings.config_path:
         with contextlib.suppress(OSError):
             config_mode = oct(os.stat(settings.config_path).st_mode & 0o777)
+    config_insecure = False
+    if config_mode:
+        with contextlib.suppress(ValueError):
+            config_insecure = bool(int(config_mode, 8) & 0o077)
+    proxy_display = redact_url_credentials(settings.proxy or ("tor" if settings.tor else None))
     privacy = {
         "telemetry": "none",
         "raw_retention": settings.keep_raw,
@@ -74,10 +110,11 @@ def doctor(
         "http_cache_ttl": settings.cache_ttl,
         "retention_days": settings.retention_days,
         "tor": settings.tor,
-        "proxy": settings.proxy,
+        "proxy": proxy_display,
         "web_token": bool(settings.web_token),
         "db_mode": info.get("mode"),
         "config_mode": config_mode,
+        "config_mode_warning": config_insecure,
     }
     payload = {
         "db": info,
@@ -89,7 +126,7 @@ def doctor(
         "shodan_key": bool(settings.shodan_api_key),
         "hunter_key": bool(settings.hunter_api_key),
         "x_token": bool(settings.x_bearer_token),
-        "proxy": settings.proxy or ("tor" if settings.tor else None),
+        "proxy": proxy_display,
         "config": str(settings.config_path) if settings.config_path else None,
         "privacy": privacy,
         "health": health,
@@ -114,6 +151,11 @@ def doctor(
         f"cache_ttl={settings.cache_ttl}s retention={settings.retention_days or 'off'} "
         f"tor={'on' if settings.tor else 'off'} db_mode={privacy['db_mode'] or '?'}"
     )
+    if config_insecure:
+        console.print(
+            f"[yellow]warning:[/yellow] {settings.config_path} is group/world-readable "
+            f"({config_mode}); chmod 600 it if it contains API keys"
+        )
     if health:
         table = Table(title="Source health")
         for column in ("Source", "Status", "Count"):
@@ -121,6 +163,27 @@ def doctor(
         for row in health:
             table.add_row(row["source"], row["status"], str(row["count"]))
         console.print(table)
+
+
+@app.command(rich_help_panel="Output")
+def schema(
+    name: Annotated[str | None, typer.Argument(help="Schema name (omit to list)")] = None,
+    list_schemas: Annotated[bool, typer.Option("--list", help="List schema names")] = False,
+) -> None:
+    """Emit JSON Schema for ColdTrail's --json payloads."""
+    from ..schemas import SCHEMA_NAMES, SCHEMAS
+
+    if list_schemas or not name:
+        for key in SCHEMA_NAMES:
+            typer.echo(key)
+        return
+    if name not in SCHEMAS:
+        typer.echo(
+            f"unknown schema {name!r}; choose from: {', '.join(SCHEMA_NAMES)}",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+    typer.echo(json.dumps(SCHEMAS[name], indent=2))
 
 
 @app.command(rich_help_panel="Operations")

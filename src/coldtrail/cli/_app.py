@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import sys
 from pathlib import Path
 from typing import Annotated, Any
@@ -39,6 +40,7 @@ SENSITIVE_FLAGS = {
     "--api-key",
     "--secret",
     "--key",
+    "--proxy",
 }
 
 
@@ -113,33 +115,48 @@ def main(
         raise typer.Exit()
 
     settings = Settings.load(config)
+    overrides: dict[str, str] = {}
     if db is not None:
         settings.db_path = db.expanduser()
+        overrides["db_path"] = "flag"
     if timeout is not None:
         settings.timeout = timeout
+        overrides["timeout"] = "flag"
     if concurrency is not None:
         settings.concurrency = concurrency
+        overrides["concurrency"] = "flag"
     if proxy:
         settings.proxy = proxy
+        overrides["proxy"] = "flag"
     if tor:
         settings.tor = True
+        overrides["tor"] = "flag"
     if not cache:
         settings.cache_ttl = 0
         settings.negative_cache_ttl = 0
+        overrides["cache_ttl"] = "flag"
+        overrides["negative_cache_ttl"] = "flag"
     if raw is not None:
         settings.keep_raw = raw
+        overrides["keep_raw"] = "flag"
     if max_requests is not None:
         settings.max_requests = max_requests
+        overrides["max_requests"] = "flag"
     if retention_days is not None:
         settings.retention_days = retention_days
+        overrides["retention_days"] = "flag"
     if respect_robots:
         settings.respect_robots = True
+        overrides["respect_robots"] = "flag"
     if allow_private_targets:
         settings.allow_private_targets = True
+        overrides["allow_private_targets"] = "flag"
     if replay:
         settings.replay = True
+        overrides["replay"] = "flag"
     ctx.obj = settings
     ctx.meta["settings"] = settings
+    ctx.meta["overrides"] = overrides
 
     from ..sources import sync as _sync_sources
 
@@ -159,7 +176,7 @@ def main(
                     None,
                     {"argv": _redact_argv(sys.argv[1:])},
                 )
-        except (OSError, ValueError):
+        except (OSError, ValueError, sqlite3.Error):
             pass
 
 

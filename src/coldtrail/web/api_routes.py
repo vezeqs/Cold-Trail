@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated, Any
 
 from fastapi import FastAPI, HTTPException, Query
@@ -13,6 +14,8 @@ from ..correlate import diff_runs
 from ..sources import SOURCES
 from ..store import Store
 from .helpers import _build_graph_payload
+
+log = logging.getLogger("coldtrail.web.api")
 
 
 def register_api(app: FastAPI, settings: Settings) -> None:
@@ -59,9 +62,10 @@ def register_api(app: FastAPI, settings: Settings) -> None:
         try:
             with _open() as store:
                 store.conn.execute("SELECT 1").fetchone()
-        except Exception as exc:
+        except Exception:
+            log.exception("health check failed")
             healthy = False
-            detail = f"{type(exc).__name__}: {exc}"
+            detail = "database unavailable"
         payload = {
             "status": "ok" if healthy else "error",
             "detail": detail,

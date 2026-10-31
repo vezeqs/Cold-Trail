@@ -28,6 +28,11 @@ class CasesMixin:
         return out
 
     def create_case(self, name: str, notes: str | None = None) -> int:
+        name = name.strip()
+        if not name:
+            raise ValueError("case name must be non-empty")
+        if len(name) > 120:
+            raise ValueError("case name must be at most 120 characters")
         with self.conn:
             cursor = self.conn.execute(
                 "INSERT INTO cases (name, created_at, notes) VALUES (?, ?, ?)",

@@ -3,6 +3,8 @@ from __future__ import annotations
 import contextlib
 from typing import TYPE_CHECKING, Any
 
+from ..utils import is_sha256
+
 
 class MaintenanceMixin:
     conn: Any
@@ -128,6 +130,8 @@ class MaintenanceMixin:
                 "DELETE FROM audit WHERE datetime(at) < datetime('now', ?)", (cutoff,)
             )
         for digest in set(attachments):
+            if not is_sha256(digest):
+                continue
             still_referenced = self.conn.execute(
                 "SELECT 1 FROM attachments WHERE sha256 = ? LIMIT 1", (digest,)
             ).fetchone()

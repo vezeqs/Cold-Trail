@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import json
 import re
 import sqlite3
 from typing import Any
 
-from ..utils import epoch_seconds
+from ..utils import epoch_seconds, json_loads
 
 
 def _like_pattern(value: str) -> str:
@@ -116,7 +115,7 @@ class QueriesMixin:
         out = []
         for row in rows:
             item = dict(row)
-            item["reasons"] = json.loads(item.pop("reasons_json"))
+            item["reasons"] = json_loads(item.pop("reasons_json"), [])
             out.append(item)
         return out
 
@@ -133,7 +132,7 @@ class QueriesMixin:
         out = []
         for row in rows:
             item = dict(row)
-            item["reasons"] = json.loads(item.pop("reasons_json"))
+            item["reasons"] = json_loads(item.pop("reasons_json"), [])
             members = self.conn.execute(
                 """SELECT source, username FROM cluster_members
                    WHERE run_id = ? AND cluster_key = ? ORDER BY source, username""",

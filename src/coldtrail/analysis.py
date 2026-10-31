@@ -21,7 +21,8 @@ PATTERNS: dict[str, re.Pattern[str]] = {
     "ipv4": re.compile(r"\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b"),
     "coords": re.compile(r"\b-?\d{1,3}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}\b"),
     "discord": re.compile(r"\b[A-Za-z0-9_.]{2,32}#\d{4}\b"),
-    "telegram": re.compile(r"(?<![\w.])(?:t\.me/|@)([A-Za-z][A-Za-z0-9_]{4,31})\b"),
+    # A trailing ":" excludes Matrix IDs (@user:server), which are not Telegram.
+    "telegram": re.compile(r"(?<![\w.])(?:t\.me/|@)([A-Za-z][A-Za-z0-9_]{4,31})\b(?!:)"),
     "phone": re.compile(r"(?<![\w.])\+?\d[\d\s().-]{7,14}\d(?![\w.])"),
     "domain": re.compile(
         r"\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+"
@@ -189,6 +190,8 @@ def infer_timezone(posts: list[Post]) -> str | None:
     # Center of typical sleep is roughly 03:00 local time
     # sleep_start + 3 (UTC) corresponds to 03:00 local
     sleep_mid_utc = (sleep_start + 3) % 24
+    # Posting-hour inference is ambiguous by 24h: UTC+13 and UTC-11 have the
+    # same wall-clock activity pattern. Report the conventional -12..+11 band.
     offset = ((3 - sleep_mid_utc + 12) % 24) - 12
     sign = "+" if offset >= 0 else "-"
     return f"{sign}{abs(offset):02d}:00"

@@ -23,6 +23,7 @@ from ..report import (
     to_json,
     to_jsonl,
     to_maltego_csv,
+    to_sarif,
     to_stix,
 )
 
@@ -40,6 +41,7 @@ EXPORTERS = {
     "html": ("text/html", None),
     "md": ("text/markdown", None),
     "stix": ("application/stix+json", to_stix),
+    "sarif": ("application/sarif+json", to_sarif),
     "maltego": ("text/csv", to_maltego_csv),
 }
 

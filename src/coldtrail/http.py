@@ -15,6 +15,7 @@ from urllib.robotparser import RobotFileParser
 import httpx
 
 from .config import Settings
+from .security import is_public_host
 from .utils import now_iso
 
 if TYPE_CHECKING:
@@ -258,16 +259,22 @@ class Fetcher:
         retries: int | None = None,
         cache_key: str | None = None,
     ) -> Fetched:
+        accept = (headers or {}).get("Accept", "")
+        # Raw captures and replay fixtures key on the real URL; the HTTP cache
+        # additionally varies by Accept so JSON and HTML never collide.
         key = cache_key or _cache_key(url, params)
+        http_key = cache_key or _cache_key(url, params, accept)
         host = urlsplit(url).netloc
 
         if self.settings.replay:
             return self._replay(key)
 
-        cached = self._cache_get(key) if method == "GET" else None
+        cached = self._cache_get(http_key) if method == "GET" else None
         if cached is not None:
+            if _looks_blocked(cached):
+                raise BlockedError(f"bot wall / access denied on {host} (HTTP {cached.status})")
             return cached
-        stale = self._cache_row(key) if method == "GET" and cached is None else None
+        stale = self._cache_row(http_key) if method == "GET" and cached is None else None
 
         if not await self._allowed(key):
             raise BlockedError(f"robots.txt disallows {redact_url(key)}")
@@ -307,7 +314,7 @@ class Fetcher:
                 # DNS/connection failures are usually permanent for a probe;
                 # retrying them just stalls the whole pivot.
                 self._record_failure(state)
-                raise FetchError(f"{type(exc).__name__}: {exc}") from exc
+                raise FetchError(f"{type(exc).__name__}: {redact_url(str(exc))}") from exc
             except httpx.TimeoutException as exc:
                 last_error = exc
                 self._record_failure(state)
@@ -315,7 +322,7 @@ class Fetcher:
                     await asyncio.sleep(delay)
                     delay *= 2
                     continue
-                raise FetchError(f"{type(exc).__name__}: {exc}") from exc
+                raise FetchError(f"{type(exc).__name__}: {redact_url(str(exc))}") from exc
             except httpx.HTTPError as exc:
                 last_error = exc
                 self._record_failure(state)
@@ -323,7 +330,7 @@ class Fetcher:
                     await asyncio.sleep(delay)
                     delay *= 2
                     continue
-                raise FetchError(f"{type(exc).__name__}: {exc}") from exc
+                raise FetchError(f"{type(exc).__name__}: {redact_url(str(exc))}") from exc
 
             if response.status_code == 304 and stale is not None:
                 return self._from_cache(stale, key)
@@ -340,14 +347,18 @@ class Fetcher:
                     f"HTTP {response.status_code} from {host} after {attempts} attempts"
                 )
 
+            if not self.settings.allow_private_targets:
+                final_host = urlsplit(str(response.url)).hostname or ""
+                if final_host and not is_public_host(final_host, resolve=False):
+                    raise BlockedError(f"redirect to non-public host blocked: {final_host}")
             state["fails"] = 0
             fetched = self._build(response, key)
             if self.settings.keep_raw and self.store is not None:
                 self.store.raw_put(key, fetched.status, fetched.content, self.run_id)
-            if method == "GET" and response.status_code == 200:
-                self._cache_put(key, response, store_final_url=cache_key is None)
             if _looks_blocked(fetched):
                 raise BlockedError(f"bot wall / access denied on {host} (HTTP {fetched.status})")
+            if method == "GET" and response.status_code == 200:
+                self._cache_put(http_key, response, store_final_url=cache_key is None)
             return fetched
 
         raise FetchError(f"request to {redact_url(url)} failed: {last_error}")
@@ -476,7 +487,11 @@ class Fetcher:
     def _from_cache(row: dict[str, Any], key: str) -> Fetched:
         body = row["body"]
         text_bytes = body[:MAX_TEXT]
-        text = text_bytes.decode("utf-8", "replace")
+        charset = _charset(row.get("content_type") or "")
+        try:
+            text = text_bytes.decode(charset or "utf-8", "replace")
+        except LookupError:
+            text = text_bytes.decode("utf-8", "replace")
         try:
             payload = json.loads(text)
         except ValueError:
@@ -528,13 +543,20 @@ class Fetcher:
         return Fetched(status=row["status"], text=text, url=key, json=payload, content=body)
 
 
-def _cache_key(url: str, params: dict[str, Any] | None) -> str:
-    if not params:
-        return url
-    ordered = sorted((str(k), str(v)) for k, v in params.items() if v is not None)
-    query = "&".join(f"{quote_plus(k)}={quote_plus(v)}" for k, v in ordered)
-    separator = "&" if "?" in url else "?"
-    return f"{url}{separator}{query}"
+def _cache_key(url: str, params: dict[str, Any] | None, accept: str = "") -> str:
+    if params:
+        ordered = sorted((str(k), str(v)) for k, v in params.items() if v is not None)
+        query = "&".join(f"{quote_plus(k)}={quote_plus(v)}" for k, v in ordered)
+        separator = "&" if "?" in url else "?"
+        url = f"{url}{separator}{query}"
+    # The same URL can be requested as JSON or HTML; never let one body satisfy
+    # the other. Explicit cache_key= callers bypass this helper.
+    return f"{url}|accept={accept.casefold()}" if accept else url
+
+
+def _charset(content_type: str) -> str | None:
+    match = re.search(r"charset\s*=\s*[\"']?([\w.:-]+)", content_type, re.IGNORECASE)
+    return match.group(1) if match else None
 
 
 def _looks_blocked(response: Fetched) -> bool:
