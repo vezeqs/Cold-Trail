@@ -188,8 +188,11 @@ src/coldtrail/
 - **Redirect SSRF:** `follow_redirects=True` means the final URL must be checked
   again (`is_public_host(..., resolve=False)`); a public URL can redirect to
   `127.0.0.1`.
-- **`is_public_host` returns `True` on DNS failure** and validation is TOCTOU.
-  This is a documented limitation; do not turn a resolver outage into a block.
+- **`is_public_host` returns `True` on DNS failure** and the initial check is
+  still a TOCTOU for proxied clients. Direct HTTP connections are pinned
+  (`_PinnedTransport`) and the TLS probe resolves once; a proxy resolves the name,
+  so the proxy is the trust boundary there. Do not turn a resolver outage into a
+  block.
 - **`resolve=False`** is used by Mastodon/Nostr/domain/avatar probes to keep
   offline tests deterministic. The web layer calls `ensure_public_target()` first;
   the CLI exposes `--allow-private-targets`.
@@ -348,7 +351,7 @@ src/coldtrail/
 - Formatting of unrelated files; do not reformat the whole tree in a fix PR.
 - Generated output: `dist/`, `.coverage`, caches, `tests/fixtures/contracts/_record.db*`.
 - Existing commit trailers or the historical `slopmanufacturer` login.
-- Public APIs without a deprecation path (`Store`, `coldtrail.cli:app`,
+- Public APIs without a deprecation path (`Store`, `coldtrail.cli:app`/`main`,
   `persist_pivot`, the JSON API shapes, and the schema `--json` contracts).
 
 ## Web API surface

@@ -12,7 +12,7 @@ from typer.testing import CliRunner
 from coldtrail.breach import hibp_breaches, pwned_password, sha1_prefix
 from coldtrail.cli import app
 from coldtrail.config import Settings
-from coldtrail.http import Fetcher
+from coldtrail.http import Fetcher, FetchError
 
 runner = CliRunner()
 
@@ -149,6 +149,38 @@ async def test_pwned_password_http_error(settings):
         async with Fetcher(settings) as fetcher:
             result = await pwned_password(fetcher, password)
     assert result["status"] == "error"
+
+
+async def test_pwned_password_error_does_not_echo_prefix():
+    password = "hunter2"
+    prefix, _ = sha1_prefix(password)
+
+    class FakeFetcher:
+        async def get_text(self, url, **kwargs):
+            raise FetchError(f"request to {url} failed")
+
+    result = await pwned_password(FakeFetcher(), password)
+    assert result["status"] == "error"
+    assert prefix not in result["detail"]
+
+
+async def test_pwned_password_hashes_the_cache_key():
+    password = "hunter2"
+    prefix, suffix = sha1_prefix(password)
+    captured = {}
+
+    class FakeFetcher:
+        async def get_text(self, url, **kwargs):
+            captured["url"] = url
+            captured["cache_key"] = kwargs.get("cache_key")
+            return 200, f"{suffix}:1"
+
+    result = await pwned_password(FakeFetcher(), password)
+    assert result["status"] == "pwned"
+    assert prefix in captured["url"]
+    assert captured["cache_key"].startswith("pwned:")
+    assert prefix not in captured["cache_key"]
+    assert password not in captured["cache_key"]
 
 
 # -- CLI --------------------------------------------------------------------

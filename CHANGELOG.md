@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-10-31
+
 ### Fixed
 
 - Web UI: requests with a non-loopback `Host` header are refused, and non-GET
@@ -42,6 +44,8 @@ All notable changes to this project are documented here. The format follows
   instead of returning an empty result.
 - Evidence: `add_evidence(source_path=...)` streams the file instead of reading
   it into RAM, and `verify_evidence` pages through attachments.
+- Pwned Passwords keeps the 5-character hash prefix out of the local cache/raw
+  key and out of error details; the request still sends only the prefix.
 
 ### Changed
 
@@ -49,6 +53,11 @@ All notable changes to this project are documented here. The format follows
   `pytest-asyncio` 1.4.1, `ruff` 0.17.3; GitHub Actions `checkout` v7,
   `configure-pages` v6, `deploy-pages` v5, `upload-pages-artifact` v5, and
   `codeql-action` v4.
+- Tests use Starlette's supported `httpx2` test client (dev-only), so the suite
+  no longer emits the `httpx` deprecation warning.
+- `SECURITY.md`, `README.md`, and `AGENTS.md` now describe the pinned-transport
+  behavior and the `COLDTRAIL_ALLOW_REMOTE_HOST=1` requirement behind a reverse
+  proxy.
 - TUI tests now read `Static` text on both Textual 2.x and 8.x via a
   `_static_text()` helper.
 - The login cookie is `"<issued>.<hmac>"` and expires server-side; it is still a

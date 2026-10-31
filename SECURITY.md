@@ -35,13 +35,16 @@ When exposed behind a reverse proxy:
 
 - set `--token` (or `COLDTRAIL_WEB_TOKEN`),
 - set `COLDTRAIL_TRUST_PROXY=1` so rate limiting keys on `X-Forwarded-For`,
+- set `COLDTRAIL_ALLOW_REMOTE_HOST=1` so the Host guard accepts the proxy's
+  external hostname (the bind stays loopback, so `serve --host` does not set it),
 - terminate TLS at the proxy and forward `X-Forwarded-Proto`,
 - keep the job store single-process (in-memory jobs are not shared across
   `uvicorn --workers`).
 
-The tools workbench can query arbitrary domains/IPs (including internal ones),
-run local external binaries, and fetch URLs. Treat it as an operator console:
-do not expose it to untrusted users, even with a token.
+The tools workbench can query public domains/IPs and, with
+`--allow-private-targets`, internal ones; it can also run local external
+binaries and fetch URLs. Treat it as an operator console: do not expose it to
+untrusted users, even with a token.
 
 ## Privacy design
 
@@ -100,10 +103,12 @@ third-party content, so prune them.
 
 ## Accepted limitations
 
-- **DNS rebinding / TOCTOU.** Host validation resolves a name once; the HTTP
-  client may resolve it again. Closing this needs a pinned-IP transport or a
-  resolver hook. Treat the web UI as an operator console and keep it on
-  loopback or behind an authenticating proxy.
+- **DNS rebinding / TOCTOU.** Host validation resolves a name once. Direct HTTP
+  connections are pinned to the validated address (`_PinnedTransport`), and the
+  TLS probe resolves and pins too, so a hostile second DNS answer cannot redirect
+  them. A proxied client (`--proxy`/`--tor`) leaves resolution to the proxy, which
+  is then the trust boundary. Treat the web UI as an operator console and keep it
+  on loopback or behind an authenticating proxy.
 - **`resolve=False` in source probes.** Mastodon/Nostr/domain/avatar checks skip
   DNS for the initial host so offline tests stay deterministic. The web layer
   calls `ensure_public_target()` first; the CLI exposes

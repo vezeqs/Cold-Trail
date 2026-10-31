@@ -1,7 +1,7 @@
 # ColdTrail audit — 2026-10-30
 
 > Newer record: [AUDIT-2026-10-31.md](AUDIT-2026-10-31.md) (independent pass,
-> 15 open findings).
+> 20 findings: 19 fixed, 1 not a bug).
 
 Baseline: `master` @ `86fc516` (v0.9.0), 526 tests, ruff/mypy/bandit clean.
 Scope: security, privacy, correctness, export integrity, documentation claims.

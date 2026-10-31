@@ -1,6 +1,6 @@
 [project]
 name = "coldtrail"
-version = "0.10.1"
+version = "0.10.2"
 description = "ColdTrail: OSINT username/email pivoting and public profile & post harvesting"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -52,6 +52,7 @@ Security = "https://github.com/vezeqs/Cold-Trail/blob/master/SECURITY.md"
 
 [dependency-groups]
 dev = [
+    "httpx2>=2.16,<3",
     "mypy>=2.4.1",
     "pytest>=9,<10",
     "pytest-asyncio>=0.23,<2",

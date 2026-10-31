@@ -7,8 +7,8 @@ abstract: >-
   and exporting evidence-grade dossiers.
 authors:
   - name: "ColdTrail contributors"
-version: 0.10.1
-date-released: 2026-10-27
+version: 0.10.2
+date-released: 2026-10-31
 license: MIT
 repository-code: "https://github.com/vezeqs/Cold-Trail"
 keywords:

@@ -222,7 +222,8 @@ ColdTrail is designed to keep investigations on your machine.
   loopback `Host` header; a non-GET request with a foreign `Origin` or a cross-site
   `Sec-Fetch-Site` is answered `403`. That closes DNS rebinding and drive-by form posts
   from any page the analyst happens to visit. A deliberate non-loopback bind opts in with
-  `--host` plus a token (or `COLDTRAIL_ALLOW_REMOTE_HOST=1`).
+  `--host` plus a token (or `COLDTRAIL_ALLOW_REMOTE_HOST=1`); behind a reverse proxy, set
+  `COLDTRAIL_ALLOW_REMOTE_HOST=1` as well so the proxy's external hostname is accepted.
 - **Redaction and encryption.** Exports support `--redact`; encrypted exports use
   PBKDF2 + Fernet.
 - **Retention.** `--retention-days N` or `prune --days N` removes old runs, raw/cache rows,
@@ -250,10 +251,11 @@ machines. `--raw` and the local HTTP cache can retain third-party content. See
   handle used to demonstrate the mechanics.
 - **Timezone inference is ambiguous.** Posting-hour analysis cannot distinguish
   UTC+13 from UTC-11; the value is a hint.
-- **DNS rebinding is a known TOCTOU.** Host validation resolves once; direct HTTP
-  connections are pinned to the validated address (`_PinnedTransport`), and the TLS
-  probe resolves and pins too, but a proxied client leaves resolution to the proxy.
-  Keep the web UI on loopback or behind an authenticating proxy.
+- **DNS rebinding is a known TOCTOU for proxied clients.** Host validation
+  resolves once; direct HTTP connections are pinned to the validated address
+  (`_PinnedTransport`), and the TLS probe resolves and pins too, but `--proxy`/
+  `--tor` leaves resolution to the proxy. Keep the web UI on loopback or behind an
+  authenticating proxy.
 - **The TLS probe needs a direct connection.** `domain --deep` skips the raw TLS
   handshake when `--tor` or `--proxy` is set (it would otherwise bypass the proxy and
   leak your address); the payload reports `tls_skipped` instead of a certificate.

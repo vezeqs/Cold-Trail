@@ -496,6 +496,14 @@ def test_config_accepts_valid_values(tmp_path):
     assert loaded.tor is True
 
 
+def test_allow_remote_host_env_is_honoured(monkeypatch, tmp_path):
+    # A reverse proxy keeps the bind loopback but forwards the external Host;
+    # the documented opt-in must survive the config/env path.
+    monkeypatch.setenv("COLDTRAIL_ALLOW_REMOTE_HOST", "1")
+    settings = Settings.load(tmp_path / "missing.toml")
+    assert settings.allow_remote_host is True
+
+
 # -- finding 11: export permissions -----------------------------------------
 
 

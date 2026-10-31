@@ -182,9 +182,12 @@ async def pwned_password(fetcher: Fetcher, password: str) -> dict[str, Any]:
         fetcher,
         PWNED_RANGE_URL.format(prefix=prefix),
         headers={"Accept": "text/plain", "Add-Padding": "true"},
+        # The prefix is the only part of the hash that leaves the machine; keep
+        # it out of the local cache/raw key and any error detail as well.
+        cache_key=sensitive_cache_key("pwned", password),
     )
     if status is None:
-        return {"status": "error", "detail": text, "count": 0}
+        return {"status": "error", "detail": text.replace(prefix, "[redacted]"), "count": 0}
     if status != 200:
         return {"status": "error", "detail": f"HTTP {status}", "count": 0}
     count = 0
