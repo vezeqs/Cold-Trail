@@ -6,7 +6,6 @@ import hashlib
 import io
 import json
 import os
-import re
 import uuid
 from typing import Any
 from urllib.parse import urlsplit
@@ -135,16 +134,25 @@ def _node_id(profile: dict[str, Any]) -> str:
     return f"{profile['source']}:{profile['username']}"
 
 
-_XML_ILLEGAL = re.compile("[^\u0009\u000a\u000d\u0020-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]")
+def _xml_clean(value: object) -> str:
+    """Keep only characters XML 1.0 allows (controls, surrogates, noncharacters out)."""
+    return "".join(
+        char
+        for char in str(value)
+        if char in "\t\n\r"
+        or 0x20 <= ord(char) <= 0xD7FF
+        or 0xE000 <= ord(char) <= 0xFFFD
+        or 0x10000 <= ord(char) <= 0x10FFFF
+    )
 
 
 def _xml_text(value: object) -> str:
-    return escape(_XML_ILLEGAL.sub("", str(value)))
+    return escape(_xml_clean(value))
 
 
 def _xml_attr(value: object) -> str:
     """Quote an XML attribute value, including quotes and illegal controls."""
-    return quoteattr(_XML_ILLEGAL.sub("", str(value)))
+    return quoteattr(_xml_clean(value))
 
 
 def to_graphml(payload: dict[str, Any]) -> str:
