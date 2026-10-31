@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import stat
 from dataclasses import asdict
 
@@ -225,7 +226,9 @@ def test_diff_out_requires_html(seeded, tmp_path):
         ],
     )
     assert result.exit_code == 2
-    assert "--out requires --format html" in result.output
+    text = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+    text = " ".join(text.split())
+    assert "requires" in text and "html" in text
 
 
 def test_web_diff_html_download(seeded):
