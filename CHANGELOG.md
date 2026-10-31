@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-10-30
+
+### Fixed
+
+- CodeQL `py/overly-large-range`: the XML character filter is now an explicit
+  XML 1.0 codepoint check instead of an overlapping regex range. Behavior is
+  unchanged (controls, surrogates, and noncharacters are stripped before
+  escaping).
+
+### Changed
+
+- Removed the superseded `terminal-demo.gif` and `web-pivot.png` assets; the
+  generated media is `cli-pivot.gif`, `web-pivot.gif`, and the page screenshots.
+- Regenerated the README proof media for 0.10.1.
+
+### Security
+
+- Dismissed the two CodeQL `py/weak-sensitive-data-hashing` alerts as documented
+  false positives: SHA-1 is required by the Pwned Passwords k-anonymity protocol
+  and only the five-character prefix leaves the machine (`AUDIT.md`).
+
 ## [0.10.0] - 2026-10-30
 
 ### Added
