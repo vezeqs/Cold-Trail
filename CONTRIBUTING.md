@@ -24,6 +24,9 @@ uv run ruff format --check .
 uv run mypy
 uv run pytest -q --cov=coldtrail
 uv build --wheel
+uv run coldtrail doctor --offline
+uv run coldtrail config --json
+uv run coldtrail schema --list
 ```
 
 Tests **never hit the network**. Use `respx` for HTTP sources,
@@ -43,14 +46,18 @@ src/coldtrail/
   pivot.py    probing, variants, expansion, persistence
   harvest.py  profiles, posts, follows
   correlate.py pair scoring, clusters, diff
-  report.py   JSON/CSV/GraphML/GEXF/DOT/HTML/Markdown/STIX/Maltego
+  report.py   JSON/CSV/GraphML/GEXF/DOT/HTML/Markdown/STIX/SARIF/Maltego,
+              redaction, encryption, HTML diff
+  schemas.py  JSON Schema contracts for --json payloads
   http.py     pacing, cache, retries, circuit breaker, Tor/proxy
   evidence.py content-addressed evidence
 tests/        offline test suite + contract fixtures
 docs/         GitHub Pages site (sitemap, robots, privacy page)
 ```
 
-See [AGENTS.md](AGENTS.md) for the detailed architecture and invariants.
+See [AGENTS.md](AGENTS.md) for the detailed architecture, invariants, and sharp
+edges, and [AUDIT.md](AUDIT.md) for the most recent audit and its accepted
+limitations.
 
 ## Adding a source
 
@@ -86,13 +93,39 @@ Do not merge changes that break these:
   CSP/no-referrer/no-store, no third-party assets.
 - **Breach features are metadata-only**; Pwned Passwords stays k-anonymous.
 
-## Before shipping
+## Good first contributions
+
+There is no maintained "good first issues" file; it drifted and listed work that
+had already shipped. Open an issue with the scope, the source or module you want
+to touch, and the test you will add. Good candidates are a new curated source
+(with a contract fixture), a new importer in `INGEST_FORMATS`, or a docs page
+that walks through a real workflow. See [docs/sources.html](docs/sources.html)
+for the current coverage.
+
+## Release
 
 Any push, tag, release, package/container publish, or deployment must run the
 `pre-ship-audit` skill (`.devin/skills/pre-ship-audit/SKILL.md`). It is also
 referenced by the always-on rule in `.devin/rules/pre-ship-audit.md`. Do not
 ship with failing tests, lint, build, or docs validation, and do not bypass
 checks.
+
+Release sequence (only after explicit approval for that specific action):
+
+```bash
+# 1. bump version in pyproject.toml and src/coldtrail/__init__.py
+# 2. move CHANGELOG [Unreleased] entries under the new version
+uv run pytest -q --cov=coldtrail
+uv run ruff check . && uv run ruff format --check . && uv run mypy
+uv build --wheel
+git tag -a vX.Y.Z -m "ColdTrail X.Y.Z"
+git push origin vX.Y.Z
+gh release create vX.Y.Z --title "ColdTrail X.Y.Z" --notes-file CHANGELOG.md
+docker build -t coldtrail:X.Y.Z .
+```
+
+Never tag a commit whose CI is red. Never `--no-verify`. Keep the release notes
+focused on user-visible changes and any privacy/security defaults.
 
 ## Commit and review
 

@@ -4,7 +4,8 @@
 
 | Version | Supported |
 | ------- | --------- |
-| 0.9.x   | yes       |
+| 0.10.x  | yes       |
+| 0.9.x   | security fixes only |
 | < 0.9   | no        |
 
 ## Reporting a vulnerability
@@ -49,7 +50,8 @@ ColdTrail is privacy-first by default:
 - **No telemetry.** No analytics, crash reporting, update checks, or hidden
   network calls. `doctor --offline` skips the only optional reachability probe.
 - **Local data only.** SQLite, WAL/SHM, and evidence blobs are created with
-  `0600`; evidence directories use `0700`. There is no cloud component.
+  `0600` under `umask(0o077)` (owner-only from creation, not after a chmod);
+  evidence directories use `0700`. There is no cloud component.
 - **Raw HTTP bodies are off by default.** `--raw` opts in for replay and
   contract recording. The local HTTP cache can be disabled with `--no-cache`.
 - **Avatar hashing is off by default.** `--avatar-hash` (or
@@ -87,4 +89,31 @@ third-party content, so prune them.
   expansion.
 - Breach lookups are metadata-only; Pwned Passwords uses k-anonymity and never
   sends or logs the password or full hash.
-- Evidence blobs are content-addressed (SHA-256) and verified on demand.
+- Evidence blobs are content-addressed (SHA-256), path-validated, and verified
+  on demand.
+- Redirects are re-validated: a public URL may not redirect into loopback,
+  link-local, `.local`, or a literal private address unless
+  `--allow-private-targets` is set.
+- `/healthz` and `/api/health` return a fixed `database unavailable` detail;
+  exception text is logged server-side, never returned to an unauthenticated
+  client.
+
+## Accepted limitations
+
+- **DNS rebinding / TOCTOU.** Host validation resolves a name once; the HTTP
+  client may resolve it again. Closing this needs a pinned-IP transport or a
+  resolver hook. Treat the web UI as an operator console and keep it on
+  loopback or behind an authenticating proxy.
+- **`resolve=False` in source probes.** Mastodon/Nostr/domain/avatar checks skip
+  DNS for the initial host so offline tests stay deterministic. The web layer
+  calls `ensure_public_target()` first; the CLI exposes
+  `--allow-private-targets` for authorized internal recon.
+- **Timezone inference is ambiguous by 24 hours.** Posting-hour analysis cannot
+  distinguish UTC+13 from UTC-11; the reported offset is a hint, not a fact.
+- **Correlation is O(n²).** A 482-source pivot evaluates ~116k pairs. This is a
+  performance property, not a correctness or security issue.
+- **Textual 8 compatibility.** The TUI source uses supported APIs; the test
+  suite still reads `Static.renderable`, which Textual 8 removed. Tracked in
+  Dependabot PR #15.
+- **No encryption at rest.** Use full-disk encryption on shared hosts; exports
+  support `--encrypt` (PBKDF2 + Fernet) for transport.

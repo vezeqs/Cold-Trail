@@ -1,17 +1,57 @@
 # ColdTrail
 
-**Local-first OSINT toolkit for usernames, emails, and public profiles.**
-Pivot across 482 sources, harvest profiles and posts into SQLite, correlate identities, and export
-evidence-grade dossiers — from a CLI, a TUI, or a local web UI.
+**Local-first OSINT for usernames, emails, and public profiles.** Pivot across 482 sources,
+harvest profiles and posts into SQLite, correlate identities, and export evidence-grade
+dossiers — from a CLI, a TUI, or a local web UI.
 
 [![CI](https://github.com/vezeqs/Cold-Trail/actions/workflows/ci.yml/badge.svg)](https://github.com/vezeqs/Cold-Trail/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Docs](https://img.shields.io/badge/docs-live-2ea44f.svg)](https://vezeqs.github.io/Cold-Trail/)
 
-![ColdTrail terminal demo](docs/assets/terminal-demo.gif)
+![Real coldtrail pivot output](docs/assets/cli-pivot.gif)
+
+*Real `coldtrail pivot octocat` output, captured by `scripts/capture_media.py`.
+`octocat` is a shared handle: the 19 hits below are public accounts with that
+name, not a claim that they belong to one person.*
+
+## The problem
+
+A username investigation usually starts as twenty browser tabs: a GitHub
+profile, a Reddit account, a Mastodon handle, a paste of search results, and a
+spreadsheet of "maybe the same person". Nothing is reproducible, the raw pages
+disappear, and the next analyst starts over.
+
+ColdTrail replaces the tabs with one local SQLite database and a repeatable
+command. Every probe is a stored check; every profile, post, link, cluster, and
+entity is queryable; every export is a file you can hash, redact, or hand to a
+reviewer.
+
+## What you get
+
+| Capability | Details |
+| --- | --- |
+| **Pivot** | 482 sources (50 curated + 432 declarative sites), handle/email variants, multi-hop expansion |
+| **Harvest** | Profiles, paginated posts, follow graphs, incremental cursors, profile-change history |
+| **Correlate** | Additive evidence scoring, calibrated confidence, Jaro-Winkler handle similarity, clusters |
+| **Investigate** | Domain/IP/phone, RDAP, DNS, crt.sh, TLS, BGP/ASN, Wayback, dorks, breach metadata |
+| **Evidence** | Content-addressed SHA-256 blobs, case dossiers, tags, notes, audit log |
+| **Export** | JSON, JSONL, CSV, GraphML, GEXF, DOT, HTML, Markdown, STIX 2.1, SARIF 2.1.0, Maltego |
+| **Automate** | `batch` (with `--jobs`), `watch`, `recluster`, `diff`, `--json` everywhere |
+| **Inspect** | `config` (effective settings + provenance), `schema` (JSON Schema contracts), `doctor` |
+| **Health** | `source health --live` records per-source status and latency; shown in the web UI |
+
+### Three interfaces, one database
+
+- **CLI** — scriptable Typer app with grouped help and JSON/JSONL output.
+- **TUI** — Textual console with dashboard, live pivot rows, browse/search, cases, tools.
+- **Web** — FastAPI app with JSON API, SSE-streamed pivots, interactive identity graph,
+  OSINT workbench, run diffing, case dossiers, evidence downloads, optional auth.
 
 ![ColdTrail web dashboard](docs/assets/web-dashboard.png)
+
+*The dashboard after the live `octocat` pivot: 40 checks, 20 profiles, 17
+correlation links, 1 cluster, and per-source health.*
 
 ## Quickstart
 
@@ -42,6 +82,61 @@ export COMPANIES_HOUSE_API_KEY=...
 export OPENSANCTIONS_API_KEY=...
 ```
 
+## Proof from a real run
+
+These are not mockups. `scripts/capture_media.py` starts the web UI against a
+real pivot database, drives Chromium, and writes the GIFs/PNGs plus a manifest
+of their hashes.
+
+### Live pivot streaming
+
+![Live pivot streaming over SSE](docs/assets/web-pivot.gif)
+
+*`POST /pivot` returns a job immediately; `/api/jobs/{id}/stream` replays each
+check as an SSE event while the page fills in.*
+
+### Run detail and identity graph
+
+![Run detail with interactive identity graph](docs/assets/web-run.png)
+
+![Identity graph settling](docs/assets/web-graph.gif)
+
+*Profile nodes, extracted-entity nodes, and correlation edges. The canvas runs
+a force simulation; nodes are draggable and the graph is clickable.*
+
+### Run diff
+
+![Run diff page](docs/assets/web-diff.png)
+
+*`coldtrail diff A B` and `/diff` compare profiles, entities, links, clusters,
+and posts. `--format html` / `?format=html` produces a self-contained dossier.*
+
+### Terminal capture
+
+![Real CLI pivot table](docs/assets/cli-pivot.png)
+
+*The same run in the terminal. `--all-checks` shows the blocked and not-found
+checks; the default view hides them.*
+
+## CLI at a glance
+
+```bash
+uv run coldtrail --help
+uv run coldtrail config --json                    # effective settings + source
+uv run coldtrail schema pivot > pivot.schema.json # validate --json output
+uv run coldtrail pivot alice --json
+uv run coldtrail harvest alice -s github --incremental
+uv run coldtrail diff 3 4 --format html -o diff.html
+uv run coldtrail export 3 --format sarif -o findings.sarif
+uv run coldtrail export 3 --format stix -o bundle.json
+uv run coldtrail serve --token "$(openssl rand -hex 24)"   # shared-token auth
+```
+
+`coldtrail config` is the answer to "why is it using that database / timeout /
+proxy?" It reports each value, its source (`default`, `config`, `env`, `flag`),
+and redacts every secret. `coldtrail schema` publishes the contracts for the
+`pivot`, `run`, `diff`, `sources`, `doctor`, `config`, and `stats` payloads.
+
 ## Who it's for
 
 - **Journalists and researchers** who need a reproducible trail from a handle or email.
@@ -51,34 +146,10 @@ export OPENSANCTIONS_API_KEY=...
 
 Use it only for authorized research, public data, and lawful scope.
 
-## What you get
-
-| Capability | Details |
-| --- | --- |
-| **Pivot** | 482 sources (50 curated sources + 432 declarative sites), handle/email variants, multi-hop expansion |
-| **Harvest** | Profiles, paginated posts, follow graphs, incremental cursors, profile-change history |
-| **Correlate** | Additive scoring, calibrated confidence, Jaro-Winkler handle similarity, clusters |
-| **Investigate** | Domain/IP/phone, RDAP, DNS, crt.sh, TLS, BGP/ASN, Wayback, dorks, breach metadata |
-| **Collect evidence** | Content-addressed SHA-256 blobs, case dossiers, tags, notes, audit log |
-| **Export** | JSON, JSONL, CSV, GraphML, GEXF, DOT, HTML, Markdown, STIX 2.1, Maltego |
-| **Automate** | `batch` (with `--jobs`), `watch`, `recluster`, `diff`, JSON output everywhere |
-| **Health** | `source health --live` records per-source status and latency; shown in the web UI |
-
-### Three interfaces, one database
-
-- **CLI** — scriptable Typer app with grouped help and JSON/JSONL output.
-- **TUI** — Textual console with dashboard, live pivot rows, browse/search, cases, tools.
-- **Web** — FastAPI app with JSON API, SSE-streamed pivots, interactive identity graph,
-  OSINT workbench, run diffing, case dossiers, evidence downloads, optional auth.
-
-```bash
-uv run coldtrail --help
-uv run coldtrail serve --token "$(openssl rand -hex 24)"   # shared-token auth
-```
-
 ## How it compares
 
-Based on public documentation, not a benchmark. Check each upstream project for current features.
+Based on public documentation, not a benchmark. Check each upstream project for
+current features.
 
 | | ColdTrail | Sherlock | Maigret | theHarvester | SpiderFoot | Maltego |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -89,14 +160,14 @@ Based on public documentation, not a benchmark. Check each upstream project for 
 | Evidence store | yes (SHA-256) | no | no | no | partial | commercial |
 | Built-in TUI | yes | no | no | no | no | no |
 | Local web UI | yes | no | no | no | yes | desktop app |
-| STIX/Maltego export | yes | no | partial | no | partial | yes |
+| STIX/SARIF export | yes | no | partial | no | partial | yes |
 | Privacy-first defaults | yes | n/a | n/a | n/a | partial | commercial |
 | License | MIT | MIT | MIT | GPL | MIT | commercial |
 
 ## Performance
 
-Network-bound and source-dependent; these are the design targets and historical measurements
-from the 0.5.2 release notes on a laptop:
+Network-bound and source-dependent; these are design targets and historical
+measurements from the 0.5.2 release notes on a laptop:
 
 | Scenario | Cold | Warm cache |
 | --- | --- | --- |
@@ -110,6 +181,10 @@ time uv run coldtrail pivot alice --web --no-save
 time uv run coldtrail pivot alice --no-save          # warm cache
 ```
 
+The 2026-10-30 audit run of `pivot octocat` (curated sources) completed 40
+checks with 19 found, 10 blocked, and 11 not found. Blocked sources are reported
+as blocked, not silently dropped.
+
 ## Privacy first
 
 ColdTrail is designed to keep investigations on your machine.
@@ -117,8 +192,9 @@ ColdTrail is designed to keep investigations on your machine.
 - **No telemetry.** No analytics, crash reporting, update checks, or phone-home. The only
   outbound requests are the sources and tools you explicitly run. `doctor --offline` skips
   even its reachability probe.
-- **Local storage, owner-only.** SQLite, WAL/SHM, and evidence blobs are created `0600`;
-  evidence directories are `0700`. There is no cloud backend.
+- **Local storage, owner-only from creation.** The SQLite file, WAL/SHM, and evidence blobs
+  are created `0600` under `umask(0o077)`; evidence directories are `0700`. There is no cloud
+  backend.
 - **Raw bodies are opt-in.** Normal runs do not retain raw HTTP responses. Use `--raw` only
   when you need replay or contract fixtures.
 - **No third-party images by default.** Avatar hashing (`--avatar-hash`) downloads profile
@@ -128,9 +204,12 @@ ColdTrail is designed to keep investigations on your machine.
   use auth headers; Shodan's key is sent over TLS and redacted locally.
 - **Tor without DNS leaks.** `--tor` uses `socks5h://127.0.0.1:9050` (remote DNS).
   `--proxy` supports HTTP/SOCKS proxies.
+- **Redirects are re-validated.** A public URL may not redirect into loopback, link-local,
+  `.local`, or a literal private address unless `--allow-private-targets` is explicit.
 - **Web UI is local and locked down.** Binds `127.0.0.1`; non-loopback binds require
   `--token` (or an explicit `--allow-unauthenticated`); cookies are HMAC-derived; CSP,
   `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, and no third-party assets.
+  `/healthz` returns a fixed `database unavailable` detail, never exception text.
 - **Redaction and encryption.** Exports support `--redact`; encrypted exports use
   PBKDF2 + Fernet.
 - **Retention.** `--retention-days N` or `prune --days N` removes old runs, raw/cache rows,
@@ -142,6 +221,31 @@ ColdTrail is designed to keep investigations on your machine.
 database is not encrypted at rest by default, so use full-disk encryption on shared
 machines. `--raw` and the local HTTP cache can retain third-party content. See
 [SECURITY.md](SECURITY.md) and the [privacy page](docs/privacy.html).
+
+## Limits and honest caveats
+
+- **Public data only.** ColdTrail does not log in, bypass paywalls, or scrape
+  private content. Sources that require auth or block non-browser clients are
+  reported as `blocked`.
+- **Coverage varies by platform.** A 200 page is not proof of a profile; the
+  declarative engine rejects challenge, landing, consent, and not-found titles,
+  but platforms change markup without notice. Contract fixtures catch drift for
+  the curated sources.
+- **Correlation is probabilistic.** Additive evidence is not proof of identity.
+  Shared handles, default avatars, and boilerplate bios produce false positives;
+  read the reasons, not just the score. `octocat` in this README is a shared
+  handle used to demonstrate the mechanics.
+- **Timezone inference is ambiguous.** Posting-hour analysis cannot distinguish
+  UTC+13 from UTC-11; the value is a hint.
+- **DNS rebinding is a known TOCTOU.** Host validation resolves once; a pinned-IP
+  transport is future work. Keep the web UI on loopback or behind an
+  authenticating proxy.
+- **Correlation is O(n²).** A full 482-source pivot evaluates ~116k pairs; network
+  time still dominates.
+- **The TUI test suite is pinned to Textual 2.x.** Dependabot PR #15 (Textual 8)
+  is blocked on the `Static.renderable` test helper.
+- **No encryption at rest by default.** Use full-disk encryption or `--encrypt`
+  for transport.
 
 ## External tools
 
@@ -167,6 +271,30 @@ uv run coldtrail ingest spiderfoot.json        # auto-detect format
 
 Every runner uses an argument vector (never a shell) and rejects option-like targets.
 
+## Verify these claims
+
+```bash
+uv run pytest                       # offline suite (respx/TestClient/Textual pilot)
+uv run pytest --cov=coldtrail       # coverage floor: 73%
+uv run ruff check . && uv run ruff format --check .
+uv run mypy                         # typed core + store gate
+uv run coldtrail doctor --offline
+uv run coldtrail config --json
+uv run coldtrail schema --list
+uv run coldtrail source verify -s github   # replay a recorded contract offline
+```
+
+Regenerate the README media (needs network for the live pivot and Playwright's
+Chromium):
+
+```bash
+uv run --with playwright python scripts/capture_media.py
+uv run pytest tests/test_media_manifest.py
+```
+
+`tests/test_media_manifest.py` fails when the images, their hashes, or the UI
+code they show fall out of sync.
+
 ## Documentation
 
 - **Site:** [docs/index.html](docs/index.html) (GitHub Pages after launch)
@@ -176,7 +304,7 @@ Every runner uses an argument vector (never a shell) and rejects option-like tar
 - **Privacy:** [docs/privacy.html](docs/privacy.html)
 - **Security policy:** [SECURITY.md](SECURITY.md)
 - **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md)
-- **Launch checklist:** [LAUNCH.md](LAUNCH.md)
+- **Audit record:** [AUDIT.md](AUDIT.md)
 - **Changelog:** [CHANGELOG.md](CHANGELOG.md)
 
 ## Safety and legal
@@ -193,29 +321,20 @@ applicable law, platform terms, and scope authorization.
 - Privacy guarantees and their limits are documented in **Privacy first** above and in
   [SECURITY.md](SECURITY.md).
 
-## Verification
-
-```bash
-uv run pytest                  # 521 tests, no network (respx/TestClient/Textual pilot)
-uv run pytest --cov=coldtrail  # coverage (73% floor)
-uv run ruff check .
-uv run ruff format --check .
-uv run mypy                    # typed core + store gate
-uv run coldtrail doctor --offline
-```
-
 ## Development
 
 Python 3.11+, `uv`, `src/` layout. Tests never hit the network; source contracts replay
 recorded fixtures. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and
-[AGENTS.md](AGENTS.md) for architecture and invariants.
+[AGENTS.md](AGENTS.md) for architecture, invariants, and sharp edges.
 
 ```
 src/coldtrail/
   cli/  tui/  web/  store/  sources/
   pivot.py  harvest.py  correlate.py  report.py  http.py  evidence.py
+  schemas.py  config.py  casework.py
 tests/   offline suite + contract fixtures
-docs/    GitHub Pages site (sitemap, robots, privacy, comparison)
+docs/    GitHub Pages site + generated proof media
+scripts/ capture_media.py, build_sites.py
 ```
 
 ## License

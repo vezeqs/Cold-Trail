@@ -66,7 +66,7 @@
         </article>
         <article class="card">
           <h3>Local, owner-only storage</h3>
-          <p>SQLite, WAL/SHM, and evidence blobs are created <code>0600</code>; evidence directories are <code>0700</code>. There is no cloud component.</p>
+          <p>SQLite, WAL/SHM, and evidence blobs are created <code>0600</code> under <code>umask(0o077)</code> — owner-only from creation, not after a chmod. Evidence directories are <code>0700</code>. There is no cloud component.</p>
         </article>
         <article class="card">
           <h3>Raw bodies opt-in</h3>
@@ -82,7 +82,8 @@
         </article>
         <article class="card">
           <h3>Tor without DNS leaks</h3>
-          <p><code>--tor</code> uses <code>socks5h://127.0.0.1:9050</code> so DNS resolves through the proxy. <code>--proxy</code> supports HTTP/SOCKS.</p>
+          <p><code>--tor</code> uses <code>socks5h://127.0.0.1:9050</code> so DNS resolves through the proxy. <code>--proxy</code> supports HTTP/SOCKS. Proxy credentials are redacted from <code>doctor</code> and the audit log.</p>
+          <p>Redirects are re-validated: a public URL cannot redirect into loopback, link-local, <code>.local</code>, or a literal private address unless private targets are explicitly allowed.</p>
         </article>
         <article class="card">
           <h3>Locked-down web UI</h3>

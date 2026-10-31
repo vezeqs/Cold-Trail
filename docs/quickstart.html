@@ -128,8 +128,16 @@ uv run coldtrail harvest alice -s reddit -n 200 --incremental
 # Follow graph (Bluesky, Mastodon, GitHub)
 uv run coldtrail graph alice -s bluesky
 
-# Compare two runs
+# Compare two runs (table, JSON, or a shareable HTML dossier)
 uv run coldtrail diff 3 4
+uv run coldtrail diff 3 4 --format html -o diff.html
+
+# Inspect effective configuration and the JSON contracts
+uv run coldtrail config --json
+uv run coldtrail schema --list
+
+# CI-friendly findings
+uv run coldtrail export 3 --format sarif -o findings.sarif
 
 # Re-correlate stored profiles
 uv run coldtrail recluster --run 3
